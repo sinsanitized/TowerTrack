@@ -1,0 +1,2 @@
+customer_name,account_number,building_name,street_address,city,state,postal_code,route_zone,system_name,job_number,rule_profile_id,last_legionella_sample,date_source,assigned_technician_email
+Fictional Example,FX-999,Sample Building,10 Example Street,New York,NY,10001,MIDTOWN EAST,CT-1,JOB-999,nyc-2026,2026-06-15,IMPORTED_CSV,tech1@towertrack.local

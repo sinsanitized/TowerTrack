@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test output
+playwright-report/
+test-results/
+coverage/
+
+# Runtime files
+uploads/*
+!uploads/.gitkeep
+
+backups/*
+!backups/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating system/editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal

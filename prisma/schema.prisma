@@ -1,0 +1,747 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATIONS_MANAGER
+  SCHEDULER
+  TECHNICIAN
+  READ_ONLY
+}
+
+enum JurisdictionMode {
+  NYC_CHAPTER_8_2026_PLUS_NYS_PART_4
+  NYS_PART_4_ONLY
+  OUT_OF_STATE_COMPANY_POLICY
+  OUT_OF_STATE_GUIDANCE
+  PENDING_REGULATION
+  CUSTOM_JURISDICTION
+}
+
+enum SourceAuthority {
+  REGULATORY
+  GUIDANCE
+  COMPANY_POLICY
+  CONTRACT_REQUIREMENT
+  PENDING_REGULATION
+  UNKNOWN_REQUIRES_REVIEW
+}
+
+enum OperatingStatus {
+  OPERATING
+  PARTIALLY_OPERATING
+  STARTING_UP
+  FULLY_SHUT_DOWN
+  SEASONALLY_INACTIVE
+  DECOMMISSIONED
+  UNKNOWN
+}
+
+enum RequirementStatus {
+  FUTURE
+  READY_TO_SCHEDULE
+  SCHEDULED_PENDING
+  COMPLETED
+  DUE_SOON
+  DUE_TODAY
+  OVERDUE
+  SUSPENDED
+  NOT_APPLICABLE
+  REQUIRES_REVIEW
+  WAITING_ON_LAB
+  WAITING_ON_THIRD_PARTY
+  OWNER_FOLLOW_UP
+}
+
+enum ColorCategory {
+  GREEN
+  YELLOW
+  RED
+  BLUE
+  GRAY
+  PURPLE
+}
+
+enum VisitStatus {
+  DRAFT
+  PLANNED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  MISSED
+  VOIDED
+  DUPLICATE
+  REPLACED
+}
+
+enum ActivityStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+  VOIDED
+}
+
+enum ActivityType {
+  ROUTINE_LEGIONELLA_SAMPLE
+  STARTUP_LEGIONELLA_SAMPLE
+  POST_HYPERHALOGENATION_SAMPLE
+  CORRECTIVE_RETEST
+  EMERGENCY_SAMPLE
+  ROUTINE_BACTERIOLOGICAL_SAMPLE
+  WATER_QUALITY_MONITORING
+  COMPLIANCE_INSPECTION
+  ROUTINE_CLEANING
+  STARTUP_CLEANING
+  CLEANING
+  DISINFECTION
+  CLEANING_AND_DISINFECTION
+  SUMMERTIME_HYPERHALOGENATION
+  CORRECTIVE_DISINFECTION
+  FULL_REMEDIATION
+  STARTUP
+  SHUTDOWN
+  NO_CIRCULATION_EVENT
+  PORTAL_SUBMISSION
+  LAB_RESULT
+  OWNER_NOTIFICATION
+  OTHER
+}
+
+enum TaskOwnership {
+  INTERNAL
+  OWNER_FOLLOW_UP
+  WAITING_ON_LAB
+  WAITING_ON_THIRD_PARTY
+  NEEDS_REVIEW
+}
+
+enum DateSource {
+  USER_ENTRY
+  FIELD_REPORT
+  LAB_REPORT
+  CHAIN_OF_CUSTODY
+  PORTAL_CONFIRMATION
+  IMPORTED_CSV
+  CORRECTION
+  UNKNOWN
+}
+
+enum PendingStatus {
+  RUMORED
+  PROPOSED
+  PASSED_NOT_EFFECTIVE
+  AWAITING_RULEMAKING
+  FINAL_RULE_PENDING_EFFECTIVE_DATE
+  ACTIVE_REQUIRES_RULE_PROFILE_CONVERSION
+  REJECTED_OR_EXPIRED
+  UNKNOWN_REQUIRES_REVIEW
+}
+
+enum ServiceEventType {
+  ROUTINE_LEGIONELLA_SAMPLE_COLLECTED
+  LEGIONELLA_RESULT_RECEIVED
+  QUARTERLY_INSPECTION_COMPLETED
+  STARTUP
+  SHUTDOWN
+  STARTUP_CLEANING_DISINFECTION
+  SUMMERTIME_HYPERHALOGENATION
+  HIGH_LEGIONELLA_DISINFECTION
+  FULL_REMEDIATION
+  POWER_FAILURE
+  BIOCIDE_LOSS
+  CONDUCTIVITY_CONTROL_FAILURE
+  DOH_DIRECTED_SAMPLE
+  OTHER_DOH_CONDITION
+  MANUAL_RISK_EVENT
+  WEEKLY_BIOLOGICAL_INDICATOR_RESULT
+  CLEANING_COMPLETED
+  REPORT_SUBMITTED
+}
+
+enum ServiceEventStatus {
+  ACTIVE
+  VOIDED
+  CORRECTED
+}
+
+enum ObligationStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  OVERDUE
+  MISSED
+  CANCELED
+  SUPERSEDED
+}
+
+enum ObligationPriority {
+  ROUTINE
+  WARNING
+  CRITICAL
+  EMERGENCY
+}
+
+enum LegionellaLevel {
+  LEVEL_1
+  LEVEL_2
+  LEVEL_3
+  LEVEL_4
+}
+
+enum ComplianceRisk {
+  GOOD
+  UPCOMING
+  WARNING
+  CRITICAL
+  OVERDUE
+  REVIEW
+  INACTIVE
+}
+
+model Organization {
+  id        String     @id @default(cuid())
+  name      String
+  users     User[]
+  customers Customer[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model User {
+  id              String               @id @default(cuid())
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  name            String
+  email           String               @unique
+  passwordHash    String
+  role            UserRole             @default(SCHEDULER)
+  active          Boolean              @default(true)
+  assignedSystems CoolingTowerSystem[] @relation("AssignedTechnician")
+  visits          Visit[]              @relation("AssignedVisitTechnician")
+  createdVisits   Visit[]              @relation("VisitCreator")
+  routes          Route[]
+  serviceEvents   ServiceEvent[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model Customer {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  accountNumber  String       @unique
+  contacts       Json?
+  notes          String?
+  active         Boolean      @default(true)
+  buildings      Building[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+}
+
+model Building {
+  id                  String               @id @default(cuid())
+  customerId          String
+  customer            Customer             @relation(fields: [customerId], references: [id])
+  buildingName        String
+  streetAddress       String
+  addressLine2        String?
+  city                String
+  state               String
+  postalCode          String
+  borough             String?
+  county              String?
+  municipality        String?
+  country             String               @default("US")
+  latitude            Float?
+  longitude           Float?
+  routeZone           String
+  accessNotes         String?
+  parkingNotes        String?
+  securityNotes       String?
+  defaultVisitMinutes Int                  @default(60)
+  active              Boolean              @default(true)
+  systems             CoolingTowerSystem[]
+  visits              Visit[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+}
+
+model Jurisdiction {
+  id           String               @id @default(cuid())
+  country      String               @default("US")
+  state        String
+  county       String?
+  city         String?
+  municipality String?
+  notes        String?
+  ruleProfiles RuleProfile[]
+  systems      CoolingTowerSystem[]
+  pending      PendingRegulation[]
+}
+
+model RuleProfile {
+  id                         String               @id
+  name                       String
+  jurisdictionMode           JurisdictionMode
+  jurisdictionId             String?
+  jurisdiction               Jurisdiction?        @relation(fields: [jurisdictionId], references: [id])
+  effectiveStartDate         DateTime?            @db.Date
+  effectiveEndDate           DateTime?            @db.Date
+  description                String
+  isDefault                  Boolean              @default(false)
+  active                     Boolean              @default(true)
+  legionellaIntervalDays     Int?
+  internalTargetIntervalDays Int?
+  appliesToPartialOperation  Boolean              @default(true)
+  rules                      RuleDefinition[]
+  systems                    CoolingTowerSystem[]
+  activities                 VisitActivity[]
+  requirements               Requirement[]
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+}
+
+model RuleDefinition {
+  id                            String          @id
+  revision                      Int             @default(1)
+  ruleProfileId                 String
+  ruleProfile                   RuleProfile     @relation(fields: [ruleProfileId], references: [id])
+  requirementType               String
+  ruleName                      String
+  sourceAuthority               SourceAuthority
+  sourceCitation                String
+  isRegulatoryRequirement       Boolean         @default(false)
+  isGuidanceRequirement         Boolean         @default(false)
+  isCompanyPolicy               Boolean         @default(false)
+  isContractRequirement         Boolean         @default(false)
+  isPendingRegulation           Boolean         @default(false)
+  frequencyDays                 Int?
+  minimumDaysAfterTrigger       Int?
+  maximumDaysAfterTrigger       Int?
+  dueDateCalculation            String
+  appliesWhenOperating          Boolean         @default(true)
+  appliesWhenPartiallyOperating Boolean         @default(true)
+  appliesWhenSeasonal           Boolean         @default(true)
+  appliesWhenShutdown           Boolean         @default(false)
+  triggerActivityType           ActivityType?
+  createsFollowUpRequirement    Boolean         @default(false)
+  followUpRequirementType       String?
+  warningDays                   Int             @default(7)
+  criticalDays                  Int             @default(3)
+  enabled                       Boolean         @default(true)
+  notes                         String?
+  activities                    VisitActivity[]
+  requirements                  Requirement[]
+  createdAt                     DateTime        @default(now())
+  updatedAt                     DateTime        @updatedAt
+}
+
+model PendingRegulation {
+  id                    String               @id @default(cuid())
+  jurisdictionId        String
+  jurisdiction          Jurisdiction         @relation(fields: [jurisdictionId], references: [id])
+  expectedRuleName      String
+  expectedAuthority     String
+  expectedEffectiveDate DateTime?            @db.Date
+  monitoringNotes       String
+  lastReviewedDate      DateTime             @db.Date
+  nextReviewDate        DateTime             @db.Date
+  sourceUrl             String?
+  status                PendingStatus
+  systems               CoolingTowerSystem[]
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+}
+
+model CoolingTowerSystem {
+  id                     String                  @id @default(cuid())
+  buildingId             String
+  building               Building                @relation(fields: [buildingId], references: [id])
+  jurisdictionId         String
+  jurisdiction           Jurisdiction            @relation(fields: [jurisdictionId], references: [id])
+  ruleProfileId          String
+  ruleProfile            RuleProfile             @relation(fields: [ruleProfileId], references: [id])
+  pendingRegulationId    String?
+  pendingRegulation      PendingRegulation?      @relation(fields: [pendingRegulationId], references: [id])
+  internalJobNumber      String                  @unique
+  systemName             String
+  manufacturer           String?
+  modelNumber            String?
+  serialNumber           String?
+  towerLocation          String?
+  tonnage                Float?
+  NYCSystemId            String?
+  NYSSystemId            String?
+  registrationNumber     String?
+  operationPeriodType    String                  @default("YEAR_ROUND")
+  operatingStatus        OperatingStatus         @default(OPERATING)
+  seasonal               Boolean                 @default(false)
+  seasonStartMonth       Int                     @default(5)
+  seasonStartDay         Int                     @default(1)
+  seasonEndMonth         Int                     @default(10)
+  seasonEndDay           Int                     @default(31)
+  actualStartupDate      DateTime?               @db.Date
+  actualShutdownDate     DateTime?               @db.Date
+  preferredTargetDay     Int?
+  monthlyTargetStartDay  Int                     @default(15)
+  monthlyTargetEndDay    Int                     @default(22)
+  preferredWeekOfMonth   Int?
+  preferredDayOfWeek     Int?
+  routeZoneOverride      String?
+  assignedTechnicianId   String?
+  assignedTechnician     User?                   @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  warningDays            Int                     @default(7)
+  planningHorizonDays    Int                     @default(21)
+  mppVersion             String?
+  qualifiedPerson        String?
+  laboratory             String?
+  notes                  String?
+  active                 Boolean                 @default(true)
+  activities             VisitActivity[]
+  requirements           Requirement[]
+  correctiveCases        CorrectiveActionCase[]
+  operatingPeriods       OperatingPeriod[]
+  serviceEvents          ServiceEvent[]
+  sampleObligations      SampleObligation[]
+  inspectionObligations  InspectionObligation[]
+  reportingObligations   ReportingObligation[]
+  maintenanceObligations MaintenanceObligation[]
+  labResults             LabResult[]
+  complianceStatus       ComplianceStatus?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  deletedAt              DateTime?
+}
+
+model OperatingPeriod {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  startDate            DateTime           @db.Date
+  endDate              DateTime?          @db.Date
+  startupEventId       String?            @unique
+  shutdownEventId      String?            @unique
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([coolingTowerSystemId, startDate])
+}
+
+model ServiceEvent {
+  id                              String                  @id @default(cuid())
+  coolingTowerSystemId            String
+  coolingTowerSystem              CoolingTowerSystem      @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  eventType                       ServiceEventType
+  eventDate                       DateTime                @db.Date
+  eventTimestamp                  DateTime?
+  status                          ServiceEventStatus      @default(ACTIVE)
+  details                         Json?
+  notes                           String?
+  recordedById                    String
+  recordedBy                      User                    @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  correctedFromEventId            String?                 @unique
+  triggeredSampleObligations      SampleObligation[]      @relation("SampleTrigger")
+  completedSampleObligations      SampleObligation[]      @relation("SampleCompletion")
+  triggeredInspectionObligations  InspectionObligation[]  @relation("InspectionTrigger")
+  completedInspectionObligations  InspectionObligation[]  @relation("InspectionCompletion")
+  triggeredReportingObligations   ReportingObligation[]   @relation("ReportingTrigger")
+  completedReportingObligations   ReportingObligation[]   @relation("ReportingCompletion")
+  triggeredMaintenanceObligations MaintenanceObligation[] @relation("MaintenanceTrigger")
+  completedMaintenanceObligations MaintenanceObligation[] @relation("MaintenanceCompletion")
+  labResult                       LabResult?
+  labResultsForSample             LabResult[]             @relation("LabResultSample")
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+
+  @@index([coolingTowerSystemId, eventDate])
+  @@index([eventType, status])
+  @@index([recordedById])
+}
+
+model SampleObligation {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  triggerEventId       String
+  triggerEvent         ServiceEvent       @relation("SampleTrigger", fields: [triggerEventId], references: [id], onDelete: Cascade)
+  obligationType       String
+  earliestDueDate      DateTime?          @db.Date
+  targetStartDate      DateTime?          @db.Date
+  targetEndDate        DateTime?          @db.Date
+  latestDueDate        DateTime?          @db.Date
+  status               ObligationStatus   @default(PENDING)
+  priority             ObligationPriority @default(ROUTINE)
+  reason               String
+  ruleSetVersion       String
+  sourceCitation       String
+  completedByEventId   String?
+  completedByEvent     ServiceEvent?      @relation("SampleCompletion", fields: [completedByEventId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([coolingTowerSystemId, status, latestDueDate])
+  @@index([triggerEventId])
+}
+
+model InspectionObligation {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  triggerEventId       String
+  triggerEvent         ServiceEvent       @relation("InspectionTrigger", fields: [triggerEventId], references: [id], onDelete: Cascade)
+  earliestDueDate      DateTime?          @db.Date
+  targetStartDate      DateTime?          @db.Date
+  targetEndDate        DateTime?          @db.Date
+  latestDueDate        DateTime?          @db.Date
+  status               ObligationStatus   @default(PENDING)
+  priority             ObligationPriority @default(ROUTINE)
+  reason               String
+  ruleSetVersion       String
+  sourceCitation       String
+  completedByEventId   String?
+  completedByEvent     ServiceEvent?      @relation("InspectionCompletion", fields: [completedByEventId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([coolingTowerSystemId, status, latestDueDate])
+}
+
+model ReportingObligation {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  triggerEventId       String
+  triggerEvent         ServiceEvent       @relation("ReportingTrigger", fields: [triggerEventId], references: [id], onDelete: Cascade)
+  obligationType       String
+  earliestDueDate      DateTime?          @db.Date
+  targetStartDate      DateTime?          @db.Date
+  targetEndDate        DateTime?          @db.Date
+  latestDueDate        DateTime?          @db.Date
+  status               ObligationStatus   @default(PENDING)
+  priority             ObligationPriority @default(ROUTINE)
+  reason               String
+  ruleSetVersion       String
+  sourceCitation       String
+  completedByEventId   String?
+  completedByEvent     ServiceEvent?      @relation("ReportingCompletion", fields: [completedByEventId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([coolingTowerSystemId, status, latestDueDate])
+}
+
+model MaintenanceObligation {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  triggerEventId       String
+  triggerEvent         ServiceEvent       @relation("MaintenanceTrigger", fields: [triggerEventId], references: [id], onDelete: Cascade)
+  obligationType       String
+  earliestDueDate      DateTime?          @db.Date
+  targetStartDate      DateTime?          @db.Date
+  targetEndDate        DateTime?          @db.Date
+  latestDueDate        DateTime?          @db.Date
+  status               ObligationStatus   @default(PENDING)
+  priority             ObligationPriority @default(ROUTINE)
+  reason               String
+  ruleSetVersion       String
+  sourceCitation       String
+  completedByEventId   String?
+  completedByEvent     ServiceEvent?      @relation("MaintenanceCompletion", fields: [completedByEventId], references: [id], onDelete: SetNull)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([coolingTowerSystemId, status, latestDueDate])
+  @@index([triggerEventId])
+}
+
+model LabResult {
+  id                    String             @id @default(cuid())
+  coolingTowerSystemId  String
+  coolingTowerSystem    CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  sourceEventId         String             @unique
+  sourceEvent           ServiceEvent       @relation(fields: [sourceEventId], references: [id], onDelete: Cascade)
+  sampleEventId         String             @unique
+  sampleEvent           ServiceEvent       @relation("LabResultSample", fields: [sampleEventId], references: [id], onDelete: Restrict)
+  cfuPerMl              Float
+  level                 LegionellaLevel
+  receivedDate          DateTime           @db.Date
+  receivedAt            DateTime           @db.Date
+  parentResultId        String?
+  parentResult          LabResult?         @relation("RetestChain", fields: [parentResultId], references: [id], onDelete: SetNull)
+  childResults          LabResult[]        @relation("RetestChain")
+  correctiveActionDueAt DateTime?
+  remediationDueAt      DateTime?
+  chainClosed           Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([coolingTowerSystemId, receivedDate])
+}
+
+model ComplianceStatus {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String             @unique
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  risk                 ComplianceRisk
+  plainEnglishStatus   String
+  explanation          String
+  asOfDate             DateTime           @db.Date
+  updatedAt            DateTime           @updatedAt
+}
+
+model Visit {
+  id                   String          @id @default(cuid())
+  buildingId           String
+  building             Building        @relation(fields: [buildingId], references: [id])
+  scheduledDate        DateTime        @db.Date
+  scheduledStartTime   String?
+  performedDate        DateTime?       @db.Date
+  status               VisitStatus     @default(PLANNED)
+  assignedTechnicianId String?
+  assignedTechnician   User?           @relation("AssignedVisitTechnician", fields: [assignedTechnicianId], references: [id])
+  routeId              String?
+  route                Route?          @relation(fields: [routeId], references: [id])
+  routeSequence        Int?
+  estimatedMinutes     Int             @default(60)
+  actualMinutes        Int?
+  notes                String?
+  createdById          String
+  createdBy            User            @relation("VisitCreator", fields: [createdById], references: [id])
+  activities           VisitActivity[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+}
+
+model VisitActivity {
+  id                            String             @id @default(cuid())
+  visitId                       String
+  visit                         Visit              @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  coolingTowerSystemId          String
+  coolingTowerSystem            CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id])
+  activityType                  ActivityType
+  scheduledDate                 DateTime           @db.Date
+  performedDate                 DateTime?          @db.Date
+  status                        ActivityStatus     @default(PLANNED)
+  qualifiesForRoutineLegionella Boolean            @default(false)
+  qualifiesForInspection        Boolean            @default(false)
+  qualifiesForCleaning          Boolean            @default(false)
+  taskOwnershipLabel            TaskOwnership      @default(INTERNAL)
+  dateSource                    DateSource         @default(USER_ENTRY)
+  ruleProfileId                 String
+  ruleProfile                   RuleProfile        @relation(fields: [ruleProfileId], references: [id])
+  ruleDefinitionId              String?
+  ruleDefinition                RuleDefinition?    @relation(fields: [ruleDefinitionId], references: [id])
+  sourceAuthority               SourceAuthority
+  details                       Json?
+  completedRequirements         Requirement[]      @relation("CompletedBy")
+  scheduledRequirements         Requirement[]      @relation("ScheduledBy")
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+}
+
+model Requirement {
+  id                      String             @id @default(cuid())
+  coolingTowerSystemId    String
+  coolingTowerSystem      CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id])
+  requirementType         String
+  sourceRule              String
+  ruleSetVersion          String
+  ruleDefinitionId        String
+  ruleDefinition          RuleDefinition     @relation(fields: [ruleDefinitionId], references: [id])
+  ruleProfileId           String
+  ruleProfile             RuleProfile        @relation(fields: [ruleProfileId], references: [id])
+  sourceAuthority         SourceAuthority
+  sourceCitation          String
+  isRegulatoryRequirement Boolean            @default(false)
+  isGuidanceRequirement   Boolean            @default(false)
+  isCompanyPolicy         Boolean            @default(false)
+  isContractRequirement   Boolean            @default(false)
+  isPendingRegulation     Boolean            @default(false)
+  earliestAllowedDate     DateTime?          @db.Date
+  schedulingWindowStart   DateTime?          @db.Date
+  preferredDate           DateTime?          @db.Date
+  latestAllowedDate       DateTime?          @db.Date
+  hardDueDate             DateTime?          @db.Date
+  scheduledActivityId     String?
+  scheduledActivity       VisitActivity?     @relation("ScheduledBy", fields: [scheduledActivityId], references: [id])
+  completedActivityId     String?
+  completedActivity       VisitActivity?     @relation("CompletedBy", fields: [completedActivityId], references: [id])
+  taskOwnershipLabel      TaskOwnership      @default(INTERNAL)
+  status                  RequirementStatus
+  statusColorCategory     ColorCategory
+  explanation             String
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+}
+
+model CorrectiveActionCase {
+  id                   String             @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id])
+  resultValue          Float
+  severityLevel        String
+  openedAt             DateTime           @default(now())
+  status               String
+  notificationDeadline DateTime?
+  disinfectionDeadline DateTime?
+  remediationDeadline  DateTime?
+  retestWindowStart    DateTime?          @db.Date
+  retestWindowEnd      DateTime?          @db.Date
+  closedAt             DateTime?
+  closureReason        String?
+  sourceAuthority      SourceAuthority
+}
+
+model Route {
+  id           String   @id @default(cuid())
+  routeDate    DateTime @db.Date
+  technicianId String
+  technician   User     @relation(fields: [technicianId], references: [id])
+  name         String
+  status       String   @default("PLANNED")
+  notes        String?
+  visits       Visit[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AuditLog {
+  id                   String   @id @default(cuid())
+  entityType           String
+  entityId             String
+  action               String
+  previousValue        Json?
+  newValue             Json?
+  reason               String
+  changedById          String
+  changedBy            User     @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  changedAt            DateTime @default(now())
+  relatedReplacementId String?
+
+  @@index([changedById, changedAt])
+}
+
+model ReviewItem {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  entityType  String
+  entityId    String
+  severity    ColorCategory @default(PURPLE)
+  status      String        @default("OPEN")
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+}

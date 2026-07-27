@@ -1,0 +1,476 @@
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+test.describe.configure({ timeout: 240_000 });
+
+async function login(page: Page) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("admin@towertrack.local");
+  await page.getByLabel("Password").fill("ChangeMe123!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL("/");
+}
+
+async function createNycTower(page: Page, name: string) {
+  await page.getByRole("link", { name: "Customers" }).click();
+  const customerForm = page.locator("form").filter({
+    has: page.getByRole("button", {
+      name: "Continue to cooling tower details",
+    }),
+  });
+  await customerForm.getByLabel("Customer name").fill(name);
+  await customerForm.getByLabel("Street address").fill("410 Lifecycle Way");
+  await customerForm.getByLabel("City").fill("New York");
+  await customerForm.getByLabel("State").fill("NY");
+  await customerForm.getByLabel("ZIP code").fill("10001");
+  await customerForm
+    .getByRole("button", { name: "Continue to cooling tower details" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Add cooling tower details" }),
+  ).toBeVisible();
+  await page.getByLabel("Manufacturer (optional)").fill("Lifecycle Works");
+  await page.getByLabel("Model number").fill("LC-500");
+  await page.getByLabel("Serial number").fill(`SER-${Date.now()}`);
+  await page.getByLabel("Tower location").fill("Roof, mechanical penthouse");
+  await page.getByLabel("Tonnage").fill("500");
+  await page
+    .getByLabel("Jurisdiction", { exact: true })
+    .selectOption({ label: "New York, NY" });
+  await page
+    .getByLabel("Rule profile", { exact: true })
+    .selectOption({ label: "NYC Chapter 8 2026 + NYS Part 4" });
+  await page.getByRole("button", { name: "Create cooling tower" }).click();
+  await expect(page.getByText("Cooling tower created")).toBeVisible();
+  await expect(page.getByText("Baseline required").first()).toBeVisible();
+  return page.url().split("?")[0];
+}
+
+async function waitForNewEvent(page: Page, previousEvent: string | null) {
+  await page.waitForURL((url) => {
+    const event = url.searchParams.get("event");
+    return Boolean(event && event !== previousEvent);
+  });
+  await expect(
+    page.getByRole("heading", { name: "Record what happened" }),
+  ).toBeVisible();
+}
+
+async function saveRecorder(
+  page: Page,
+  configure: (form: Locator) => Promise<void>,
+) {
+  const previousEvent = new URL(page.url()).searchParams.get("event");
+  const form = page.locator("#record-event form");
+  await form.getByText("Add notes (optional)", { exact: true }).click();
+  await configure(form);
+  await form.getByRole("button", { name: "Save completed event" }).click();
+  await waitForNewEvent(page, previousEvent);
+}
+
+async function recordEvent(
+  page: Page,
+  button: string,
+  date: string,
+  notes: string,
+  configure?: (form: Locator) => Promise<void>,
+) {
+  const eventButton = page.getByRole("button", { name: button });
+  if (!(await eventButton.isVisible())) {
+    await page.getByText("More event types", { exact: true }).click();
+  }
+  await eventButton.click();
+  await saveRecorder(page, async (form) => {
+    await form.getByLabel("Event date").fill(date);
+    await form.getByLabel("Notes").fill(notes);
+    if (configure) await configure(form);
+  });
+}
+
+async function submitReport(page: Page, reportType: string, date: string) {
+  const form = page.locator(
+    `form:has(input[name="reportType"][value="${reportType}"])`,
+  );
+  await expect(form).toBeVisible();
+  await form.getByLabel("Submission date").fill(date);
+  await form
+    .getByRole("button", {
+      name:
+        reportType === "PORTAL_SAMPLE_DATE"
+          ? "Record NYC portal submission"
+          : "Record submission",
+    })
+    .click();
+  await expect(
+    page.locator(`form:has(input[name="reportType"][value="${reportType}"])`),
+  ).toHaveCount(0);
+}
+
+async function expandObligation(section: Locator, title: string) {
+  const card = section.locator("article").filter({ hasText: title }).first();
+  await card
+    .getByText("Required action, triggering event, and rule details", {
+      exact: true,
+    })
+    .click();
+}
+
+async function recordSampleAndPortal(
+  page: Page,
+  sampleDate: string,
+  submissionDate: string,
+) {
+  await recordEvent(
+    page,
+    "Add sample",
+    sampleDate,
+    "ELAP culture sample with signed chain of custody",
+  );
+  await expect(
+    page.getByRole("heading", {
+      name: "Submit this sample date to the NYC DOH portal",
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Record NYC portal submission" })
+    .click();
+  await submitReport(page, "PORTAL_SAMPLE_DATE", submissionDate);
+}
+
+test.beforeEach(async ({ page }) => {
+  await login(page);
+});
+
+test("new NYC tower completes an auditable lifecycle and one sample closes overlapping obligations", async ({
+  page,
+}) => {
+  const name = `Lifecycle Building ${Date.now()}`;
+  const systemUrl = await createNycTower(page, name);
+  await expect(
+    page.getByRole("button", { name: "Add lab result" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(/Add a Legionella sample before adding a laboratory result/),
+  ).toBeVisible();
+
+  await recordEvent(
+    page,
+    "Add cleaning",
+    "2026-07-01",
+    "Initial cleaning and disinfection before first operation",
+    async (form) => {
+      await form
+        .getByLabel("Cleaning type")
+        .selectOption("STARTUP_CLEANING_DISINFECTION");
+    },
+  );
+  await expect(page.getByText("Baseline required").first()).toBeVisible();
+  await expect(
+    page.getByText("No event-generated sample obligation is open."),
+  ).toBeVisible();
+
+  await recordEvent(
+    page,
+    "Add startup",
+    "2026-07-02",
+    "Commissioning startup after documented cleaning",
+  );
+  const samples = page
+    .locator("section:visible")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Open Legionella sampling obligations",
+      }),
+    })
+    .last();
+  await expect(samples.getByText("Startup sample").first()).toBeVisible();
+  await expandObligation(samples, "Startup sample");
+  await expect(samples.getByText(/Jul 5, 2026/).first()).toBeVisible();
+  await expect(samples.getByText(/Jul 16, 2026/).first()).toBeVisible();
+  await submitReport(page, "STARTUP_DOH_NOTIFICATION", "2026-07-03");
+
+  await recordSampleAndPortal(page, "2026-07-06", "2026-07-07");
+  await expect(
+    page.getByRole("button", { name: "Add lab result" }),
+  ).toBeEnabled();
+  const recordedSample = page
+    .locator("#regulatory-events article")
+    .filter({ hasText: "Routine legionella sample collected" })
+    .first();
+  await recordedSample.getByRole("link", { name: "Record lab result" }).click();
+  await expect(page).toHaveURL(/labSample=/);
+  await expect(
+    page.locator("#record-event").getByRole("heading", {
+      name: "Record Legionella result received",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.locator("#record-event").getByLabel("Sample tested"),
+  ).toHaveValue(/.+/);
+  await expect(samples.getByText("Startup sample")).toHaveCount(0);
+  await expect(
+    samples.getByText("Monthly Legionella sample").first(),
+  ).toBeVisible();
+  await expandObligation(samples, "Monthly Legionella sample");
+  await expect(samples.getByText(/Aug 6, 2026/).first()).toBeVisible();
+
+  await recordEvent(
+    page,
+    "Add inspection",
+    "2026-07-06",
+    "Qualified-person commissioning inspection",
+  );
+  await expect(page.getByText(/Oct 4, 2026/).first()).toBeVisible();
+
+  await page.getByText("More event types", { exact: true }).click();
+  await page
+    .getByRole("button", { name: "Add disinfection or remediation" })
+    .click();
+  const recorder = page.locator("#record-event");
+  await recorder.getByLabel("Event date").fill("2026-07-06");
+  await expect(
+    recorder.getByText(/weekend dates inside this window/),
+  ).toBeVisible();
+  await saveRecorder(page, async (form) => {
+    await form
+      .getByLabel("Notes")
+      .fill("Preventive disinfection with field treatment record");
+  });
+  await expandObligation(samples, "Post disinfection retest");
+  await expect(samples.getByText(/Jul 9, 2026/).first()).toBeVisible();
+
+  await page
+    .locator("#regulatory-events a")
+    .filter({ hasText: "High legionella disinfection" })
+    .filter({ hasText: "Jul 6, 2026" })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Correct event details" }),
+  ).toBeVisible();
+  await page.getByLabel("Event date").fill("2026-07-05");
+  await expect(page.getByLabel("Event date")).toHaveValue("2026-07-05");
+  await page
+    .getByLabel("Correction reason (required)")
+    .fill("Corrected against the signed treatment ticket");
+  await page.getByRole("button", { name: "Save corrected event" }).click();
+  await expect(page.getByText("Event correction saved")).toBeVisible();
+  await expect(samples.getByText(/Jul 8, 2026/).first()).toBeVisible();
+
+  await page
+    .locator("#regulatory-events a")
+    .filter({ hasText: "High legionella disinfection" })
+    .filter({ hasText: "Jul 5, 2026" })
+    .first()
+    .click();
+  await page
+    .getByLabel("Reason to void (required)")
+    .fill("Treatment was recorded against the wrong cooling tower");
+  await page.getByRole("button", { name: "Void event (audited)" }).click();
+  await expect(page.getByText(/Event voided/)).toBeVisible();
+  await expect(samples.getByText(/Jul 8, 2026/)).toHaveCount(0);
+
+  await recordEvent(
+    page,
+    "Add lab result",
+    "2026-07-10",
+    "Final ELAP report reviewed by the qualified person",
+    async (form) => {
+      await expect(form.getByLabel("Sample tested")).toBeVisible();
+      await expect(
+        form.getByLabel("Sample tested").locator("option:checked"),
+      ).toContainText("Monday 07/06/2026");
+      await form.getByLabel("Result (CFU/mL)").fill("250");
+    },
+  );
+  await expect(
+    page.getByText("Level 3 corrective action").first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Sample collected Mon, Jul 6, 2026/),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Legionella LEVEL 3 RETEST").first(),
+  ).toBeVisible();
+
+  await recordEvent(
+    page,
+    "Add disinfection or remediation",
+    "2026-07-11",
+    "Corrective biocide response to the Level 3 result",
+  );
+  await expect(page.getByText("Level 3 corrective action")).toHaveCount(0);
+  await expect(
+    samples.getByText("Post disinfection retest").first(),
+  ).toBeVisible();
+
+  await page.goto("/work/visit-opportunities");
+  const opportunity = page.locator("article").filter({ hasText: name });
+  await expect(
+    opportunity.getByText(/One visit can complete [2-9] obligations/),
+  ).toBeVisible();
+  await expect(opportunity.getByText("Schedule this visit")).toHaveCount(0);
+  await opportunity
+    .getByRole("link", { name: "Open tower & record work" })
+    .click();
+  await recordEvent(
+    page,
+    "Add sample",
+    "2026-07-18",
+    "Technician collected one sample covering every compatible open window",
+  );
+  await expect(samples.getByText("Post disinfection retest")).toHaveCount(0);
+  await expect(samples.getByText(/Aug 18, 2026/).first()).toBeVisible();
+  await expect(page.getByText("NYC portal follow-up").first()).toBeVisible();
+});
+
+test("a year-round tower keeps one rolling sample clock and closes historical portal follow-ups", async ({
+  page,
+}) => {
+  const name = `Year-Round Tower ${Date.now()}`;
+  await createNycTower(page, name);
+  const systemUrl = page.url().split("?")[0];
+  await recordEvent(
+    page,
+    "Add cleaning",
+    "2026-01-20",
+    "Startup cleaning before continuous year-round operation",
+    async (form) => {
+      await form
+        .getByLabel("Cleaning type")
+        .selectOption("STARTUP_CLEANING_DISINFECTION");
+    },
+  );
+  await recordEvent(
+    page,
+    "Add startup",
+    "2026-02-01",
+    "Start of continuous operation",
+  );
+  await submitReport(page, "STARTUP_DOH_NOTIFICATION", "2026-02-02");
+
+  for (const [sample, submitted] of [
+    ["2026-02-04", "2026-02-05"],
+    ["2026-03-07", "2026-03-08"],
+    ["2026-04-07", "2026-04-08"],
+    ["2026-05-08", "2026-05-09"],
+    ["2026-06-08", "2026-06-09"],
+    ["2026-07-09", "2026-07-10"],
+  ] as const) {
+    await recordSampleAndPortal(page, sample, submitted);
+  }
+
+  const samples = page
+    .locator("section:visible")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Open Legionella sampling obligations",
+      }),
+    })
+    .last();
+  await expect(samples.getByText("Monthly Legionella sample")).toHaveCount(1);
+  await expect(samples.getByText(/Aug 9, 2026/).first()).toBeVisible();
+  await expect(page.getByText("NYC portal follow-up")).toHaveCount(0);
+  await expect(page.getByText("Overdue obligation")).toHaveCount(0);
+
+  const cleaningPlanForm = page.locator("#cleaning-plan form");
+  await expect(
+    cleaningPlanForm.getByRole("button", {
+      name: "Create two-day cleaning plan",
+    }),
+  ).toBeVisible();
+  await expect(
+    cleaningPlanForm.locator('input[name="chemicalAddDate"]'),
+  ).toHaveValue("2026-07-20");
+  await expect(
+    cleaningPlanForm.locator('input[name="cleaningDate"]'),
+  ).toHaveValue("2026-07-21");
+  await cleaningPlanForm
+    .locator('select[name="technicianId"]')
+    .selectOption({ label: "Mike Torres" });
+  await cleaningPlanForm
+    .getByRole("button", { name: "Create two-day cleaning plan" })
+    .click();
+  await expect(page).toHaveURL(/\/visits\/[a-z0-9]+\?planned=1$/);
+  await expect(page.getByText("Two-day cleaning plan created")).toBeVisible();
+  await expect(page.getByText("Monday 07/20/2026")).toBeVisible();
+  await expect(page.getByText("Tuesday 07/21/2026")).toBeVisible();
+  await expect(page.getByText("Annual cleaning").first()).toBeVisible();
+
+  await page.goto(systemUrl);
+  await expect(page.getByText("Active cleaning plan")).toBeVisible();
+  await expect(
+    page.getByText(/annual cleaning obligation remains open/i),
+  ).toBeVisible();
+});
+
+test("a seasonal tower preserves its history but stops the routine clock after shutdown", async ({
+  page,
+}) => {
+  const name = `Seasonal Tower ${Date.now()}`;
+  await createNycTower(page, name);
+  const seasonalForm = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Save operation pattern" }),
+  });
+  await seasonalForm.getByRole("radio", { name: /^Seasonal Tower/ }).check();
+  await seasonalForm.getByLabel("Season start month").selectOption("1");
+  await seasonalForm.getByLabel("Season start day").fill("1");
+  await seasonalForm.getByLabel("Season end month").selectOption("6");
+  await seasonalForm.getByLabel("Season end day").fill("30");
+  await seasonalForm
+    .getByLabel("Reason for change")
+    .fill("Document January through June seasonal operation");
+  await seasonalForm
+    .getByRole("button", { name: "Save operation pattern" })
+    .click();
+  await expect(
+    page.getByText("Seasonal Tower · Jan 1–Jun 30").first(),
+  ).toBeVisible();
+
+  await recordEvent(
+    page,
+    "Add cleaning",
+    "2025-12-20",
+    "Pre-startup seasonal cleaning and disinfection",
+    async (form) => {
+      await form
+        .getByLabel("Cleaning type")
+        .selectOption("STARTUP_CLEANING_DISINFECTION");
+    },
+  );
+  await recordEvent(page, "Add startup", "2026-01-01", "Seasonal startup");
+  await submitReport(page, "STARTUP_DOH_NOTIFICATION", "2026-01-02");
+  for (const [sample, submitted] of [
+    ["2026-01-04", "2026-01-05"],
+    ["2026-02-04", "2026-02-05"],
+    ["2026-03-07", "2026-03-08"],
+    ["2026-04-07", "2026-04-08"],
+    ["2026-05-08", "2026-05-09"],
+    ["2026-06-08", "2026-06-09"],
+  ] as const) {
+    await recordSampleAndPortal(page, sample, submitted);
+  }
+  await recordEvent(
+    page,
+    "Add shutdown",
+    "2026-06-30",
+    "Tower fully drained for the end of its operating season",
+  );
+  await submitReport(page, "SHUTDOWN_DOH_NOTIFICATION", "2026-07-01");
+
+  const samples = page
+    .locator("section:visible")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Open Legionella sampling obligations",
+      }),
+    })
+    .last();
+  await expect(samples.getByText("Monthly Legionella sample")).toHaveCount(0);
+  await expect(page.getByText("Inactive").first()).toBeVisible();
+  await expect(
+    page
+      .locator("#regulatory-events")
+      .getByText("Routine legionella sample collected"),
+  ).toHaveCount(6);
+  await expect(page.getByText("No open summertime requirement")).toBeVisible();
+});
