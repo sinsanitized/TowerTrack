@@ -2,6 +2,10 @@ import { Download, Upload } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { SourceBadge } from "@/components/source-badge";
 import {
+  createRuleDefinitionAction,
+  createUserAction,
+  setUserActiveAction,
+  updateUserRoleAction,
   updateRuleDefinitionAction,
   updateRuleProfileAction,
 } from "@/app/actions";
@@ -19,7 +23,26 @@ const authorities = [
   "PENDING_REGULATION",
   "UNKNOWN_REQUIRES_REVIEW",
 ] as const;
+const requirementTypes = [
+  "ROUTINE_LEGIONELLA_SAMPLE",
+  "COMPLIANCE_INSPECTION",
+  "PORTAL_SAMPLE_DATE",
+  "SUMMERTIME_HYPERHALOGENATION",
+] as const;
 const nycRuleDisplay = nycRuleDisplayValues();
+const userRoles = [
+  UserRole.ADMIN,
+  UserRole.OPERATIONS_MANAGER,
+  UserRole.SCHEDULER,
+  UserRole.TECHNICIAN,
+  UserRole.READ_ONLY,
+] as const;
+const userActionMessages: Record<string, string> = {
+  created: "User account created successfully.",
+  role: "User role updated successfully.",
+  disabled: "User account disabled successfully.",
+  reactivated: "User account reactivated successfully.",
+};
 
 type RuleSummary = {
   requirementType: string;
@@ -114,25 +137,45 @@ function appliesWhen(rule: RuleSummary) {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ savedProfile?: string; savedRule?: string }>;
+  searchParams: Promise<{
+    savedProfile?: string;
+    savedRule?: string;
+    ruleAction?: string;
+    userSaved?: string;
+    userAction?: string;
+  }>;
 }) {
   const user = await requireRole([UserRole.ADMIN]);
   const saved = await searchParams;
-  const profiles = await db.ruleProfile.findMany({
-    where: {
-      systems: {
-        some: {
-          building: { customer: { organizationId: user.organizationId } },
+  const [profiles, users] = await Promise.all([
+    db.ruleProfile.findMany({
+      where: {
+        systems: {
+          some: {
+            building: { customer: { organizationId: user.organizationId } },
+          },
         },
       },
-    },
-    include: {
-      jurisdiction: true,
-      rules: { orderBy: [{ requirementType: "asc" }, { ruleName: "asc" }] },
-      _count: { select: { systems: true, rules: true } },
-    },
-    orderBy: { name: "asc" },
-  });
+      include: {
+        jurisdiction: true,
+        rules: { orderBy: [{ requirementType: "asc" }, { ruleName: "asc" }] },
+        _count: { select: { systems: true, rules: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    db.user.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        active: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
   return (
     <>
@@ -144,10 +187,172 @@ export default async function AdminPage({
       {(saved.savedProfile || saved.savedRule) && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
           {saved.savedRule
-            ? `Rule ${saved.savedRule} revised and affected towers recalculated.`
+            ? saved.ruleAction === "created"
+              ? "Jurisdiction rule added and affected towers recalculated."
+              : `Rule ${saved.savedRule} revised and affected towers recalculated.`
             : `Routine timing for ${saved.savedProfile} updated and affected towers recalculated.`}
         </div>
       )}
+      {saved.userSaved && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+          {userActionMessages[saved.userAction ?? ""] ??
+            "User account updated successfully."}
+        </div>
+      )}
+      <section
+        className="panel mb-6 p-5"
+        aria-labelledby="user-management-title"
+      >
+        <div>
+          <div className="label">Access control</div>
+          <h2 id="user-management-title" className="mt-1 text-xl font-black">
+            User management
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Create accounts, assign permissions, and remove access. Every change
+            is recorded in the audit log.
+          </p>
+        </div>
+
+        <form
+          action={createUserAction}
+          className="mt-5 grid gap-4 lg:grid-cols-4"
+        >
+          <label>
+            <span className="label">Full name</span>
+            <input className="field mt-1" name="name" required minLength={2} />
+          </label>
+          <label>
+            <span className="label">Email address</span>
+            <input className="field mt-1" name="email" type="email" required />
+          </label>
+          <label>
+            <span className="label">Initial password</span>
+            <input
+              className="field mt-1"
+              name="password"
+              type="password"
+              required
+              minLength={12}
+              autoComplete="new-password"
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              At least 12 characters
+            </span>
+          </label>
+          <label>
+            <span className="label">Role</span>
+            <select
+              className="field mt-1"
+              name="role"
+              defaultValue={UserRole.TECHNICIAN}
+            >
+              {userRoles.map((role) => (
+                <option key={role} value={role}>
+                  {plainEnumLabel(role)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="lg:col-span-4">
+            <button className="btn btn-primary" type="submit">
+              Create user
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-3 py-3">User</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Role</th>
+                <th className="px-3 py-3 text-right">Access</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {users.map((account) => (
+                <tr
+                  key={account.id}
+                  className={!account.active ? "text-slate-500" : undefined}
+                >
+                  <td className="px-3 py-4">
+                    <div className="font-bold text-slate-900">
+                      {account.name}
+                    </div>
+                    <div>{account.email}</div>
+                  </td>
+                  <td className="px-3 py-4">
+                    <span
+                      className={
+                        account.active
+                          ? "inline-flex rounded-full bg-emerald-100 px-2.5 py-1 font-bold text-emerald-800"
+                          : "inline-flex rounded-full bg-slate-200 px-2.5 py-1 font-bold text-slate-700"
+                      }
+                    >
+                      {account.active ? "Active" : "Disabled"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-4">
+                    <form
+                      action={updateUserRoleAction}
+                      className="flex items-center gap-2"
+                    >
+                      <input type="hidden" name="userId" value={account.id} />
+                      <select
+                        className="field max-w-56"
+                        name="role"
+                        defaultValue={account.role}
+                      >
+                        {userRoles.map((role) => (
+                          <option key={role} value={role}>
+                            {plainEnumLabel(role)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn"
+                        type="submit"
+                        disabled={account.id === user.id}
+                        title={
+                          account.id === user.id
+                            ? "Another administrator must change your role"
+                            : undefined
+                        }
+                      >
+                        Save role
+                      </button>
+                    </form>
+                  </td>
+                  <td className="px-3 py-4 text-right">
+                    <form action={setUserActiveAction}>
+                      <input type="hidden" name="userId" value={account.id} />
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={account.active ? "false" : "true"}
+                      />
+                      <button
+                        className="btn"
+                        type="submit"
+                        disabled={account.id === user.id && account.active}
+                        title={
+                          account.id === user.id && account.active
+                            ? "You cannot disable your own account"
+                            : undefined
+                        }
+                      >
+                        {account.active ? "Disable" : "Reactivate"}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
       <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
         <div className="space-y-5">
           {profiles.map((profile) => {
@@ -385,6 +590,155 @@ export default async function AdminPage({
                     <h3 className="mt-1 text-lg font-black">
                       What is required and when
                     </h3>
+                    {requirementTypes.some(
+                      (type) =>
+                        !profile.rules.some(
+                          (rule) => rule.requirementType === type,
+                        ),
+                    ) && (
+                      <details className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50">
+                        <summary className="cursor-pointer list-none p-4 font-black text-emerald-900">
+                          Add jurisdiction rule
+                        </summary>
+                        <form
+                          action={createRuleDefinitionAction}
+                          className="grid gap-4 border-t border-emerald-200 p-4 sm:grid-cols-2 xl:grid-cols-3"
+                        >
+                          <input
+                            type="hidden"
+                            name="profileId"
+                            value={profile.id}
+                          />
+                          <label>
+                            <span className="label">Obligation type</span>
+                            <select
+                              className="field mt-1"
+                              name="requirementType"
+                              required
+                            >
+                              {requirementTypes
+                                .filter(
+                                  (type) =>
+                                    !profile.rules.some(
+                                      (rule) => rule.requirementType === type,
+                                    ),
+                                )
+                                .map((type) => (
+                                  <option key={type} value={type}>
+                                    {obligationName(type)}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <label className="sm:col-span-1 xl:col-span-2">
+                            <span className="label">Rule name</span>
+                            <input
+                              className="field mt-1"
+                              name="ruleName"
+                              minLength={3}
+                              required
+                            />
+                          </label>
+                          <label>
+                            <span className="label">Authority</span>
+                            <select
+                              className="field mt-1"
+                              name="sourceAuthority"
+                              required
+                            >
+                              {authorities.map((authority) => (
+                                <option key={authority} value={authority}>
+                                  {plainEnumLabel(authority)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="sm:col-span-1 xl:col-span-2">
+                            <span className="label">Source citation</span>
+                            <input
+                              className="field mt-1"
+                              name="sourceCitation"
+                              minLength={3}
+                              required
+                            />
+                          </label>
+                          <label>
+                            <span className="label">Hard interval (days)</span>
+                            <input
+                              className="field mt-1"
+                              name="frequencyDays"
+                              type="number"
+                              min="1"
+                              max="3650"
+                            />
+                            <span className="mt-1 block text-xs text-slate-600">
+                              Required for recurring sample, inspection, and
+                              reporting rules
+                            </span>
+                          </label>
+                          <label>
+                            <span className="label">
+                              Minimum days after trigger
+                            </span>
+                            <input
+                              className="field mt-1"
+                              name="minimumDaysAfterTrigger"
+                              type="number"
+                              min="0"
+                              max="3650"
+                            />
+                          </label>
+                          <label>
+                            <span className="label">
+                              Maximum days after trigger
+                            </span>
+                            <input
+                              className="field mt-1"
+                              name="maximumDaysAfterTrigger"
+                              type="number"
+                              min="0"
+                              max="3650"
+                            />
+                            <span className="mt-1 block text-xs text-slate-600">
+                              Both trigger offsets are required for
+                              hyperhalogenation rules
+                            </span>
+                          </label>
+                          <label className="flex items-center gap-2 rounded-lg bg-white p-3 text-sm font-bold">
+                            <input
+                              name="enabled"
+                              type="checkbox"
+                              defaultChecked
+                            />
+                            Enable immediately
+                          </label>
+                          <label className="sm:col-span-2 xl:col-span-3">
+                            <span className="label">Notes</span>
+                            <textarea
+                              className="field mt-1 min-h-20"
+                              name="notes"
+                            />
+                          </label>
+                          <label className="sm:col-span-2 xl:col-span-3">
+                            <span className="label">
+                              Reason for adding rule
+                            </span>
+                            <input
+                              className="field mt-1"
+                              name="reason"
+                              minLength={8}
+                              defaultValue="Add rule from verified source"
+                              required
+                            />
+                          </label>
+                          <div className="sm:col-span-2 xl:col-span-3">
+                            <button className="btn btn-primary">
+                              Add rule and recalculate towers
+                            </button>
+                          </div>
+                        </form>
+                      </details>
+                    )}
                     <div className="mt-3 space-y-4">
                       {profile.rules.map((rule) => (
                         <article

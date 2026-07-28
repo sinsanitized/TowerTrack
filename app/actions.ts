@@ -9,6 +9,7 @@ import {
   VisitStatus,
 } from "@prisma/client";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { clearSession, requireRole } from "@/lib/auth";
 import { asUtc, dateOnly, isWeekend, todayInTimeZone } from "@/lib/date";
@@ -40,6 +41,186 @@ const sourceAuthorities = [
   "PENDING_REGULATION",
   "UNKNOWN_REQUIRES_REVIEW",
 ] as const;
+
+const supportedRequirementTypes = [
+  "ROUTINE_LEGIONELLA_SAMPLE",
+  "COMPLIANCE_INSPECTION",
+  "PORTAL_SAMPLE_DATE",
+  "SUMMERTIME_HYPERHALOGENATION",
+] as const;
+
+const manageableUserRoles = [
+  UserRole.ADMIN,
+  UserRole.OPERATIONS_MANAGER,
+  UserRole.SCHEDULER,
+  UserRole.TECHNICIAN,
+  UserRole.READ_ONLY,
+] as const;
+
+export async function createUserAction(formData: FormData) {
+  const administrator = await requireRole([UserRole.ADMIN]);
+  const parsed = z
+    .object({
+      name: z.string().trim().min(2).max(120),
+      email: z.string().trim().toLowerCase().email().max(254),
+      password: z.string().min(12).max(1024),
+      role: z.enum(manageableUserRoles),
+    })
+    .parse(Object.fromEntries(formData));
+
+  const existing = await db.user.findUnique({
+    where: { email: parsed.email },
+    select: { id: true },
+  });
+  if (existing)
+    throw new Error("A user with that email address already exists.");
+
+  const passwordHash = await bcrypt.hash(parsed.password, 12);
+  const created = await db.$transaction(async (tx) => {
+    const account = await tx.user.create({
+      data: {
+        organizationId: administrator.organizationId,
+        name: parsed.name,
+        email: parsed.email,
+        passwordHash,
+        role: parsed.role,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        entityType: "User",
+        entityId: account.id,
+        action: "CREATED",
+        reason: "Administrator created a user account",
+        changedById: administrator.id,
+        newValue: {
+          name: account.name,
+          email: account.email,
+          role: account.role,
+          active: account.active,
+        },
+      },
+    });
+    return account;
+  });
+
+  revalidatePath("/admin");
+  redirect(`/admin?userSaved=${created.id}&userAction=created`);
+}
+
+export async function updateUserRoleAction(formData: FormData) {
+  const administrator = await requireRole([UserRole.ADMIN]);
+  const parsed = z
+    .object({
+      userId: z.string().min(1),
+      role: z.enum(manageableUserRoles),
+    })
+    .parse(Object.fromEntries(formData));
+
+  await db.$transaction(async (tx) => {
+    const account = await tx.user.findFirstOrThrow({
+      where: {
+        id: parsed.userId,
+        organizationId: administrator.organizationId,
+      },
+    });
+    if (account.role === parsed.role) return;
+    if (account.id === administrator.id && parsed.role !== UserRole.ADMIN)
+      throw new Error("You cannot remove your own administrator role.");
+    if (
+      account.active &&
+      account.role === UserRole.ADMIN &&
+      parsed.role !== UserRole.ADMIN
+    ) {
+      const activeAdministrators = await tx.user.count({
+        where: {
+          organizationId: administrator.organizationId,
+          role: UserRole.ADMIN,
+          active: true,
+        },
+      });
+      if (activeAdministrators <= 1)
+        throw new Error(
+          "Assign another active administrator before changing this role.",
+        );
+    }
+    await tx.user.update({
+      where: { id: account.id },
+      data: { role: parsed.role },
+    });
+    await tx.auditLog.create({
+      data: {
+        entityType: "User",
+        entityId: account.id,
+        action: "ROLE_CHANGED",
+        reason: "Administrator changed a user role",
+        changedById: administrator.id,
+        previousValue: { role: account.role },
+        newValue: { role: parsed.role },
+      },
+    });
+  });
+
+  revalidatePath("/admin");
+  redirect(`/admin?userSaved=${parsed.userId}&userAction=role`);
+}
+
+export async function setUserActiveAction(formData: FormData) {
+  const administrator = await requireRole([UserRole.ADMIN]);
+  const parsed = z
+    .object({
+      userId: z.string().min(1),
+      active: z.enum(["true", "false"]).transform((value) => value === "true"),
+    })
+    .parse(Object.fromEntries(formData));
+
+  await db.$transaction(async (tx) => {
+    const account = await tx.user.findFirstOrThrow({
+      where: {
+        id: parsed.userId,
+        organizationId: administrator.organizationId,
+      },
+    });
+    if (account.active === parsed.active) return;
+    if (account.id === administrator.id && !parsed.active)
+      throw new Error("You cannot disable your own account.");
+    if (account.role === UserRole.ADMIN && account.active && !parsed.active) {
+      const activeAdministrators = await tx.user.count({
+        where: {
+          organizationId: administrator.organizationId,
+          role: UserRole.ADMIN,
+          active: true,
+        },
+      });
+      if (activeAdministrators <= 1)
+        throw new Error(
+          "Create another active administrator before disabling this account.",
+        );
+    }
+    await tx.user.update({
+      where: { id: account.id },
+      data: { active: parsed.active },
+    });
+    await tx.auditLog.create({
+      data: {
+        entityType: "User",
+        entityId: account.id,
+        action: parsed.active ? "REACTIVATED" : "DISABLED",
+        reason: parsed.active
+          ? "Administrator reactivated a user account"
+          : "Administrator disabled a user account",
+        changedById: administrator.id,
+        previousValue: { active: account.active },
+        newValue: { active: parsed.active },
+      },
+    });
+  });
+
+  revalidatePath("/admin");
+  redirect(
+    `/admin?userSaved=${parsed.userId}&userAction=${parsed.active ? "reactivated" : "disabled"}`,
+  );
+}
 
 const optionalRuleInteger = z.preprocess(
   (value) => (value === "" || value == null ? null : value),
@@ -1854,6 +2035,156 @@ export async function updateRuleDefinitionAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/admin");
   redirect(`/admin?savedRule=${existing.id}`);
+}
+
+export async function createRuleDefinitionAction(formData: FormData) {
+  const user = await requireRole([UserRole.ADMIN]);
+  const parsed = z
+    .object({
+      profileId: z.string().min(1),
+      requirementType: z.enum(supportedRequirementTypes),
+      ruleName: z.string().trim().min(3).max(200),
+      sourceAuthority: z.enum(sourceAuthorities),
+      sourceCitation: z.string().trim().min(3).max(2000),
+      frequencyDays: optionalRuleInteger,
+      minimumDaysAfterTrigger: optionalRuleInteger,
+      maximumDaysAfterTrigger: optionalRuleInteger,
+      enabled: z.boolean(),
+      notes: z.string().trim().max(4000).optional(),
+      reason: z.string().trim().min(8).max(2000),
+    })
+    .parse({
+      profileId: String(formData.get("profileId") || ""),
+      requirementType: String(formData.get("requirementType") || ""),
+      ruleName: String(formData.get("ruleName") || ""),
+      sourceAuthority: String(formData.get("sourceAuthority") || ""),
+      sourceCitation: String(formData.get("sourceCitation") || ""),
+      frequencyDays: formData.get("frequencyDays"),
+      minimumDaysAfterTrigger: formData.get("minimumDaysAfterTrigger"),
+      maximumDaysAfterTrigger: formData.get("maximumDaysAfterTrigger"),
+      enabled: formData.get("enabled") === "on",
+      notes: String(formData.get("notes") || ""),
+      reason: String(formData.get("reason") || ""),
+    });
+
+  const intervalType = [
+    "ROUTINE_LEGIONELLA_SAMPLE",
+    "COMPLIANCE_INSPECTION",
+    "PORTAL_SAMPLE_DATE",
+  ].includes(parsed.requirementType);
+  const triggerWindowType =
+    parsed.requirementType === "SUMMERTIME_HYPERHALOGENATION";
+  if (
+    intervalType &&
+    (parsed.frequencyDays == null || parsed.frequencyDays < 1)
+  )
+    throw new Error("This rule requires a hard interval of at least one day.");
+  if (
+    triggerWindowType &&
+    (parsed.minimumDaysAfterTrigger == null ||
+      parsed.maximumDaysAfterTrigger == null)
+  )
+    throw new Error(
+      "This rule requires both minimum and maximum trigger offsets.",
+    );
+  if (
+    parsed.minimumDaysAfterTrigger != null &&
+    parsed.maximumDaysAfterTrigger != null &&
+    parsed.maximumDaysAfterTrigger < parsed.minimumDaysAfterTrigger
+  )
+    throw new Error("The maximum trigger offset must be after the minimum.");
+
+  const profile = await db.ruleProfile.findUniqueOrThrow({
+    where: { id: parsed.profileId },
+    include: {
+      rules: {
+        where: { requirementType: parsed.requirementType },
+        select: { id: true },
+      },
+      systems: {
+        where: {
+          building: { customer: { organizationId: user.organizationId } },
+        },
+        select: { id: true },
+      },
+      _count: { select: { systems: true } },
+    },
+  });
+  if (
+    profile.systems.length === 0 ||
+    profile._count.systems !== profile.systems.length
+  )
+    throw new Error(
+      "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
+    );
+  if (profile.rules.length)
+    throw new Error(
+      "This jurisdiction already has that obligation type. Edit its existing rule instead.",
+    );
+  if (
+    parsed.requirementType === "ROUTINE_LEGIONELLA_SAMPLE" &&
+    parsed.frequencyDays != null &&
+    profile.internalTargetIntervalDays != null &&
+    profile.internalTargetIntervalDays >= parsed.frequencyDays
+  )
+    throw new Error(
+      "The hard interval must remain later than the internal target interval.",
+    );
+
+  const ruleId = `${profile.id}-${parsed.requirementType.toLowerCase().replaceAll("_", "-")}-${crypto.randomUUID().slice(0, 8)}`;
+  const newValue = {
+    ruleProfileId: profile.id,
+    requirementType: parsed.requirementType,
+    ruleName: parsed.ruleName,
+    sourceAuthority: parsed.sourceAuthority as SourceAuthority,
+    sourceCitation: parsed.sourceCitation,
+    frequencyDays: intervalType ? parsed.frequencyDays : null,
+    minimumDaysAfterTrigger: triggerWindowType
+      ? parsed.minimumDaysAfterTrigger
+      : null,
+    maximumDaysAfterTrigger: triggerWindowType
+      ? parsed.maximumDaysAfterTrigger
+      : null,
+    dueDateCalculation: intervalType
+      ? "LAST_QUALIFYING_ACTIVITY_PLUS_FREQUENCY"
+      : triggerWindowType
+        ? "TRIGGER_DATE_PLUS_WINDOW"
+        : "CALENDAR_YEAR_REQUIREMENT",
+    enabled: parsed.enabled,
+    notes: parsed.notes || null,
+    isRegulatoryRequirement: parsed.sourceAuthority === "REGULATORY",
+    isGuidanceRequirement: parsed.sourceAuthority === "GUIDANCE",
+    isCompanyPolicy: parsed.sourceAuthority === "COMPANY_POLICY",
+    isContractRequirement: parsed.sourceAuthority === "CONTRACT_REQUIREMENT",
+    isPendingRegulation: parsed.sourceAuthority === "PENDING_REGULATION",
+  };
+
+  await db.$transaction(async (tx) => {
+    await tx.ruleDefinition.create({
+      data: { id: ruleId, ...newValue },
+    });
+    if (parsed.requirementType === "ROUTINE_LEGIONELLA_SAMPLE")
+      await tx.ruleProfile.update({
+        where: { id: profile.id },
+        data: { legionellaIntervalDays: parsed.frequencyDays },
+      });
+    for (const system of profile.systems)
+      await rebuildSystemComplianceProjections(tx, system.id);
+    await tx.auditLog.create({
+      data: {
+        entityType: "RuleDefinition",
+        entityId: ruleId,
+        action: "CREATED",
+        reason: parsed.reason,
+        changedById: user.id,
+        newValue: { revision: 1, ...newValue },
+      },
+    });
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect(`/admin?savedRule=${ruleId}&ruleAction=created`);
 }
 
 export async function createCustomerAction(formData: FormData) {

@@ -263,7 +263,7 @@ test("visit opportunities guide technicians to record actual work without bookin
 test("admin can view and revise a versioned rule definition", async ({
   page,
 }) => {
-  await page.getByRole("link", { name: "Admin" }).click();
+  await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
   await expect(page.getByText("Effective start")).toHaveCount(0);
   await expect(page.getByText("Effective end")).toHaveCount(0);

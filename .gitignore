@@ -38,3 +38,5 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 *.db-journal
+
+*.tsbuildinfo
