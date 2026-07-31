@@ -2,8 +2,12 @@ import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("admin@towertrack.local");
-  await page.getByLabel("Password").fill("ChangeMe123!");
+  await page
+    .getByLabel("Email")
+    .fill(process.env.INITIAL_ADMIN_EMAIL ?? "admin@towertrack.local");
+  await page
+    .getByLabel("Password")
+    .fill(process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 });
@@ -11,7 +15,7 @@ test("home leads directly into tower event entry", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Action Center" }),
   ).toBeVisible();
-  await expect(page.getByText("Recommended combined visits")).toBeVisible();
+  await expect(page.getByText("Combined Visit Recommendations")).toBeVisible();
   await expect(page.getByText("Tower directory")).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Planning", exact: true }),
@@ -30,42 +34,38 @@ test("home leads directly into tower event entry", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add sample" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Add cleaning" }),
+    page.getByRole("button", { name: "Record Legionella sample" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Add startup" }),
+    page.getByRole("button", { name: "Record cleaning" }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record startup" }),
   ).not.toBeVisible();
   await expect(
     page.getByText("More event types", { exact: true }),
+  ).toBeVisible();
+  await page.getByText("More event types", { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Record cleaning" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: "Record routine legionella sample collected",
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Save completed event" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save Event" })).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: "Open Legionella sampling obligations",
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Key tower obligations" }),
-  ).toBeVisible();
-  const keyObligations = page.getByLabel("Key tower obligations");
-  await expect(
-    keyObligations.getByText("Last monthly Legionella test"),
+    page.getByRole("heading", { name: "Next required actions" }),
   ).toBeVisible();
   await expect(
-    keyObligations.getByText("Quarterly inspection", { exact: true }),
-  ).toBeVisible();
-  await expect(keyObligations.getByText("Cleanings this year")).toBeVisible();
-  await expect(
-    keyObligations.getByText("Summertime hyperhalogenation", { exact: true }),
+    page.getByRole("heading", { name: "Recent activity" }),
   ).toBeVisible();
 });
 test("system view shows authority and separate target and hard due", async ({
@@ -81,17 +81,16 @@ test("system view shows authority and separate target and hard due", async ({
   ).toBeVisible();
   await search.press("Enter");
   await expect(page).toHaveURL(/\/systems\//);
-  await expect(page.getByText("Legionella clock")).toBeVisible();
-  await expect(page.getByText("Internal target")).toBeVisible();
   await expect(
-    page.getByText("Monthly sample deadline", { exact: true }),
+    page.getByRole("heading", { name: "Next required actions" }),
   ).toBeVisible();
-  const priority = page.locator(".panel").filter({
-    has: page.getByRole("heading", { name: "Recent records and priority" }),
-  });
-  await expect(priority.getByText("Most urgent open obligation")).toBeVisible();
-  await expect(priority.getByText("Deadline", { exact: true })).toBeVisible();
+  await expect(page.getByText("Target date").first()).toBeVisible();
+  await expect(page.getByText("Hard due date").first()).toBeVisible();
   await expect(page.getByText("Next hard due")).toHaveCount(0);
+  await page.getByRole("link", { name: "Obligations", exact: true }).click();
+  await page
+    .getByText("Rule details and obligation completion tools", { exact: true })
+    .click();
   await expect(
     page.getByText(/Regulatory|Company policy|Guidance only/).first(),
   ).toBeVisible();
@@ -171,7 +170,7 @@ test("home presents mutually exclusive Action Center sections", async ({
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Recommended combined visits" }),
+    page.getByRole("heading", { name: "Combined Visit Recommendations" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Upcoming and currently actionable" }),
@@ -346,13 +345,14 @@ test("admin can view and revise a versioned rule definition", async ({
 test("customer onboarding continues from address to cooling tower details", async ({
   page,
 }) => {
+  const customerName = `Workflow Test Customer ${Date.now()}`;
   await page.getByRole("link", { name: "Customers" }).click();
   const addCustomer = page.locator("form").filter({
     has: page.getByRole("button", {
       name: "Continue to cooling tower details",
     }),
   });
-  await addCustomer.getByLabel("Customer name").fill("Workflow Test Customer");
+  await addCustomer.getByLabel("Customer name").fill(customerName);
   await addCustomer.getByLabel("Street address").fill("123 Test Avenue");
   await addCustomer.getByLabel("City").fill("New York");
   await addCustomer.getByLabel("State").fill("NY");
@@ -367,36 +367,51 @@ test("customer onboarding continues from address to cooling tower details", asyn
   await page.getByLabel("Model number").fill("MODEL-100");
   await page.getByLabel("Serial number").fill("SERIAL-100");
   await page.getByLabel("Tower location").fill("Roof, west side");
-  await page.getByLabel("Tonnage").fill("450");
+  await page.getByLabel("Cooling Tower Tonnage").fill("450");
+  await page.getByLabel("Year-round").check();
+  await page
+    .getByLabel("Legionella Responsibility")
+    .selectOption("OUR_COMPANY");
   await page
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
   await page
-    .getByLabel("Rule profile", { exact: true })
-    .selectOption({ label: "NYC Chapter 8 2026 + NYS Part 4" });
+    .getByLabel("Compliance Rules", { exact: true })
+    .selectOption("NYC_AND_NYS");
+  await page.getByLabel("Profile version", { exact: true }).selectOption({
+    label: "NYC Chapter 8 + New York State — NYC Chapter 8 2026 + NYS Part 4",
+  });
   await page.getByRole("button", { name: "Create cooling tower" }).click();
   await expect(page.getByText("Cooling tower created")).toBeVisible();
+  await page.getByRole("link", { name: "Tower Information" }).click();
   await expect(
     page.getByRole("heading", { name: "Equipment details" }),
   ).toBeVisible();
   await expect(page.getByText("MODEL-100")).toBeVisible();
   await expect(page.getByText("SERIAL-100")).toBeVisible();
   await expect(page.getByText("450 tons")).toBeVisible();
+  await page
+    .getByRole("link", { name: "Settings", exact: true })
+    .last()
+    .click();
   await page.getByRole("link", { name: "Edit customer & tower" }).click();
   await expect(
-    page.getByRole("heading", { name: /Edit Workflow Test Customer/ }),
+    page.getByRole("heading", { name: new RegExp(`Edit ${customerName}`) }),
   ).toBeVisible();
   await expect(page.getByLabel("Jurisdiction", { exact: true })).toHaveValue(
     /.+/,
   );
-  await expect(page.getByLabel("Rule profile", { exact: true })).toHaveValue(
-    "nyc-2026",
-  );
+  await expect(
+    page.getByText("NYC Chapter 8 + New York State").first(),
+  ).toBeVisible();
   await page.getByLabel("Tower location").fill("Roof, east side");
   await page
     .getByRole("button", { name: "Save customer and tower changes" })
     .click();
-  await expect(page.getByText(/rule settings updated/)).toBeVisible();
+  await expect(
+    page.getByText(/customer, tower, jurisdiction, and rule settings updated/i),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Tower Information" }).click();
   await expect(page.getByText("Roof, east side")).toBeVisible();
 });
 
@@ -467,10 +482,12 @@ test("operations manager records cleaning in the tower event workflow", async ({
     .first()
     .click();
   await expect(page).toHaveURL(/\/systems\//);
+  await page.getByRole("button", { name: "Record an event" }).click();
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible();
-  const addCleaning = page.getByRole("button", { name: "Add cleaning" });
+  await page.getByText("More event types", { exact: true }).click();
+  const addCleaning = page.getByRole("button", { name: "Record cleaning" });
   await expect(addCleaning).toBeVisible();
   await addCleaning.click();
   await expect(page.getByLabel("Cleaning type")).toBeVisible();
@@ -478,12 +495,13 @@ test("operations manager records cleaning in the tower event workflow", async ({
   await eventForm.getByLabel("Event date").fill("2026-07-14");
   await eventForm.getByText("Add notes (optional)", { exact: true }).click();
   await eventForm.getByLabel("Notes").fill("Verified field cleaning record");
-  await eventForm.getByRole("button", { name: "Save completed event" }).click();
+  await eventForm.getByRole("button", { name: "Save Event" }).click();
   await expect(page).toHaveURL(/event=/);
   await expect(page.getByText(/Event recorded/)).toBeVisible();
-  const recentRecords = page.locator(".panel").filter({
-    has: page.getByRole("heading", { name: "Recent records and priority" }),
+  await page.getByRole("link", { name: "Overview", exact: true }).click();
+  const recentActivity = page.locator(".panel").filter({
+    has: page.getByRole("heading", { name: "Recent activity" }),
   });
-  await expect(recentRecords).toBeVisible();
-  await expect(recentRecords.getByText("Tue, Jul 14, 2026")).toBeVisible();
+  await expect(recentActivity).toBeVisible();
+  await expect(recentActivity.getByText("Tue, Jul 14, 2026")).toBeVisible();
 });

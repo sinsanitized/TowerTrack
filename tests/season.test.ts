@@ -10,6 +10,17 @@ const seasonalTower = {
 };
 
 describe("seasonal operation helpers", () => {
+  it("requires review when the operating schedule is missing", () => {
+    expect(seasonLabel({ ...seasonalTower, operationPeriodType: null })).toBe(
+      "Schedule not set",
+    );
+    expect(
+      seasonalStatus(
+        { ...seasonalTower, operationPeriodType: null },
+        "2026-07-14",
+      ),
+    ).toBe("Review required");
+  });
   it("labels year-round towers plainly", () => {
     expect(
       seasonLabel({

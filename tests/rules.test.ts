@@ -7,6 +7,7 @@ import {
   completionFollowUps,
   correctiveAction,
   dateEntryWarnings,
+  DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW,
   groupByRoute,
   hyperhalogenationFollowUp,
   noCirculationActions,
@@ -16,6 +17,14 @@ import {
 } from "@/lib/rules";
 
 const base = { today: "2026-07-13", operatingStatus: "OPERATING" as const };
+describe("routine sampling defaults", () => {
+  it("targets collection between the 20th and 25th", () => {
+    expect(DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW).toEqual({
+      startDay: 20,
+      endDay: 25,
+    });
+  });
+});
 describe("date-only arithmetic", () => {
   it("crosses month and year boundaries", () =>
     expect(addDays("2026-12-20", 31)).toBe("2027-01-20"));

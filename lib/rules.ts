@@ -1,6 +1,10 @@
 import { addDays, clampDate, diffDays } from "@/lib/date";
 
 export const NYC_CHAPTER_8_RULESET_VERSION = "NYC_CH8_2026.1";
+export const DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW = {
+  startDay: 20,
+  endDay: 25,
+} as const;
 export const NYC_CHAPTER_8_RULES = {
   routineSampleMaxGapDays: 31,
   routineWarningDay: 25,

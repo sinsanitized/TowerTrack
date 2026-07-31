@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import type { ObligationStatus } from "@prisma/client";
 import { dateOnly, diffDays, todayDateOnly } from "@/lib/date";
 import { seasonLabel, seasonalStatus } from "@/lib/season";
 import { ruleProfileWarnings, type ProfileMode } from "@/lib/rules";
@@ -7,6 +8,11 @@ import {
   nextAnnualCleaningObligation,
 } from "@/lib/obligation-engine";
 import { ruleSetVersion } from "@/lib/rule-profile";
+import {
+  complianceJurisdictionForConfiguration,
+  complianceJurisdictionLabel,
+  profileSourceLabel,
+} from "@/lib/compliance-profile";
 import {
   bestVisitOpportunity,
   complianceBaselineReview,
@@ -25,6 +31,7 @@ export type OperationalQueryScope = {
   organizationId: string;
   today?: string;
   systemId?: string;
+  includeMissed?: boolean;
 };
 
 export async function planningRows({
@@ -181,9 +188,10 @@ export async function planningRows({
     const nextDated = obligationRows
       .filter((item) => item.latest)
       .sort((a, b) => (a.latest ?? "").localeCompare(b.latest ?? ""))[0];
-    const isNyc =
-      system.ruleProfile.jurisdictionMode ===
-      "NYC_CHAPTER_8_2026_PLUS_NYS_PART_4";
+    const isNyc = system.ruleConfiguration === "NYC_AND_NYS";
+    const profileJurisdiction = complianceJurisdictionForConfiguration(
+      system.ruleConfiguration,
+    );
     const compliance =
       inactiveComplianceStatus(system.operatingStatus) ??
       complianceBaselineReview({
@@ -245,7 +253,13 @@ export async function planningRows({
       customer: system.building.customer.name,
       buildingId: system.building.id,
       building: system.building.buildingName,
-      address: `${system.building.streetAddress}, ${system.building.city}`,
+      address: [
+        system.building.streetAddress,
+        system.building.addressLine2,
+        `${system.building.city}, ${system.building.state} ${system.building.postalCode || "Postal code not recorded"}`,
+      ]
+        .filter(Boolean)
+        .join(", "),
       state: system.building.state,
       routeZone: system.routeZoneOverride || system.building.routeZone,
       borough: system.building.borough,
@@ -263,6 +277,18 @@ export async function planningRows({
         : null,
       profileId: system.ruleProfileId,
       profile: system.ruleProfile.name,
+      ruleConfiguration: system.ruleConfiguration,
+      legionellaResponsibility: system.legionellaResponsibility,
+      legionellaVendorName: system.legionellaVendorName,
+      ruleConfigurationConfirmed: system.ruleConfigurationConfirmed,
+      profileJurisdiction,
+      profileJurisdictionLabel:
+        complianceJurisdictionLabel(profileJurisdiction),
+      profileSourceLabel: profileSourceLabel(profileJurisdiction),
+      profileVersion: ruleSetVersion(system.ruleProfile),
+      profileEffectiveDate: system.ruleProfile.effectiveStartDate
+        ? dateOnly(system.ruleProfile.effectiveStartDate)
+        : null,
       authority:
         system.ruleProfile.rules[0]?.sourceAuthority ??
         "UNKNOWN_REQUIRES_REVIEW",
@@ -302,7 +328,11 @@ export async function complianceDashboardRows({
   organizationId,
   today = todayDateOnly(),
   systemId,
+  includeMissed = false,
 }: OperationalQueryScope) {
+  const obligationStatuses: ObligationStatus[] = includeMissed
+    ? ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"]
+    : ["PENDING", "SCHEDULED", "OVERDUE"];
   const systems = await db.coolingTowerSystem.findMany({
     where: {
       active: true,
@@ -323,7 +353,7 @@ export async function complianceDashboardRows({
         include: { visit: true },
       },
       sampleObligations: {
-        where: { status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] } },
+        where: { status: { in: obligationStatuses } },
         orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
         include: {
           triggerEvent: {
@@ -332,7 +362,7 @@ export async function complianceDashboardRows({
         },
       },
       inspectionObligations: {
-        where: { status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] } },
+        where: { status: { in: obligationStatuses } },
         orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
         include: {
           triggerEvent: {
@@ -341,7 +371,7 @@ export async function complianceDashboardRows({
         },
       },
       reportingObligations: {
-        where: { status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] } },
+        where: { status: { in: obligationStatuses } },
         orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
         include: {
           triggerEvent: {
@@ -350,7 +380,7 @@ export async function complianceDashboardRows({
         },
       },
       maintenanceObligations: {
-        where: { status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] } },
+        where: { status: { in: obligationStatuses } },
         orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
         include: {
           triggerEvent: {
@@ -456,9 +486,10 @@ export async function complianceDashboardRows({
     const routineSample =
       samples.find((item) => item.type === "ROUTINE_OPERATING_SAMPLE") || null;
     const nextInspection = inspections[0] || null;
-    const isNyc =
-      system.ruleProfile.jurisdictionMode ===
-      "NYC_CHAPTER_8_2026_PLUS_NYS_PART_4";
+    const isNyc = system.ruleConfiguration === "NYC_AND_NYS";
+    const profileJurisdiction = complianceJurisdictionForConfiguration(
+      system.ruleConfiguration,
+    );
     const currentYear = Number(today.slice(0, 4));
     const summertimeDue =
       reports.find(
@@ -613,10 +644,34 @@ export async function complianceDashboardRows({
       building: system.building.buildingName,
       customer: system.building.customer.name,
       systemName: system.systemName,
-      address: `${system.building.streetAddress}, ${system.building.city}`,
+      tonnage: system.tonnage,
+      operatingSchedule:
+        system.operationPeriodType === "SEASONAL" ||
+        system.operationPeriodType === "YEAR_ROUND"
+          ? (system.operationPeriodType as "SEASONAL" | "YEAR_ROUND")
+          : null,
+      address: [
+        system.building.streetAddress,
+        system.building.addressLine2,
+        `${system.building.city}, ${system.building.state} ${system.building.postalCode || "Postal code not recorded"}`,
+      ]
+        .filter(Boolean)
+        .join(", "),
       routeZone: system.routeZoneOverride || system.building.routeZone,
       operatingStatus: system.operatingStatus,
       profile: system.ruleProfile.name,
+      ruleConfiguration: system.ruleConfiguration,
+      legionellaResponsibility: system.legionellaResponsibility,
+      legionellaVendorName: system.legionellaVendorName,
+      ruleConfigurationConfirmed: system.ruleConfigurationConfirmed,
+      profileJurisdiction,
+      profileJurisdictionLabel:
+        complianceJurisdictionLabel(profileJurisdiction),
+      profileSourceLabel: profileSourceLabel(profileJurisdiction),
+      profileVersion: ruleSetVersion(system.ruleProfile),
+      profileEffectiveDate: system.ruleProfile.effectiveStartDate
+        ? dateOnly(system.ruleProfile.effectiveStartDate)
+        : null,
       risk,
       riskDisplay,
       nextSample,

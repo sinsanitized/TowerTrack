@@ -4,8 +4,12 @@ test.describe.configure({ timeout: 240_000 });
 
 async function login(page: Page) {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("admin@towertrack.local");
-  await page.getByLabel("Password").fill("ChangeMe123!");
+  await page
+    .getByLabel("Email")
+    .fill(process.env.INITIAL_ADMIN_EMAIL ?? "admin@towertrack.local");
+  await page
+    .getByLabel("Password")
+    .fill(process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 }
@@ -32,13 +36,20 @@ async function createNycTower(page: Page, name: string) {
   await page.getByLabel("Model number").fill("LC-500");
   await page.getByLabel("Serial number").fill(`SER-${Date.now()}`);
   await page.getByLabel("Tower location").fill("Roof, mechanical penthouse");
-  await page.getByLabel("Tonnage").fill("500");
+  await page.getByLabel("Cooling Tower Tonnage").fill("500");
+  await page.getByLabel("Year-round").check();
+  await page
+    .getByLabel("Legionella Responsibility")
+    .selectOption("OUR_COMPANY");
   await page
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
   await page
-    .getByLabel("Rule profile", { exact: true })
-    .selectOption({ label: "NYC Chapter 8 2026 + NYS Part 4" });
+    .getByLabel("Compliance Rules", { exact: true })
+    .selectOption("NYC_AND_NYS");
+  await page.getByLabel("Profile version", { exact: true }).selectOption({
+    label: "NYC Chapter 8 + New York State — NYC Chapter 8 2026 + NYS Part 4",
+  });
   await page.getByRole("button", { name: "Create cooling tower" }).click();
   await expect(page.getByText("Cooling tower created")).toBeVisible();
   await expect(page.getByText("Baseline required").first()).toBeVisible();
@@ -63,7 +74,7 @@ async function saveRecorder(
   const form = page.locator("#record-event form");
   await form.getByText("Add notes (optional)", { exact: true }).click();
   await configure(form);
-  await form.getByRole("button", { name: "Save completed event" }).click();
+  await form.getByRole("button", { name: "Save Event" }).click();
   await waitForNewEvent(page, previousEvent);
 }
 
@@ -75,6 +86,10 @@ async function recordEvent(
   configure?: (form: Locator) => Promise<void>,
 ) {
   const eventButton = page.getByRole("button", { name: button });
+  if (!(await eventButton.isVisible())) {
+    const openRecorder = page.getByRole("button", { name: "Record an event" });
+    if (await openRecorder.isVisible()) await openRecorder.click();
+  }
   if (!(await eventButton.isVisible())) {
     await page.getByText("More event types", { exact: true }).click();
   }
@@ -121,7 +136,7 @@ async function recordSampleAndPortal(
 ) {
   await recordEvent(
     page,
-    "Add sample",
+    "Record Legionella sample",
     sampleDate,
     "ELAP culture sample with signed chain of custody",
   );
@@ -146,7 +161,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   const name = `Lifecycle Building ${Date.now()}`;
   const systemUrl = await createNycTower(page, name);
   await expect(
-    page.getByRole("button", { name: "Add lab result" }),
+    page.getByRole("button", { name: "Record Legionella result" }),
   ).toBeDisabled();
   await expect(
     page.getByText(/Add a Legionella sample before adding a laboratory result/),
@@ -154,7 +169,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 
   await recordEvent(
     page,
-    "Add cleaning",
+    "Record cleaning",
     "2026-07-01",
     "Initial cleaning and disinfection before first operation",
     async (form) => {
@@ -170,7 +185,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 
   await recordEvent(
     page,
-    "Add startup",
+    "Record startup",
     "2026-07-02",
     "Commissioning startup after documented cleaning",
   );
@@ -190,7 +205,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 
   await recordSampleAndPortal(page, "2026-07-06", "2026-07-07");
   await expect(
-    page.getByRole("button", { name: "Add lab result" }),
+    page.getByRole("button", { name: "Record Legionella result" }),
   ).toBeEnabled();
   const recordedSample = page
     .locator("#regulatory-events article")
@@ -215,16 +230,14 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 
   await recordEvent(
     page,
-    "Add inspection",
+    "Record inspection",
     "2026-07-06",
     "Qualified-person commissioning inspection",
   );
   await expect(page.getByText(/Oct 4, 2026/).first()).toBeVisible();
 
   await page.getByText("More event types", { exact: true }).click();
-  await page
-    .getByRole("button", { name: "Add disinfection or remediation" })
-    .click();
+  await page.getByRole("button", { name: "Record disinfection" }).click();
   const recorder = page.locator("#record-event");
   await recorder.getByLabel("Event date").fill("2026-07-06");
   await expect(
@@ -271,7 +284,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 
   await recordEvent(
     page,
-    "Add lab result",
+    "Record Legionella result",
     "2026-07-10",
     "Final ELAP report reviewed by the qualified person",
     async (form) => {
@@ -294,7 +307,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 
   await recordEvent(
     page,
-    "Add disinfection or remediation",
+    "Record disinfection",
     "2026-07-11",
     "Corrective biocide response to the Level 3 result",
   );
@@ -314,7 +327,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     .click();
   await recordEvent(
     page,
-    "Add sample",
+    "Record Legionella sample",
     "2026-07-18",
     "Technician collected one sample covering every compatible open window",
   );
@@ -331,7 +344,7 @@ test("a year-round tower keeps one rolling sample clock and closes historical po
   const systemUrl = page.url().split("?")[0];
   await recordEvent(
     page,
-    "Add cleaning",
+    "Record cleaning",
     "2026-01-20",
     "Startup cleaning before continuous year-round operation",
     async (form) => {
@@ -342,7 +355,7 @@ test("a year-round tower keeps one rolling sample clock and closes historical po
   );
   await recordEvent(
     page,
-    "Add startup",
+    "Record startup",
     "2026-02-01",
     "Start of continuous operation",
   );
@@ -409,9 +422,9 @@ test("a seasonal tower preserves its history but stops the routine clock after s
   const name = `Seasonal Tower ${Date.now()}`;
   await createNycTower(page, name);
   const seasonalForm = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Save operation pattern" }),
+    has: page.getByRole("button", { name: "Save operating schedule" }),
   });
-  await seasonalForm.getByRole("radio", { name: /^Seasonal Tower/ }).check();
+  await seasonalForm.getByRole("radio", { name: /^Seasonal/ }).check();
   await seasonalForm.getByLabel("Season start month").selectOption("1");
   await seasonalForm.getByLabel("Season start day").fill("1");
   await seasonalForm.getByLabel("Season end month").selectOption("6");
@@ -420,7 +433,7 @@ test("a seasonal tower preserves its history but stops the routine clock after s
     .getByLabel("Reason for change")
     .fill("Document January through June seasonal operation");
   await seasonalForm
-    .getByRole("button", { name: "Save operation pattern" })
+    .getByRole("button", { name: "Save operating schedule" })
     .click();
   await expect(
     page.getByText("Seasonal Tower · Jan 1–Jun 30").first(),
@@ -428,7 +441,7 @@ test("a seasonal tower preserves its history but stops the routine clock after s
 
   await recordEvent(
     page,
-    "Add cleaning",
+    "Record cleaning",
     "2025-12-20",
     "Pre-startup seasonal cleaning and disinfection",
     async (form) => {
@@ -437,7 +450,7 @@ test("a seasonal tower preserves its history but stops the routine clock after s
         .selectOption("STARTUP_CLEANING_DISINFECTION");
     },
   );
-  await recordEvent(page, "Add startup", "2026-01-01", "Seasonal startup");
+  await recordEvent(page, "Record startup", "2026-01-01", "Seasonal startup");
   await submitReport(page, "STARTUP_DOH_NOTIFICATION", "2026-01-02");
   for (const [sample, submitted] of [
     ["2026-01-04", "2026-01-05"],
@@ -451,7 +464,7 @@ test("a seasonal tower preserves its history but stops the routine clock after s
   }
   await recordEvent(
     page,
-    "Add shutdown",
+    "Record shutdown",
     "2026-06-30",
     "Tower fully drained for the end of its operating season",
   );

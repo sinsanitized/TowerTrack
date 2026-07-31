@@ -3,15 +3,17 @@ import { AlertTriangle, CalendarCheck, Layers3 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
+import { getUrgency } from "@/lib/compliance-intelligence";
 import {
-  compareUrgentAttention,
-  getAttentionBucket,
-  getUrgency,
-} from "@/lib/compliance-intelligence";
+  deadlinePeriodBounds,
+  deadlinePeriodForDate,
+} from "@/lib/deadline-view";
+import { isOurOperationalResponsibility } from "@/lib/service-responsibility";
+import { buttonClass } from "@/lib/button-variants";
 import { complianceDashboardRows } from "@/lib/queries";
 import { requirementLabel, requiredActionLabel } from "@/lib/labels";
 import { requireUser } from "@/lib/auth";
-import { todayDateOnly } from "@/lib/date";
+import { asUtc, todayDateOnly } from "@/lib/date";
 
 type DashboardRows = Awaited<ReturnType<typeof complianceDashboardRows>>;
 type DashboardRow = DashboardRows[number];
@@ -21,10 +23,12 @@ function ActionRow({
   row,
   obligation,
   today,
+  tone = "default",
 }: {
   row: DashboardRow;
   obligation: DashboardObligation;
   today: string;
+  tone?: "default" | "next" | "immediate";
 }) {
   const urgency = getUrgency({
     today,
@@ -34,11 +38,22 @@ function ActionRow({
     targetStartDate: obligation.targetStart,
   });
   return (
-    <article className="border-b border-slate-200 p-4 last:border-b-0 sm:p-5">
+    <article
+      className={`border-b p-4 last:border-b-0 sm:p-5 ${
+        tone === "next"
+          ? "border-blue-100 bg-blue-50/40"
+          : tone === "immediate"
+            ? "border-red-100 bg-red-50/40"
+            : "border-slate-200"
+      }`}
+    >
       <div className="grid gap-4 lg:grid-cols-[minmax(170px,.65fr)_minmax(260px,1.2fr)_minmax(190px,.75fr)_auto] lg:items-center">
         <div className="min-w-0">
           <div className="font-black">{row.systemName}</div>
           <div className="text-sm text-slate-600">{row.building}</div>
+          <div className="mt-1 text-xs font-bold text-slate-500">
+            {row.profileJurisdictionLabel}
+          </div>
         </div>
         <div className="min-w-0">
           <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -52,6 +67,9 @@ function ActionRow({
               Why this is required
             </summary>
             <p className="mt-2 text-slate-600">{obligation.reason}</p>
+            <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-500">
+              {row.profileSourceLabel}
+            </p>
           </details>
         </div>
         <div>
@@ -67,15 +85,40 @@ function ActionRow({
           </div>
         </div>
         <Link
-          className="btn btn-primary min-h-11 justify-center whitespace-nowrap"
+          className={buttonClass(
+            obligation.category === "SAMPLE" ? "primary" : "secondary",
+            "min-h-11 justify-center whitespace-nowrap",
+          )}
           href={`/systems/${row.id}${
-            obligation.category === "SAMPLE" ? "?record=sample" : ""
+            obligation.type === "SUMMERTIME_HYPERHALOGENATION_DUE"
+              ? "?record=hyperhalogenation"
+              : obligation.category === "SAMPLE"
+                ? "?record=sample"
+                : ""
           }#record-event`}
         >
           {obligation.category === "SAMPLE" ? "Record sample" : "Open tower"}
         </Link>
       </div>
     </article>
+  );
+}
+
+function compactWeekDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(asUtc(value));
+}
+
+function actionDeadlineSort(
+  a: { obligation: DashboardObligation },
+  b: { obligation: DashboardObligation },
+) {
+  return (a.obligation.latest ?? "9999-12-31").localeCompare(
+    b.obligation.latest ?? "9999-12-31",
   );
 }
 
@@ -90,6 +133,10 @@ export default async function ActionCenterPage() {
     row.openObligations
       .filter(
         (obligation) =>
+          isOurOperationalResponsibility(
+            obligation.type,
+            row.legionellaResponsibility,
+          ) &&
           ![
             "MISSED",
             "OVERDUE",
@@ -100,40 +147,54 @@ export default async function ActionCenterPage() {
       )
       .map((obligation) => ({ row, obligation })),
   );
-  const dueItems = actionable
+  const immediateItems = actionable
+    .filter(({ obligation }) => obligation.priority === "EMERGENCY")
+    .sort(actionDeadlineSort);
+  const immediateIds = new Set(
+    immediateItems.map(({ obligation }) => obligation.id),
+  );
+  const thisWeekItems = actionable
     .filter(
-      ({ obligation }) => getAttentionBucket(obligation, today) === "URGENT",
+      ({ obligation }) =>
+        !immediateIds.has(obligation.id) &&
+        deadlinePeriodForDate(obligation.latest, today) === "THIS_WEEK",
     )
-    .sort((a, b) => compareUrgentAttention(a.obligation, b.obligation, today));
-  const dueIds = new Set(dueItems.map(({ obligation }) => obligation.id));
+    .sort(actionDeadlineSort);
+  const thisWeekIds = new Set(
+    thisWeekItems.map(({ obligation }) => obligation.id),
+  );
+  const nextWeekItems = actionable
+    .filter(
+      ({ obligation }) =>
+        !immediateIds.has(obligation.id) &&
+        deadlinePeriodForDate(obligation.latest, today) === "NEXT_WEEK",
+    )
+    .sort(actionDeadlineSort);
+  const visibleActionIds = new Set([
+    ...immediateIds,
+    ...thisWeekIds,
+    ...nextWeekItems.map(({ obligation }) => obligation.id),
+  ]);
   const combinedRows = rows.filter(
     (row) =>
       (row.visitOpportunity?.obligations.length ?? 0) > 1 &&
-      row.visitOpportunity!.obligations.every((item) => !dueIds.has(item.id)),
-  );
-  const combinedIds = new Set(
-    combinedRows.flatMap((row) =>
-      row.visitOpportunity!.obligations.map((item) => item.id),
-    ),
-  );
-  const upcomingItems = actionable
-    .filter(
-      ({ obligation }) =>
-        !dueIds.has(obligation.id) && !combinedIds.has(obligation.id),
-    )
-    .sort((a, b) =>
-      (a.obligation.latest ?? "9999-12-31").localeCompare(
-        b.obligation.latest ?? "9999-12-31",
+      row.visitOpportunity!.obligations.every(
+        (item) => !visibleActionIds.has(item.id),
       ),
-    );
+  );
   const issueCount = rows.reduce(
     (count, row) =>
       count +
-      row.openObligations.filter((obligation) =>
-        ["MISSED", "OVERDUE"].includes(obligation.status),
+      row.openObligations.filter(
+        (obligation) =>
+          isOurOperationalResponsibility(
+            obligation.type,
+            row.legionellaResponsibility,
+          ) && ["MISSED", "OVERDUE"].includes(obligation.status),
       ).length,
     0,
   );
+  const periodBounds = deadlinePeriodBounds(today);
 
   return (
     <>
@@ -143,38 +204,76 @@ export default async function ActionCenterPage() {
         description="Work that can still prevent a compliance failure, ordered by deadline."
       />
 
-      {issueCount > 0 && (
-        <section className="mb-7 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-5 text-red-950">
+      {(issueCount > 0 || immediateItems.length > 0) && (
+        <section className="panel mb-7 overflow-hidden border-red-200">
+          <div className="border-b border-red-200 bg-red-50 p-5">
+            <h2 className="mt-1 text-xl font-black text-red-950">
+              Immediate Attention
+            </h2>
+            <p className="mt-1 text-sm font-bold text-red-800">
+              Only visible when needed
+            </p>
+          </div>
+          {issueCount > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-red-200 bg-red-50/40 p-5 text-red-950">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 shrink-0" size={20} />
+                <div>
+                  <h3 className="font-black">
+                    {issueCount} unresolved compliance{" "}
+                    {issueCount === 1 ? "issue" : "issues"}
+                  </h3>
+                  <p className="mt-1 text-sm">
+                    Review missed or overdue company responsibilities.
+                  </p>
+                </div>
+              </div>
+              <Link
+                className="btn min-h-11 border-red-300 bg-white"
+                href="/work/overdue-towers"
+              >
+                Review compliance issues
+              </Link>
+            </div>
+          )}
+          {immediateItems.map(({ row, obligation }) => (
+            <ActionRow
+              key={obligation.id}
+              row={row}
+              obligation={obligation}
+              today={today}
+              tone="immediate"
+            />
+          ))}
+        </section>
+      )}
+
+      <section
+        className="panel mb-7 overflow-hidden border-amber-200"
+        data-testid="this-week-section"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 p-5">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 shrink-0" size={20} />
+            <CalendarCheck className="mt-1 text-amber-800" size={20} />
             <div>
-              <div className="label text-red-800">Compliance issues</div>
-              <h2 className="mt-1 text-lg font-black">
-                {issueCount} unresolved {issueCount === 1 ? "issue" : "issues"}
-              </h2>
-              <p className="mt-1 text-sm">
-                These need review and are kept separate from preventable work.
+              <h2 className="mt-1 text-xl font-black">Current Work Week</h2>
+              <p className="mt-1 text-sm font-bold text-amber-900">
+                Work requiring action now
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                Today through {compactWeekDate(periodBounds.thisWeekEnd)}
               </p>
             </div>
           </div>
           <Link
-            className="btn min-h-11 border-red-300 bg-white"
-            href="/work/overdue-towers"
+            className="text-sm font-black text-amber-900"
+            href="/deadlines?period=THIS_WEEK"
           >
-            Review compliance issues
+            View all due this week →
           </Link>
-        </section>
-      )}
-
-      <section className="panel mb-7 overflow-hidden">
-        <div className="border-b border-slate-200 p-5">
-          <div className="label">Highest priority</div>
-          <h2 className="mt-1 text-xl font-black">
-            Due within the next three working days
-          </h2>
         </div>
-        {dueItems.length ? (
-          dueItems.map(({ row, obligation }) => (
+        {thisWeekItems.length ? (
+          thisWeekItems.map(({ row, obligation }) => (
             <ActionRow
               key={obligation.id}
               row={row}
@@ -184,20 +283,64 @@ export default async function ActionCenterPage() {
           ))
         ) : (
           <p className="p-5 text-sm font-bold text-slate-600">
-            Nothing is due within the next three working days.
+            Nothing else is due before the end of this week.
           </p>
         )}
       </section>
 
-      <section className="panel mb-7 p-5">
+      <section
+        className="panel mb-7 overflow-hidden border-blue-200 bg-blue-50/20"
+        data-testid="next-week-section"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-200 bg-blue-50 p-5">
+          <div className="flex items-start gap-3">
+            <CalendarCheck className="mt-1 text-blue-700" size={20} />
+            <div>
+              <h2 className="mt-1 text-xl font-black">Next Week</h2>
+              <p className="mt-1 text-sm font-bold text-blue-800">
+                Near-term planning
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                {compactWeekDate(periodBounds.nextWeekStart)} through{" "}
+                {compactWeekDate(periodBounds.nextWeekEnd)}
+              </p>
+            </div>
+          </div>
+          <Link
+            className="text-sm font-black text-blue-800"
+            href="/deadlines?period=NEXT_WEEK"
+          >
+            View all due next week →
+          </Link>
+        </div>
+        {nextWeekItems.length ? (
+          nextWeekItems.map(({ row, obligation }) => (
+            <ActionRow
+              key={obligation.id}
+              row={row}
+              obligation={obligation}
+              today={today}
+              tone="next"
+            />
+          ))
+        ) : (
+          <p className="p-5 text-sm font-bold text-blue-900">
+            Nothing is currently due next week.
+          </p>
+        )}
+      </section>
+
+      <section className="panel p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             <Layers3 className="mt-1" size={20} />
             <div>
-              <div className="label">Route optimization</div>
               <h2 className="mt-1 text-xl font-black">
-                Recommended combined visits
+                Combined Visit Recommendations
               </h2>
+              <p className="mt-1 text-sm font-bold text-emerald-800">
+                Route and obligation optimization
+              </p>
             </div>
           </div>
           <Link
@@ -252,36 +395,10 @@ export default async function ActionCenterPage() {
             })
           ) : (
             <p className="text-sm font-bold text-slate-600">
-              No non-urgent obligations currently share valid completion dates.
+              No later obligations currently share valid completion dates.
             </p>
           )}
         </div>
-      </section>
-
-      <section className="panel overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-slate-200 p-5">
-          <CalendarCheck size={20} />
-          <div>
-            <div className="label">Plan ahead</div>
-            <h2 className="mt-1 text-xl font-black">
-              Upcoming and currently actionable
-            </h2>
-          </div>
-        </div>
-        {upcomingItems.length ? (
-          upcomingItems.map(({ row, obligation }) => (
-            <ActionRow
-              key={obligation.id}
-              row={row}
-              obligation={obligation}
-              today={today}
-            />
-          ))
-        ) : (
-          <p className="p-5 text-sm text-slate-600">
-            No additional actionable obligations are open.
-          </p>
-        )}
       </section>
     </>
   );

@@ -53,6 +53,10 @@ export function requirementLabel(value: string): string {
   if (value === "STARTUP_CLEANING_DISINFECTION")
     return "Startup cleaning and disinfection";
   if (value === "PORTAL_SAMPLE_DATE") return "NYC portal follow-up";
+  if (value === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
+    return "Routine bacteriological sample";
+  if (value === "NYS_ANNUAL_CERTIFICATION")
+    return "New York State annual certification";
   if (value === "LAB_RESULT") return "Laboratory result";
   return plainEnumLabel(value);
 }
@@ -76,5 +80,9 @@ export function requiredActionLabel(value: string): string {
     return "Complete startup cleaning and disinfection";
   if (value === "PORTAL_SAMPLE_DATE")
     return "Submit the sample date through the NYC portal";
+  if (value === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
+    return "Confirm the owner-managed bacteriological culture sample";
+  if (value === "NYS_ANNUAL_CERTIFICATION")
+    return "Submit the New York State annual certification";
   return requirementLabel(value);
 }

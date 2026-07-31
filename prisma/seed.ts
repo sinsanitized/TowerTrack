@@ -9,10 +9,15 @@ import {
   SourceAuthority,
   UserRole,
   VisitStatus,
+  TowerRuleConfiguration,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { addDays } from "../lib/date";
-import { calculateLegionellaPlan, type ProfileMode } from "../lib/rules";
+import {
+  calculateLegionellaPlan,
+  DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW,
+  type ProfileMode,
+} from "../lib/rules";
 import { rebuildSystemComplianceProjections } from "../lib/obligation-projections";
 
 const db = new PrismaClient();
@@ -20,6 +25,9 @@ const TODAY = "2026-07-13";
 const D = (value: string) => new Date(`${value}T12:00:00Z`);
 
 async function main() {
+  const demoMode = process.env.DEMO_MODE === "true";
+  await db.legacyImportRow.deleteMany();
+  await db.legacyImportBatch.deleteMany();
   await db.auditLog.deleteMany();
   await db.reviewItem.deleteMany();
   await db.complianceStatus.deleteMany();
@@ -35,6 +43,7 @@ async function main() {
   await db.visitActivity.deleteMany();
   await db.visit.deleteMany();
   await db.route.deleteMany();
+  await db.towerRuleAssignment.deleteMany();
   await db.coolingTowerSystem.deleteMany();
   await db.pendingRegulation.deleteMany();
   await db.ruleDefinition.deleteMany();
@@ -45,8 +54,20 @@ async function main() {
   await db.user.deleteMany();
   await db.organization.deleteMany();
   const org = await db.organization.create({
-    data: { name: "TowerTrack Demo Water Treatment" },
+    data: {
+      name:
+        process.env.INITIAL_ORGANIZATION_NAME ||
+        (demoMode ? "TowerTrack Demo Water Treatment" : "TowerTrack"),
+    },
   });
+  if (
+    !demoMode &&
+    (!process.env.INITIAL_ADMIN_PASSWORD ||
+      process.env.INITIAL_ADMIN_PASSWORD.length < 12)
+  )
+    throw new Error(
+      "INITIAL_ADMIN_PASSWORD must contain at least 12 characters outside demo mode.",
+    );
   const password = await bcrypt.hash(
     process.env.INITIAL_ADMIN_PASSWORD || "ChangeMe123!",
     12,
@@ -55,39 +76,46 @@ async function main() {
   const admin = await db.user.create({
     data: {
       organizationId: org.id,
-      name: "Avery Morgan",
+      name:
+        process.env.INITIAL_ADMIN_NAME ||
+        (demoMode ? "Avery Morgan" : "TowerTrack Administrator"),
       email: process.env.INITIAL_ADMIN_EMAIL || "admin@towertrack.local",
       passwordHash: password,
       role: UserRole.ADMIN,
     },
   });
-  const mike = await db.user.create({
-    data: {
-      organizationId: org.id,
-      name: "Mike Torres",
-      email: "mike@towertrack.local",
-      passwordHash: password,
-      role: UserRole.TECHNICIAN,
-    },
-  });
-  const nia = await db.user.create({
-    data: {
-      organizationId: org.id,
-      name: "Nia Patel",
-      email: "nia@towertrack.local",
-      passwordHash: password,
-      role: UserRole.TECHNICIAN,
-    },
-  });
-  await db.user.create({
-    data: {
-      organizationId: org.id,
-      name: "Fictional Demo Viewer",
-      email: "demo@towertrack.local",
-      passwordHash: demoPassword,
-      role: UserRole.READ_ONLY,
-    },
-  });
+  const mike = demoMode
+    ? await db.user.create({
+        data: {
+          organizationId: org.id,
+          name: "Mike Torres",
+          email: "mike@towertrack.local",
+          passwordHash: password,
+          role: UserRole.TECHNICIAN,
+        },
+      })
+    : null;
+  const nia = demoMode
+    ? await db.user.create({
+        data: {
+          organizationId: org.id,
+          name: "Nia Patel",
+          email: "nia@towertrack.local",
+          passwordHash: password,
+          role: UserRole.TECHNICIAN,
+        },
+      })
+    : null;
+  if (demoMode)
+    await db.user.create({
+      data: {
+        organizationId: org.id,
+        name: "Fictional Demo Viewer",
+        email: "demo@towertrack.local",
+        passwordHash: demoPassword,
+        role: UserRole.READ_ONLY,
+      },
+    });
   const nyc = await db.jurisdiction.create({
     data: {
       country: "US",
@@ -129,7 +157,7 @@ async function main() {
       name: "NYS Part 4 Only",
       mode: JurisdictionMode.NYS_PART_4_ONLY,
       jurisdictionId: nys.id,
-      interval: 90,
+      interval: null,
       authority: SourceAuthority.REGULATORY,
       description:
         "New York State outside NYC; never receives the NYC 31-day rule.",
@@ -172,7 +200,10 @@ async function main() {
       description:
         "Custom rule awaiting verified citation and admin confirmation.",
     },
-  ];
+  ].filter(
+    (profile) =>
+      demoMode || ["nyc-2026", "nys-only", "oos-policy"].includes(profile.id),
+  );
   for (const p of profiles) {
     await db.ruleProfile.create({
       data: {
@@ -215,6 +246,7 @@ async function main() {
         warningDays: 7,
         criticalDays: 3,
         notes: p.description,
+        enabled: p.id === "nyc-2026" || p.id === "nys-only",
       },
     });
   }
@@ -267,8 +299,26 @@ async function main() {
       90,
       "10 NYCRR §4-1.8",
     ],
+    [
+      "nys-reporting",
+      "nys-only",
+      "NYS_REGISTRY_REPORTING",
+      "NYS registry reporting",
+      90,
+      "10 NYCRR §4-1.3",
+    ],
+    [
+      "nys-certification",
+      "nys-only",
+      "ANNUAL_CERTIFICATION",
+      "NYS annual certification",
+      null,
+      "10 NYCRR §4-1.8(b)",
+    ],
   ] as const;
-  for (const [id, profileId, type, name, days, citation] of extras)
+  for (const [id, profileId, type, name, days, citation] of extras.filter(
+    (rule) => demoMode || ["nyc-2026", "nys-only"].includes(rule[1]),
+  ))
     await db.ruleDefinition.create({
       data: {
         id,
@@ -285,6 +335,27 @@ async function main() {
           id === "nyc-hyper" ? "POST_HYPERHALOGENATION_SAMPLE" : null,
       },
     });
+  if (!demoMode) {
+    await db.auditLog.create({
+      data: {
+        entityType: "Seed",
+        entityId: org.id,
+        action: "REFERENCE_DATA_INITIALIZED",
+        reason: "Initialized production organization and NYC rule data",
+        changedById: admin.id,
+        newValue: {
+          organizationName: org.name,
+          administratorEmail: admin.email,
+          ruleProfileId: "nyc-2026",
+        },
+      },
+    });
+    console.log(
+      "Initialized production TowerTrack organization, administrator, and NYC rules without demo operational data.",
+    );
+    return;
+  }
+  if (!mike || !nia) throw new Error("Demo technicians were not initialized.");
   const pending = await db.pendingRegulation.create({
     data: {
       jurisdictionId: nj.id,
@@ -550,11 +621,26 @@ async function main() {
         : i === 15
           ? OperatingStatus.SEASONALLY_INACTIVE
           : OperatingStatus.OPERATING;
+    const ruleConfiguration =
+      profileId === "nyc-2026"
+        ? TowerRuleConfiguration.NYC_AND_NYS
+        : profileId === "nys-only"
+          ? TowerRuleConfiguration.NYS_ONLY
+          : TowerRuleConfiguration.CUSTOM;
     const system = await db.coolingTowerSystem.create({
       data: {
         buildingId: building.id,
         jurisdictionId,
         ruleProfileId: profileId,
+        ruleConfiguration,
+        ruleConfigurationEffectiveDate: D(
+          profileId === "nyc-2026" ? "2026-05-08" : "2016-07-06",
+        ),
+        ruleConfigurationConfirmed: ![
+          "oos-guidance",
+          "pending",
+          "custom",
+        ].includes(profileId),
         pendingRegulationId: i === 16 || i === 22 ? pending.id : null,
         internalJobNumber: `JOB-${1001 + i}`,
         systemName: `CT-${(i % 2) + 1}`,
@@ -569,11 +655,24 @@ async function main() {
         seasonEndMonth: 10,
         seasonEndDay: 31,
         preferredTargetDay: [15, 18, 20, 22][i % 4],
+        monthlyTargetStartDay: DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW.startDay,
+        monthlyTargetEndDay: DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW.endDay,
         assignedTechnicianId: i % 2 ? mike.id : nia.id,
         mppVersion: "MPP-FX-2026.1",
         qualifiedPerson: "Fictional QP",
         laboratory: "Fictional ELAP Laboratory",
         notes: "Fictional seed data",
+      },
+    });
+    await db.towerRuleAssignment.create({
+      data: {
+        coolingTowerSystemId: system.id,
+        configuration: ruleConfiguration,
+        ruleProfileId: profileId,
+        effectiveStartDate: system.ruleConfigurationEffectiveDate,
+        requiresReview: !system.ruleConfigurationConfirmed,
+        changedById: admin.id,
+        reason: "Seeded explicit tower compliance-rule assignment",
       },
     });
     systems.push(system);

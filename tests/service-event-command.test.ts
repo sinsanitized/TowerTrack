@@ -79,17 +79,23 @@ describe("service event commands", () => {
     expect(command.eventTimestamp).toBeNull();
   });
 
-  it("requires the complete hyperhalogenation field record", () => {
-    expect(() =>
-      parseServiceEventCommand(
-        {
-          ...baseInput,
-          eventType: "SUMMERTIME_HYPERHALOGENATION",
-          chemical: "Sodium hypochlorite",
-        },
-        { today: "2026-07-17" },
-      ),
-    ).toThrow(/chemical, quantity, contact time/i);
+  it("saves hyperhalogenation with only the authoritative date", () => {
+    const command = parseServiceEventCommand(
+      {
+        ...baseInput,
+        eventType: "SUMMERTIME_HYPERHALOGENATION",
+      },
+      { today: "2026-07-17" },
+    );
+    expect(command.eventDate).toBe("2026-07-17");
+    expect(command.eventTimestamp).toBeNull();
+    expect(command.details).toMatchObject({
+      chemical: null,
+      quantity: null,
+      contactTime: null,
+      freeHalogenResidual: null,
+      technician: null,
+    });
   });
 
   it("preserves the sample subtype through the activity mapping boundary", () => {

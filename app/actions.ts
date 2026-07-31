@@ -12,7 +12,13 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { clearSession, requireRole } from "@/lib/auth";
-import { asUtc, dateOnly, isWeekend, todayInTimeZone } from "@/lib/date";
+import {
+  addDays,
+  asUtc,
+  dateOnly,
+  isWeekend,
+  todayInTimeZone,
+} from "@/lib/date";
 import {
   activitiesCanShareVisit,
   completedEventsConflictOnSameDate,
@@ -32,6 +38,13 @@ import {
   annualCleaningProgress,
   nextAnnualCleaningObligation,
 } from "@/lib/obligation-engine";
+import { DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW } from "@/lib/rules";
+import { ruleSetVersion } from "@/lib/rule-profile";
+import {
+  profileMatchesTowerConfiguration,
+  towerRuleConfigurationValues,
+} from "@/lib/tower-rule-configuration";
+import { serviceResponsibilityValues } from "@/lib/service-responsibility";
 
 const sourceAuthorities = [
   "REGULATORY",
@@ -44,10 +57,73 @@ const sourceAuthorities = [
 
 const supportedRequirementTypes = [
   "ROUTINE_LEGIONELLA_SAMPLE",
+  "ROUTINE_BACTERIOLOGICAL_SAMPLE",
   "COMPLIANCE_INSPECTION",
   "PORTAL_SAMPLE_DATE",
+  "NYS_REGISTRY_REPORTING",
+  "ANNUAL_CERTIFICATION",
   "SUMMERTIME_HYPERHALOGENATION",
+  "ANNUAL_CLEANING",
+  "STARTUP_CLEANING_DISINFECTION",
+  "STARTUP_SAMPLE",
+  "SHUTDOWN_REQUIREMENT",
+  "POST_CLEANING_SAMPLE",
+  "POST_DISINFECTION_SAMPLE",
+  "CUSTOMER_RECURRING_EVENT",
+  "COMPANY_POLICY_OBLIGATION",
 ] as const;
+
+export async function createCustomRuleProfileAction(formData: FormData) {
+  const user = await requireRole([UserRole.ADMIN]);
+  const parsed = z
+    .object({
+      name: z.string().trim().min(3).max(160),
+      effectiveDate: z.string().date(),
+      description: z.string().trim().min(8).max(2000),
+      reason: z.string().trim().min(8).max(2000),
+    })
+    .parse({
+      name: String(formData.get("name") || ""),
+      effectiveDate: String(formData.get("effectiveDate") || ""),
+      description: String(formData.get("description") || ""),
+      reason: String(formData.get("reason") || ""),
+    });
+  const id = `custom-${crypto.randomUUID()}`;
+  await db.$transaction(async (tx) => {
+    await tx.ruleProfile.create({
+      data: {
+        id,
+        organizationId: user.organizationId,
+        name: parsed.name,
+        jurisdictionMode: "CUSTOM_JURISDICTION",
+        effectiveStartDate: asUtc(parsed.effectiveDate),
+        description: parsed.description,
+        isDefault: false,
+        active: true,
+        legionellaIntervalDays: null,
+        internalTargetIntervalDays: null,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        entityType: "RuleProfile",
+        entityId: id,
+        action: "CREATED",
+        reason: parsed.reason,
+        changedById: user.id,
+        newValue: {
+          name: parsed.name,
+          complianceJurisdiction: "CUSTOM",
+          effectiveDate: parsed.effectiveDate,
+          enabledRequirements: [],
+          safetyNotice: "Company policy — verify local requirements",
+        },
+      },
+    });
+  });
+  revalidatePath("/admin");
+  redirect(`/admin?savedProfile=${id}&profileAction=created`);
+}
 
 const manageableUserRoles = [
   UserRole.ADMIN,
@@ -385,7 +461,53 @@ export async function recordServiceEventAction(formData: FormData) {
   const command = parseServiceEventCommand(
     serviceEventInputFromFormData(formData),
   );
-  await scopedSystem(systemId, user.organizationId);
+  if (
+    command.eventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
+    user.role !== UserRole.ADMIN &&
+    user.role !== UserRole.OPERATIONS_MANAGER
+  )
+    throw new Error(
+      "Routine bacteriological sampling is owner managed and may only be confirmed by an authorized office user.",
+    );
+  const eventSystem = await db.coolingTowerSystem.findFirstOrThrow({
+    where: {
+      id: systemId,
+      building: { customer: { organizationId: user.organizationId } },
+    },
+    select: { legionellaResponsibility: true, legionellaVendorName: true },
+  });
+  const isLegionellaEvent = [
+    "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+    "LEGIONELLA_RESULT_RECEIVED",
+  ].includes(command.eventType);
+  if (
+    isLegionellaEvent &&
+    eventSystem.legionellaResponsibility === "NOT_TRACKED"
+  )
+    throw new Error("Legionella is not tracked in TowerTrack for this tower.");
+  if (
+    isLegionellaEvent &&
+    eventSystem.legionellaResponsibility !== "OUR_COMPANY" &&
+    user.role !== UserRole.ADMIN &&
+    user.role !== UserRole.OPERATIONS_MANAGER
+  )
+    throw new Error(
+      "External Legionella information may only be recorded by an authorized office user.",
+    );
+  const performedBy = command.details.performedByResponsibility;
+  if (
+    isLegionellaEvent &&
+    eventSystem.legionellaResponsibility !== "OUR_COMPANY"
+  ) {
+    if (performedBy !== eventSystem.legionellaResponsibility)
+      throw new Error(
+        "The event performer must match this tower's Legionella responsibility.",
+      );
+  } else if (performedBy !== "OUR_COMPANY") {
+    throw new Error(
+      "External attribution is only available for externally managed Legionella work.",
+    );
+  }
   const result = await db.$transaction(async (tx) => {
     await assertNoCleaningHyperConflict(tx, {
       systemId,
@@ -429,6 +551,11 @@ export async function recordServiceEventAction(formData: FormData) {
         eventTimestamp: command.eventTimestamp,
         details: command.details,
         notes: command.notes,
+        performedByResponsibility: performedBy,
+        externalProviderName:
+          command.details.externalProviderName ||
+          eventSystem.legionellaVendorName,
+        externalSource: command.details.externalSource,
         recordedById: user.id,
       },
     });
@@ -467,6 +594,66 @@ export async function recordServiceEventAction(formData: FormData) {
   );
 }
 
+export async function updateServiceResponsibilityAction(formData: FormData) {
+  const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
+  const parsed = z
+    .object({
+      systemId: z.string().min(1),
+      legionellaResponsibility: z.enum(serviceResponsibilityValues),
+      legionellaVendorName: z.string().trim().max(200).optional(),
+      reason: z.string().trim().min(8).max(2000),
+    })
+    .parse(Object.fromEntries(formData));
+  if (
+    parsed.legionellaResponsibility === "OTHER_VENDOR" &&
+    !parsed.legionellaVendorName
+  )
+    throw new Error("Enter the Legionella vendor name.");
+  const existing = await db.coolingTowerSystem.findFirstOrThrow({
+    where: {
+      id: parsed.systemId,
+      building: { customer: { organizationId: user.organizationId } },
+    },
+    select: { legionellaResponsibility: true, legionellaVendorName: true },
+  });
+  await db.$transaction(async (tx) => {
+    await tx.coolingTowerSystem.update({
+      where: { id: parsed.systemId },
+      data: {
+        legionellaResponsibility: parsed.legionellaResponsibility,
+        legionellaVendorName:
+          parsed.legionellaResponsibility === "OTHER_VENDOR"
+            ? parsed.legionellaVendorName
+            : null,
+      },
+    });
+    await tx.reviewItem.updateMany({
+      where: {
+        entityType: "CoolingTowerSystem",
+        entityId: parsed.systemId,
+        title: "Legionella responsibility must be confirmed",
+        status: "OPEN",
+      },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
+    await tx.auditLog.create({
+      data: {
+        entityType: "CoolingTowerSystem",
+        entityId: parsed.systemId,
+        action: "SERVICE_RESPONSIBILITY_UPDATED",
+        reason: parsed.reason,
+        changedById: user.id,
+        previousValue: existing,
+        newValue: parsed,
+      },
+    });
+  });
+  revalidatePath("/");
+  revalidatePath("/deadlines");
+  revalidatePath(`/systems/${parsed.systemId}`);
+  redirect(`/systems/${parsed.systemId}?view=settings&responsibility=1`);
+}
+
 export async function correctServiceEventAction(formData: FormData) {
   const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const identifiers = z
@@ -490,10 +677,13 @@ export async function correctServiceEventAction(formData: FormData) {
       },
     },
   });
+  const submittedDetails = Object.fromEntries(
+    Object.entries(command.details).filter(([, value]) => value != null),
+  );
   const details = {
     ...eventDetailsObject(existing.details),
-    ...command.details,
-  };
+    ...submittedDetails,
+  } as Prisma.InputJsonObject;
   const replacement = await db.$transaction(async (tx) => {
     await assertNoCleaningHyperConflict(tx, {
       systemId: existing.coolingTowerSystemId,
@@ -758,6 +948,7 @@ export async function updateMonthlyTargetWindowAction(formData: FormData) {
     });
   });
   revalidatePath("/");
+  revalidatePath("/deadlines");
   revalidatePath(`/systems/${parsed.systemId}`);
   redirect(`/systems/${parsed.systemId}?targetWindow=1`);
 }
@@ -896,6 +1087,15 @@ export async function updateSeasonalSettingsAction(formData: FormData) {
       where: { id: parsed.systemId },
       data: nextValue,
     });
+    await tx.reviewItem.updateMany({
+      where: {
+        entityType: "CoolingTowerSystem",
+        entityId: parsed.systemId,
+        title: "Operating schedule must be confirmed.",
+        status: "OPEN",
+      },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
     await rebuildSystemComplianceProjections(tx, parsed.systemId);
     await tx.auditLog.create({
       data: {
@@ -923,6 +1123,7 @@ export async function updateSeasonalSettingsAction(formData: FormData) {
     });
   });
   revalidatePath("/");
+  revalidatePath("/deadlines");
   revalidatePath(`/systems/${parsed.systemId}`);
   redirect(`/systems/${parsed.systemId}?operationPattern=1`);
 }
@@ -1837,8 +2038,9 @@ export async function updateRuleProfileAction(formData: FormData) {
     },
   });
   if (
-    existing.systems.length === 0 ||
-    existing._count.systems !== existing.systems.length
+    existing.organizationId !== user.organizationId &&
+    (existing.systems.length === 0 ||
+      existing._count.systems !== existing.systems.length)
   )
     throw new Error(
       "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
@@ -1915,6 +2117,10 @@ export async function updateRuleDefinitionAction(formData: FormData) {
       frequencyDays: optionalRuleInteger,
       minimumDaysAfterTrigger: optionalRuleInteger,
       maximumDaysAfterTrigger: optionalRuleInteger,
+      effectiveDate: z.preprocess(
+        (value) => (value == null || value === "" ? null : value),
+        z.string().date().nullable(),
+      ),
       enabled: z.boolean(),
       notes: z.string().trim().optional(),
       reason: z.string().trim().min(8).max(2000),
@@ -1927,6 +2133,7 @@ export async function updateRuleDefinitionAction(formData: FormData) {
       frequencyDays: formData.get("frequencyDays"),
       minimumDaysAfterTrigger: formData.get("minimumDaysAfterTrigger"),
       maximumDaysAfterTrigger: formData.get("maximumDaysAfterTrigger"),
+      effectiveDate: formData.get("effectiveDate"),
       enabled: formData.get("enabled") === "on",
       notes: String(formData.get("notes") || ""),
       reason: String(formData.get("reason") || ""),
@@ -1949,16 +2156,26 @@ export async function updateRuleDefinitionAction(formData: FormData) {
             select: { id: true },
           },
           _count: { select: { systems: true } },
+          rules: true,
         },
       },
     },
   });
   if (
-    existing.ruleProfile.systems.length === 0 ||
-    existing.ruleProfile._count.systems !== existing.ruleProfile.systems.length
+    existing.ruleProfile.organizationId !== user.organizationId &&
+    (existing.ruleProfile.systems.length === 0 ||
+      existing.ruleProfile._count.systems !==
+        existing.ruleProfile.systems.length)
   )
     throw new Error(
       "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
+    );
+  if (
+    existing.ruleProfile.jurisdictionMode === "CUSTOM_JURISDICTION" &&
+    parsed.sourceAuthority === "REGULATORY"
+  )
+    throw new Error(
+      "Custom profile requirements must be labeled as company, customer, contract, guidance, or review—not as verified regulation.",
     );
   if (
     existing.requirementType === "ROUTINE_LEGIONELLA_SAMPLE" &&
@@ -1972,7 +2189,9 @@ export async function updateRuleDefinitionAction(formData: FormData) {
   const nextRevision = existing.revision + 1;
   const intervalEditable = [
     "ROUTINE_LEGIONELLA_SAMPLE",
+    "ROUTINE_BACTERIOLOGICAL_SAMPLE",
     "PORTAL_SAMPLE_DATE",
+    "NYS_REGISTRY_REPORTING",
     "COMPLIANCE_INSPECTION",
   ].includes(existing.requirementType);
   const triggerWindowEditable =
@@ -1999,23 +2218,102 @@ export async function updateRuleDefinitionAction(formData: FormData) {
     isPendingRegulation: parsed.sourceAuthority === "PENDING_REGULATION",
     revision: nextRevision,
   };
+  const createCustomVersion =
+    existing.ruleProfile.jurisdictionMode === "CUSTOM_JURISDICTION" &&
+    existing.ruleProfile.systems.length > 0;
+  if (createCustomVersion && parsed.effectiveDate !== todayInTimeZone())
+    throw new Error(
+      "Changing an assigned custom profile creates a new version. Use today's explicit effective date so future obligations can be recalculated without retroactive ambiguity.",
+    );
+  let savedRuleId = existing.id;
   await db.$transaction(async (tx) => {
-    await tx.ruleDefinition.update({
-      where: { id: existing.id },
-      data: nextValue,
-    });
-    if (existing.requirementType === "ROUTINE_LEGIONELLA_SAMPLE")
-      await tx.ruleProfile.update({
-        where: { id: existing.ruleProfileId },
-        data: { legionellaIntervalDays: parsed.frequencyDays },
+    if (createCustomVersion) {
+      const effectiveDate = parsed.effectiveDate as string;
+      const nextProfileId = `${existing.ruleProfile.id}-v-${effectiveDate}-${crypto.randomUUID().slice(0, 8)}`;
+      const clonedRules = existing.ruleProfile.rules.map((rule) => {
+        const { id, ruleProfileId, createdAt, updatedAt, ...definition } = rule;
+        void id;
+        void ruleProfileId;
+        void createdAt;
+        void updatedAt;
+        const nextRuleId = `${nextProfileId}-${rule.requirementType.toLowerCase().replaceAll("_", "-")}`;
+        if (rule.id === existing.id) savedRuleId = nextRuleId;
+        return {
+          ...definition,
+          id: nextRuleId,
+          ...(rule.id === existing.id ? nextValue : {}),
+        };
       });
+      await tx.ruleProfile.create({
+        data: {
+          id: nextProfileId,
+          organizationId: user.organizationId,
+          name: existing.ruleProfile.name,
+          jurisdictionMode: existing.ruleProfile.jurisdictionMode,
+          jurisdictionId: existing.ruleProfile.jurisdictionId,
+          effectiveStartDate: asUtc(effectiveDate),
+          description: existing.ruleProfile.description,
+          isDefault: existing.ruleProfile.isDefault,
+          active: true,
+          legionellaIntervalDays:
+            existing.requirementType === "ROUTINE_LEGIONELLA_SAMPLE"
+              ? parsed.frequencyDays
+              : existing.ruleProfile.legionellaIntervalDays,
+          internalTargetIntervalDays:
+            existing.ruleProfile.internalTargetIntervalDays,
+          appliesToPartialOperation:
+            existing.ruleProfile.appliesToPartialOperation,
+          rules: { create: clonedRules },
+        },
+      });
+      await tx.ruleProfile.update({
+        where: { id: existing.ruleProfile.id },
+        data: {
+          active: false,
+          effectiveEndDate: asUtc(addDays(effectiveDate, -1)),
+        },
+      });
+      await tx.coolingTowerSystem.updateMany({
+        where: { id: { in: existing.ruleProfile.systems.map(({ id }) => id) } },
+        data: { ruleProfileId: nextProfileId },
+      });
+      await tx.auditLog.create({
+        data: {
+          entityType: "RuleProfile",
+          entityId: nextProfileId,
+          action: "VERSION_CREATED",
+          reason: parsed.reason,
+          changedById: user.id,
+          previousValue: {
+            profileId: existing.ruleProfile.id,
+            effectiveStartDate: existing.ruleProfile.effectiveStartDate,
+            ruleSetVersion: ruleSetVersion(existing.ruleProfile),
+          },
+          newValue: {
+            profileId: nextProfileId,
+            effectiveDate,
+            revisedRuleId: savedRuleId,
+          },
+        },
+      });
+    } else {
+      await tx.ruleDefinition.update({
+        where: { id: existing.id },
+        data: nextValue,
+      });
+      if (existing.requirementType === "ROUTINE_LEGIONELLA_SAMPLE")
+        await tx.ruleProfile.update({
+          where: { id: existing.ruleProfileId },
+          data: { legionellaIntervalDays: parsed.frequencyDays },
+        });
+    }
     for (const system of existing.ruleProfile.systems)
       await rebuildSystemComplianceProjections(tx, system.id);
     await tx.auditLog.create({
       data: {
         entityType: "RuleDefinition",
-        entityId: existing.id,
-        action: "REVISED",
+        entityId: savedRuleId,
+        action: createCustomVersion ? "CREATED_IN_NEW_VERSION" : "REVISED",
         reason: parsed.reason,
         changedById: user.id,
         previousValue: {
@@ -2034,7 +2332,7 @@ export async function updateRuleDefinitionAction(formData: FormData) {
   });
   revalidatePath("/");
   revalidatePath("/admin");
-  redirect(`/admin?savedRule=${existing.id}`);
+  redirect(`/admin?savedRule=${savedRuleId}`);
 }
 
 export async function createRuleDefinitionAction(formData: FormData) {
@@ -2046,6 +2344,10 @@ export async function createRuleDefinitionAction(formData: FormData) {
       ruleName: z.string().trim().min(3).max(200),
       sourceAuthority: z.enum(sourceAuthorities),
       sourceCitation: z.string().trim().min(3).max(2000),
+      triggerActivityType: z.preprocess(
+        (value) => (value == null || value === "" ? null : value),
+        z.nativeEnum(ActivityType).nullable(),
+      ),
       frequencyDays: optionalRuleInteger,
       minimumDaysAfterTrigger: optionalRuleInteger,
       maximumDaysAfterTrigger: optionalRuleInteger,
@@ -2059,6 +2361,7 @@ export async function createRuleDefinitionAction(formData: FormData) {
       ruleName: String(formData.get("ruleName") || ""),
       sourceAuthority: String(formData.get("sourceAuthority") || ""),
       sourceCitation: String(formData.get("sourceCitation") || ""),
+      triggerActivityType: formData.get("triggerActivityType"),
       frequencyDays: formData.get("frequencyDays"),
       minimumDaysAfterTrigger: formData.get("minimumDaysAfterTrigger"),
       maximumDaysAfterTrigger: formData.get("maximumDaysAfterTrigger"),
@@ -2069,11 +2372,24 @@ export async function createRuleDefinitionAction(formData: FormData) {
 
   const intervalType = [
     "ROUTINE_LEGIONELLA_SAMPLE",
+    "ROUTINE_BACTERIOLOGICAL_SAMPLE",
     "COMPLIANCE_INSPECTION",
     "PORTAL_SAMPLE_DATE",
+    "NYS_REGISTRY_REPORTING",
+  ].includes(parsed.requirementType);
+  const customTriggeredType = [
+    "ANNUAL_CLEANING",
+    "STARTUP_CLEANING_DISINFECTION",
+    "STARTUP_SAMPLE",
+    "SHUTDOWN_REQUIREMENT",
+    "POST_CLEANING_SAMPLE",
+    "POST_DISINFECTION_SAMPLE",
+    "CUSTOMER_RECURRING_EVENT",
+    "COMPANY_POLICY_OBLIGATION",
   ].includes(parsed.requirementType);
   const triggerWindowType =
-    parsed.requirementType === "SUMMERTIME_HYPERHALOGENATION";
+    parsed.requirementType === "SUMMERTIME_HYPERHALOGENATION" ||
+    (customTriggeredType && parsed.minimumDaysAfterTrigger != null);
   if (
     intervalType &&
     (parsed.frequencyDays == null || parsed.frequencyDays < 1)
@@ -2093,6 +2409,19 @@ export async function createRuleDefinitionAction(formData: FormData) {
     parsed.maximumDaysAfterTrigger < parsed.minimumDaysAfterTrigger
   )
     throw new Error("The maximum trigger offset must be after the minimum.");
+  if (customTriggeredType && parsed.triggerActivityType == null)
+    throw new Error(
+      "Custom recurring and follow-up rules require a trigger activity.",
+    );
+  if (
+    customTriggeredType &&
+    parsed.frequencyDays == null &&
+    (parsed.minimumDaysAfterTrigger == null ||
+      parsed.maximumDaysAfterTrigger == null)
+  )
+    throw new Error(
+      "Custom rules require either a recurring interval or both trigger offsets.",
+    );
 
   const profile = await db.ruleProfile.findUniqueOrThrow({
     where: { id: parsed.profileId },
@@ -2111,11 +2440,19 @@ export async function createRuleDefinitionAction(formData: FormData) {
     },
   });
   if (
-    profile.systems.length === 0 ||
-    profile._count.systems !== profile.systems.length
+    profile.organizationId !== user.organizationId &&
+    (profile.systems.length === 0 ||
+      profile._count.systems !== profile.systems.length)
   )
     throw new Error(
       "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
+    );
+  if (
+    profile.jurisdictionMode === "CUSTOM_JURISDICTION" &&
+    parsed.sourceAuthority === "REGULATORY"
+  )
+    throw new Error(
+      "Custom profile requirements must be labeled as company, customer, contract, guidance, or review—not as verified regulation.",
     );
   if (profile.rules.length)
     throw new Error(
@@ -2145,11 +2482,16 @@ export async function createRuleDefinitionAction(formData: FormData) {
     maximumDaysAfterTrigger: triggerWindowType
       ? parsed.maximumDaysAfterTrigger
       : null,
+    triggerActivityType: customTriggeredType
+      ? parsed.triggerActivityType
+      : null,
     dueDateCalculation: intervalType
       ? "LAST_QUALIFYING_ACTIVITY_PLUS_FREQUENCY"
       : triggerWindowType
         ? "TRIGGER_DATE_PLUS_WINDOW"
-        : "CALENDAR_YEAR_REQUIREMENT",
+        : customTriggeredType
+          ? "TRIGGER_DATE_PLUS_FREQUENCY"
+          : "CALENDAR_YEAR_REQUIREMENT",
     enabled: parsed.enabled,
     notes: parsed.notes || null,
     isRegulatoryRequirement: parsed.sourceAuthority === "REGULATORY",
@@ -2259,11 +2601,7 @@ export async function createCustomerAction(formData: FormData) {
 }
 
 export async function createCoolingTowerSystemAction(formData: FormData) {
-  const user = await requireRole([
-    UserRole.ADMIN,
-    UserRole.OPERATIONS_MANAGER,
-    UserRole.SCHEDULER,
-  ]);
+  const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const parsed = z
     .object({
       customerId: z.string().min(1),
@@ -2274,10 +2612,39 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
       serialNumber: z.string().trim().min(1),
       towerLocation: z.string().trim().min(2),
       tonnage: z.coerce.number().positive(),
+      operatingSchedule: z.enum(["YEAR_ROUND", "SEASONAL"]),
+      seasonStartMonth: z.coerce.number().int().min(1).max(12).optional(),
+      seasonStartDay: z.coerce.number().int().min(1).max(31).optional(),
+      seasonEndMonth: z.coerce.number().int().min(1).max(12).optional(),
+      seasonEndDay: z.coerce.number().int().min(1).max(31).optional(),
       jurisdictionId: z.string().min(1),
       ruleProfileId: z.string().min(1),
+      ruleConfiguration: z.enum(towerRuleConfigurationValues),
+      ruleEffectiveDate: z.string().date(),
+      legionellaResponsibility: z.enum(serviceResponsibilityValues),
+      legionellaVendorName: z.string().trim().max(200).optional(),
     })
     .parse(Object.fromEntries(formData));
+  const seasonal = parsed.operatingSchedule === "SEASONAL";
+  if (
+    parsed.legionellaResponsibility === "OTHER_VENDOR" &&
+    !parsed.legionellaVendorName
+  )
+    throw new Error("Enter the Legionella vendor name.");
+  const validMonthDay = (
+    month: number | undefined,
+    day: number | undefined,
+  ) => {
+    if (month == null || day == null) return false;
+    const test = new Date(Date.UTC(2024, month - 1, day));
+    return test.getUTCMonth() === month - 1 && test.getUTCDate() === day;
+  };
+  if (
+    seasonal &&
+    (!validMonthDay(parsed.seasonStartMonth, parsed.seasonStartDay) ||
+      !validMonthDay(parsed.seasonEndMonth, parsed.seasonEndDay))
+  )
+    throw new Error("Season start and end dates must be valid calendar dates.");
   const [building, profile] = await Promise.all([
     db.building.findFirstOrThrow({
       where: {
@@ -2287,7 +2654,11 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
       },
     }),
     db.ruleProfile.findFirstOrThrow({
-      where: { id: parsed.ruleProfileId, active: true },
+      where: {
+        id: parsed.ruleProfileId,
+        active: true,
+        OR: [{ organizationId: null }, { organizationId: user.organizationId }],
+      },
     }),
   ]);
   if (
@@ -2296,6 +2667,15 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
   )
     throw new Error(
       "The selected jurisdiction does not match that compliance profile.",
+    );
+  if (
+    !profileMatchesTowerConfiguration(
+      parsed.ruleConfiguration,
+      profile.jurisdictionMode,
+    )
+  )
+    throw new Error(
+      "The selected profile does not match the tower compliance-rule configuration.",
     );
   const jurisdiction = await db.jurisdiction.findUniqueOrThrow({
     where: { id: parsed.jurisdictionId },
@@ -2307,6 +2687,13 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
         buildingId: building.id,
         jurisdictionId: jurisdiction.id,
         ruleProfileId: profile.id,
+        ruleConfiguration: parsed.ruleConfiguration,
+        ruleConfigurationEffectiveDate: asUtc(parsed.ruleEffectiveDate),
+        legionellaResponsibility: parsed.legionellaResponsibility,
+        legionellaVendorName:
+          parsed.legionellaResponsibility === "OTHER_VENDOR"
+            ? parsed.legionellaVendorName
+            : null,
         internalJobNumber,
         systemName: parsed.systemName,
         manufacturer: parsed.manufacturer || null,
@@ -2314,7 +2701,29 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
         serialNumber: parsed.serialNumber,
         towerLocation: parsed.towerLocation,
         tonnage: parsed.tonnage,
+        operationPeriodType: parsed.operatingSchedule,
+        seasonal,
+        ...(seasonal
+          ? {
+              seasonStartMonth: parsed.seasonStartMonth!,
+              seasonStartDay: parsed.seasonStartDay!,
+              seasonEndMonth: parsed.seasonEndMonth!,
+              seasonEndDay: parsed.seasonEndDay!,
+            }
+          : {}),
         operatingStatus: "UNKNOWN",
+        monthlyTargetStartDay: DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW.startDay,
+        monthlyTargetEndDay: DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW.endDay,
+      },
+    });
+    await tx.towerRuleAssignment.create({
+      data: {
+        coolingTowerSystemId: created.id,
+        configuration: parsed.ruleConfiguration,
+        ruleProfileId: profile.id,
+        effectiveStartDate: asUtc(parsed.ruleEffectiveDate),
+        changedById: user.id,
+        reason: "Initial cooling tower compliance-rule assignment",
       },
     });
     await tx.auditLog.create({
@@ -2333,8 +2742,21 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
           serialNumber: parsed.serialNumber,
           towerLocation: parsed.towerLocation,
           tonnage: parsed.tonnage,
+          operatingSchedule: parsed.operatingSchedule,
+          ...(seasonal
+            ? {
+                seasonStartMonth: parsed.seasonStartMonth,
+                seasonStartDay: parsed.seasonStartDay,
+                seasonEndMonth: parsed.seasonEndMonth,
+                seasonEndDay: parsed.seasonEndDay,
+              }
+            : {}),
           jurisdictionId: jurisdiction.id,
           ruleProfileId: profile.id,
+          ruleConfiguration: parsed.ruleConfiguration,
+          ruleEffectiveDate: parsed.ruleEffectiveDate,
+          legionellaResponsibility: parsed.legionellaResponsibility,
+          legionellaVendorName: parsed.legionellaVendorName || null,
           internalJobNumber,
         },
       },
@@ -2342,16 +2764,13 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
     return created;
   });
   revalidatePath("/");
+  revalidatePath("/deadlines");
   revalidatePath("/customers");
   redirect(`/systems/${system.id}?created=1`);
 }
 
 export async function updateCustomerTowerAction(formData: FormData) {
-  const user = await requireRole([
-    UserRole.ADMIN,
-    UserRole.OPERATIONS_MANAGER,
-    UserRole.SCHEDULER,
-  ]);
+  const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const parsed = z
     .object({
       systemId: z.string().min(1),
@@ -2371,11 +2790,10 @@ export async function updateCustomerTowerAction(formData: FormData) {
         z.coerce.number().positive().optional(),
       ),
       jurisdictionId: z.string().min(1),
-      ruleProfileId: z.string().min(1),
       reason: z.string().trim().min(8).max(2000),
     })
     .parse(Object.fromEntries(formData));
-  const [existing, profile, jurisdiction] = await Promise.all([
+  const [existing, jurisdiction] = await Promise.all([
     db.coolingTowerSystem.findFirstOrThrow({
       where: {
         id: parsed.systemId,
@@ -2383,17 +2801,10 @@ export async function updateCustomerTowerAction(formData: FormData) {
       },
       include: { building: { include: { customer: true } } },
     }),
-    db.ruleProfile.findFirstOrThrow({
-      where: { id: parsed.ruleProfileId, active: true },
-    }),
     db.jurisdiction.findUniqueOrThrow({
       where: { id: parsed.jurisdictionId },
     }),
   ]);
-  if (profile.jurisdictionId && profile.jurisdictionId !== jurisdiction.id)
-    throw new Error(
-      "The selected jurisdiction does not match that compliance profile.",
-    );
   const state = parsed.state.toUpperCase();
   const buildingName =
     existing.building.buildingName === existing.building.customer.name
@@ -2426,10 +2837,8 @@ export async function updateCustomerTowerAction(formData: FormData) {
         towerLocation: parsed.towerLocation || null,
         tonnage: parsed.tonnage ?? null,
         jurisdictionId: jurisdiction.id,
-        ruleProfileId: profile.id,
       },
     });
-    await rebuildSystemComplianceProjections(tx, existing.id);
     await tx.auditLog.createMany({
       data: [
         {
@@ -2476,7 +2885,6 @@ export async function updateCustomerTowerAction(formData: FormData) {
             towerLocation: existing.towerLocation,
             tonnage: existing.tonnage,
             jurisdictionId: existing.jurisdictionId,
-            ruleProfileId: existing.ruleProfileId,
           },
           newValue: {
             systemName: parsed.systemName,
@@ -2486,14 +2894,158 @@ export async function updateCustomerTowerAction(formData: FormData) {
             towerLocation: parsed.towerLocation || null,
             tonnage: parsed.tonnage ?? null,
             jurisdictionId: jurisdiction.id,
-            ruleProfileId: profile.id,
           },
         },
       ],
     });
   });
   revalidatePath("/");
+  revalidatePath("/deadlines");
   revalidatePath("/customers");
   revalidatePath(`/systems/${existing.id}`);
   redirect(`/systems/${existing.id}?updated=1`);
+}
+
+export async function changeTowerRuleConfigurationAction(formData: FormData) {
+  const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
+  const parsed = z
+    .object({
+      systemId: z.string().min(1),
+      ruleConfiguration: z.enum(towerRuleConfigurationValues),
+      ruleProfileId: z.string().min(1),
+      effectiveDate: z.string().date(),
+      reason: z.string().trim().min(8).max(2000),
+    })
+    .parse(Object.fromEntries(formData));
+  const [system, profile] = await Promise.all([
+    db.coolingTowerSystem.findFirstOrThrow({
+      where: {
+        id: parsed.systemId,
+        building: { customer: { organizationId: user.organizationId } },
+      },
+      include: {
+        ruleAssignments: {
+          where: { effectiveEndDate: null },
+          orderBy: { effectiveStartDate: "desc" },
+          take: 1,
+        },
+      },
+    }),
+    db.ruleProfile.findFirstOrThrow({
+      where: {
+        id: parsed.ruleProfileId,
+        active: true,
+        OR: [{ organizationId: null }, { organizationId: user.organizationId }],
+      },
+      include: { rules: true },
+    }),
+  ]);
+  if (
+    !profileMatchesTowerConfiguration(
+      parsed.ruleConfiguration,
+      profile.jurisdictionMode,
+    )
+  )
+    throw new Error(
+      "The selected profile does not match the tower compliance-rule configuration.",
+    );
+  if (parsed.ruleConfiguration === "NYC_AND_NYS") {
+    const hasNysProfile = await db.ruleProfile.count({
+      where: {
+        active: true,
+        jurisdictionMode: "NYS_PART_4_ONLY",
+        effectiveStartDate: { lte: asUtc(parsed.effectiveDate) },
+        OR: [
+          { effectiveEndDate: null },
+          { effectiveEndDate: { gte: asUtc(parsed.effectiveDate) } },
+        ],
+      },
+    });
+    if (!hasNysProfile)
+      throw new Error(
+        "NYC + NYS cannot be assigned because no effective New York State base profile is available.",
+      );
+  }
+  const current = system.ruleAssignments[0];
+  if (current && parsed.effectiveDate <= dateOnly(current.effectiveStartDate))
+    throw new Error(
+      "The new effective date must be after the current assignment start date.",
+    );
+  const customNeedsReview =
+    parsed.ruleConfiguration === "CUSTOM" &&
+    !profile.rules.some((rule) => rule.enabled);
+  await db.$transaction(async (tx) => {
+    if (current)
+      await tx.towerRuleAssignment.update({
+        where: { id: current.id },
+        data: { effectiveEndDate: asUtc(addDays(parsed.effectiveDate, -1)) },
+      });
+    const assignment = await tx.towerRuleAssignment.create({
+      data: {
+        coolingTowerSystemId: system.id,
+        configuration: parsed.ruleConfiguration,
+        ruleProfileId: profile.id,
+        effectiveStartDate: asUtc(parsed.effectiveDate),
+        requiresReview: customNeedsReview,
+        changedById: user.id,
+        reason: parsed.reason,
+      },
+    });
+    await tx.coolingTowerSystem.update({
+      where: { id: system.id },
+      data: {
+        ruleConfiguration: parsed.ruleConfiguration,
+        ruleConfigurationEffectiveDate: asUtc(parsed.effectiveDate),
+        ruleConfigurationConfirmed: !customNeedsReview,
+        ruleProfileId: profile.id,
+      },
+    });
+    await tx.reviewItem.updateMany({
+      where: {
+        entityType: "CoolingTowerSystem",
+        entityId: system.id,
+        title: "Compliance rules must be confirmed.",
+        status: "OPEN",
+      },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
+    if (customNeedsReview)
+      await tx.reviewItem.create({
+        data: {
+          title: "Compliance rules must be confirmed.",
+          description:
+            "The selected custom profile has no enabled requirements. Configure and confirm the company or customer program before relying on generated dates.",
+          entityType: "CoolingTowerSystem",
+          entityId: system.id,
+          severity: "PURPLE",
+        },
+      });
+    await rebuildSystemComplianceProjections(tx, system.id);
+    await tx.auditLog.create({
+      data: {
+        entityType: "TowerRuleAssignment",
+        entityId: assignment.id,
+        action: "COMPLIANCE_RULES_CHANGED",
+        reason: parsed.reason,
+        changedById: user.id,
+        previousValue: current
+          ? {
+              configuration: current.configuration,
+              ruleProfileId: current.ruleProfileId,
+              effectiveStartDate: current.effectiveStartDate,
+            }
+          : undefined,
+        newValue: {
+          configuration: parsed.ruleConfiguration,
+          ruleProfileId: profile.id,
+          effectiveDate: parsed.effectiveDate,
+          requiresReview: customNeedsReview,
+        },
+      },
+    });
+  });
+  revalidatePath("/");
+  revalidatePath("/deadlines");
+  revalidatePath(`/systems/${system.id}`);
+  redirect(`/systems/${system.id}?view=settings&rulesChanged=1`);
 }

@@ -7,6 +7,7 @@ import {
 
 export type RegulatoryEventType =
   | "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
+  | "BACTERIOLOGICAL_SAMPLE_COLLECTED"
   | "LEGIONELLA_RESULT_RECEIVED"
   | "QUARTERLY_INSPECTION_COMPLETED"
   | "STARTUP"
@@ -41,6 +42,8 @@ export interface RegulatoryEventInput {
 
 export interface TowerRuleConfig {
   isNyc: boolean;
+  includesNys?: boolean;
+  profileKind?: "NYC" | "NYS" | "CUSTOM";
   operating: boolean;
   monthlyTargetStartDay: number;
   monthlyTargetEndDay: number;
@@ -48,16 +51,24 @@ export interface TowerRuleConfig {
   routineSampleTargetIntervalDays?: number | null;
   sampleDateReportDays?: number | null;
   inspectionIntervalDays?: number | null;
+  bacteriologicalSampleIntervalDays?: number | null;
+  registryReportingIntervalDays?: number | null;
   hyperSampleMinimumDays?: number | null;
   hyperSampleMaximumDays?: number | null;
   routineSampleEnabled?: boolean;
   sampleDateReportingEnabled?: boolean;
   inspectionEnabled?: boolean;
+  bacteriologicalSampleEnabled?: boolean;
+  annualCertificationEnabled?: boolean;
+  registryReportingEnabled?: boolean;
   hyperhalogenationEnabled?: boolean;
   sourceCitations?: {
     routineSample?: string | null;
     sampleDateReporting?: string | null;
     inspection?: string | null;
+    bacteriologicalSample?: string | null;
+    annualCertification?: string | null;
+    registryReporting?: string | null;
     hyperhalogenation?: string | null;
   };
   responseTimings?: {
@@ -68,6 +79,16 @@ export interface TowerRuleConfig {
     retestMaximumDays: number;
   };
   ruleSetVersion?: string;
+  customRules?: Array<{
+    requirementType: string;
+    ruleName: string;
+    sourceAuthority: string;
+    sourceCitation: string;
+    triggerEventType: RegulatoryEventType;
+    frequencyDays: number | null;
+    minimumDaysAfterTrigger: number | null;
+    maximumDaysAfterTrigger: number | null;
+  }>;
 }
 
 export interface ProjectedObligation {
@@ -215,7 +236,7 @@ function routineSample(
     targetEndDate: intervalTarget ?? target.end,
     latestDueDate: latest,
     priority: "ROUTINE",
-    reason: `Operating systems require Legionella culture sampling with no more than ${maximumGap} days between collection events.${config.routineSampleTargetIntervalDays ? ` The internal service target is day ${config.routineSampleTargetIntervalDays}.` : " The fixed monthly target does not move with planned work."}`,
+    reason: `${config.profileKind === "CUSTOM" ? "Company or customer operational requirement: " : ""}Operating systems require Legionella culture sampling with no more than ${maximumGap} days between collection events.${config.routineSampleTargetIntervalDays ? ` The internal service target is day ${config.routineSampleTargetIntervalDays}.` : " The fixed monthly target does not move with planned work."}`,
     ruleSetVersion: NYC_CHAPTER_8_RULESET_VERSION,
     sourceCitation: config.sourceCitations?.routineSample ?? NYC_CITATION,
   };
@@ -278,12 +299,58 @@ const EMERGENCY_TYPES = new Set<RegulatoryEventType>([
   "MANUAL_RISK_EVENT",
 ]);
 
+function customRuleReason(
+  rule: NonNullable<TowerRuleConfig["customRules"]>[number],
+) {
+  const source =
+    rule.sourceAuthority === "CONTRACT_REQUIREMENT"
+      ? "Customer requirement"
+      : rule.sourceAuthority === "COMPANY_POLICY"
+        ? "Company policy"
+        : "Operational requirement";
+  return `${source}: ${rule.ruleName}`;
+}
+
+function addCustomRuleObligation(
+  projection: EventProjection,
+  event: RegulatoryEventInput,
+  rule: NonNullable<TowerRuleConfig["customRules"]>[number],
+  ruleSetVersion: string,
+) {
+  const minimum = rule.minimumDaysAfterTrigger ?? rule.frequencyDays ?? 0;
+  const maximum = rule.maximumDaysAfterTrigger ?? rule.frequencyDays;
+  const obligation: ProjectedObligation = {
+    triggerEventId: event.id,
+    obligationType: rule.requirementType,
+    earliestDueDate: addDays(event.date, minimum),
+    targetStartDate: addDays(event.date, minimum),
+    targetEndDate: maximum == null ? null : addDays(event.date, maximum),
+    latestDueDate: maximum == null ? null : addDays(event.date, maximum),
+    priority: maximum == null ? "WARNING" : "ROUTINE",
+    reason: customRuleReason(rule),
+    ruleSetVersion,
+    sourceCitation: rule.sourceCitation,
+  };
+  if (rule.requirementType.includes("SAMPLE"))
+    projection.sample.push(obligation);
+  else if (rule.requirementType.includes("INSPECTION"))
+    projection.inspection.push(obligation);
+  else if (
+    rule.requirementType.includes("CERTIFICATION") ||
+    rule.requirementType.includes("REPORT") ||
+    rule.requirementType.includes("SUBMISSION")
+  )
+    projection.reporting.push(obligation);
+  else projection.maintenance.push(obligation);
+}
+
 export function projectEventObligations(
   event: RegulatoryEventInput,
   config: TowerRuleConfig,
 ): EventProjection {
   const projection = emptyProjection();
-  if (!config.isNyc) return projection;
+  const profileKind = config.profileKind ?? (config.isNyc ? "NYC" : "CUSTOM");
+  const isNys = profileKind === "NYS";
 
   if (
     event.type === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&
@@ -295,51 +362,152 @@ export function projectEventObligations(
       projection.reporting.push(
         reportingObligation(
           event,
-          "PORTAL_SAMPLE_DATE",
+          isNys ? "NYS_LEGIONELLA_RESULT_REPORTING" : "PORTAL_SAMPLE_DATE",
           config.sampleDateReportDays ?? RULES.sampleDateReportDays,
-          `Report the Legionella sample test date through the NYC cooling tower portal within ${config.sampleDateReportDays ?? RULES.sampleDateReportDays} days.`,
+          isNys
+            ? `Report the Legionella sampling and analysis information in the New York State registry within ${config.sampleDateReportDays ?? 90} days while the tower is in use.`
+            : `Report the Legionella sample test date through the NYC cooling tower portal within ${config.sampleDateReportDays ?? RULES.sampleDateReportDays} days.`,
           "WARNING",
           config.sourceCitations?.sampleDateReporting ?? NYC_CITATION,
         ),
       );
+    if (config.includesNys && config.registryReportingEnabled)
+      projection.reporting.push(
+        reportingObligation(
+          event,
+          "NYS_LEGIONELLA_RESULT_REPORTING",
+          config.registryReportingIntervalDays ?? 90,
+          `Report the Legionella sampling and analysis information in the New York State registry within ${config.registryReportingIntervalDays ?? 90} days while the tower is in use.`,
+          "WARNING",
+          config.sourceCitations?.registryReporting ?? "10 NYCRR §4-1.3",
+        ),
+      );
   }
 
-  if (event.type === "STARTUP") {
-    projection.maintenance.push({
+  if (
+    event.type === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
+    config.operating &&
+    config.bacteriologicalSampleEnabled
+  ) {
+    const interval = config.bacteriologicalSampleIntervalDays ?? 30;
+    const due = addDays(event.date, interval);
+    projection.sample.push({
       triggerEventId: event.id,
-      obligationType: "STARTUP_CLEANING_DISINFECTION",
-      earliestDueDate: addDays(event.date, -15),
-      targetStartDate: addDays(event.date, -15),
-      targetEndDate: event.date,
-      latestDueDate: event.date,
-      priority: "CRITICAL",
-      reason:
-        `Before startup on ${event.date}, the tower must be cleaned and disinfected during the preceding 15-day window (${addDays(event.date, -15)} through ${event.date}). ` +
-        "A cleaning recorded after startup cannot retroactively satisfy this requirement.",
+      obligationType: "ROUTINE_BACTERIOLOGICAL_SAMPLE",
+      earliestDueDate: addDays(event.date, 1),
+      targetStartDate: addDays(due, -5),
+      targetEndDate: due,
+      latestDueDate: due,
+      priority: "ROUTINE",
+      reason: `While the tower is in use, collect the next bacteriological culture sample within ${interval} days. This is separate from Legionella culture sampling.`,
       ruleSetVersion: config.ruleSetVersion ?? NYC_CHAPTER_8_RULESET_VERSION,
-      sourceCitation: "24 RCNY §8-06(b)",
+      sourceCitation:
+        config.sourceCitations?.bacteriologicalSample ??
+        "10 NYCRR §4-1.4(b)(1)",
     });
-    projection.sample.push(
-      windowObligation(
-        event,
-        "STARTUP_SAMPLE",
-        RULES.startupSampleMinimumDays,
-        RULES.startupSampleMaximumDays,
-        `Startup on ${event.date} creates a Legionella culture sample window from day 3 through day 14. Startup cleaning is tracked separately and does not set this window.`,
-      ),
-    );
-    projection.reporting.push(
-      reportingObligation(
-        event,
-        "STARTUP_DOH_NOTIFICATION",
-        RULES.startupReportDays,
-        "Report the startup to NYC DOH within 5 days.",
-        "CRITICAL",
-      ),
-    );
+    if (config.includesNys && config.registryReportingEnabled)
+      projection.reporting.push(
+        reportingObligation(
+          event,
+          "NYS_BACTERIOLOGICAL_RESULT_REPORTING",
+          config.registryReportingIntervalDays ?? 90,
+          "Report the bacteriological sample, result, and any required remediation in the New York State registry while the tower is in use.",
+          "WARNING",
+          config.sourceCitations?.registryReporting ?? "10 NYCRR §4-1.3",
+        ),
+      );
   }
 
-  if (event.type === "SHUTDOWN") {
+  if (event.type === "STARTUP" && profileKind !== "CUSTOM") {
+    if (config.includesNys && config.bacteriologicalSampleEnabled) {
+      const interval = config.bacteriologicalSampleIntervalDays ?? 30;
+      const due = addDays(event.date, interval);
+      projection.sample.push({
+        triggerEventId: event.id,
+        obligationType: "ROUTINE_BACTERIOLOGICAL_SAMPLE",
+        earliestDueDate: event.date,
+        targetStartDate: addDays(due, -5),
+        targetEndDate: due,
+        latestDueDate: due,
+        priority: "ROUTINE",
+        reason: `Owner-managed cooling-tower bacteriological culture is required at intervals not exceeding ${interval} days while the tower is in use. This is a separate heterotrophic bacterial analysis and does not replace Legionella culture sampling.`,
+        ruleSetVersion: config.ruleSetVersion ?? NYC_CHAPTER_8_RULESET_VERSION,
+        sourceCitation:
+          config.sourceCitations?.bacteriologicalSample ??
+          "10 NYCRR §4-1.4(b)(1)",
+      });
+    }
+    if (isNys) {
+      projection.sample.push(
+        windowObligation(
+          event,
+          "STARTUP_SAMPLE",
+          0,
+          14,
+          "Collect a Legionella culture sample within 14 days after seasonal startup. Startup cleaning is tracked separately and is required before startup when stagnant water remained for more than five days.",
+          "CRITICAL",
+          "10 NYCRR §4-1.4(b)(2), (c)(2)",
+        ),
+      );
+      if (config.registryReportingEnabled)
+        projection.reporting.push(
+          reportingObligation(
+            event,
+            "NYS_REGISTRY_UPDATE",
+            config.registryReportingIntervalDays ?? 90,
+            "Report the seasonal startup date in the New York State cooling tower registry while the tower is in use.",
+            "WARNING",
+            config.sourceCitations?.registryReporting ?? "10 NYCRR §4-1.3",
+          ),
+        );
+    } else {
+      projection.maintenance.push({
+        triggerEventId: event.id,
+        obligationType: "STARTUP_CLEANING_DISINFECTION",
+        earliestDueDate: addDays(event.date, -15),
+        targetStartDate: addDays(event.date, -15),
+        targetEndDate: event.date,
+        latestDueDate: event.date,
+        priority: "CRITICAL",
+        reason:
+          `Before startup on ${event.date}, the tower must be cleaned and disinfected during the preceding 15-day window (${addDays(event.date, -15)} through ${event.date}). ` +
+          "A cleaning recorded after startup cannot retroactively satisfy this requirement.",
+        ruleSetVersion: config.ruleSetVersion ?? NYC_CHAPTER_8_RULESET_VERSION,
+        sourceCitation: "24 RCNY §8-06(b)",
+      });
+      projection.sample.push(
+        windowObligation(
+          event,
+          "STARTUP_SAMPLE",
+          RULES.startupSampleMinimumDays,
+          RULES.startupSampleMaximumDays,
+          `Startup on ${event.date} creates a Legionella culture sample window from day 3 through day 14. Startup cleaning is tracked separately and does not set this window.`,
+        ),
+      );
+      projection.reporting.push(
+        reportingObligation(
+          event,
+          "STARTUP_DOH_NOTIFICATION",
+          RULES.startupReportDays,
+          "Report the startup to NYC DOH within 5 days.",
+          "CRITICAL",
+        ),
+      );
+    }
+    if (!isNys && config.includesNys && config.registryReportingEnabled)
+      projection.reporting.push(
+        reportingObligation(
+          event,
+          "NYS_REGISTRY_UPDATE",
+          config.registryReportingIntervalDays ?? 90,
+          "Report the seasonal startup date in the New York State cooling tower registry while the tower is in use.",
+          "WARNING",
+          config.sourceCitations?.registryReporting ?? "10 NYCRR §4-1.3",
+        ),
+      );
+  }
+
+  if (event.type === "SHUTDOWN" && config.isNyc) {
     projection.reporting.push(
       reportingObligation(
         event,
@@ -353,7 +521,7 @@ export function projectEventObligations(
 
   if (
     event.type === "SUMMERTIME_HYPERHALOGENATION" &&
-    config.hyperhalogenationEnabled !== false
+    (config.hyperhalogenationEnabled ?? config.isNyc)
   ) {
     const minimumDays =
       config.hyperSampleMinimumDays ?? RULES.hyperSampleMinimumDays;
@@ -365,34 +533,44 @@ export function projectEventObligations(
         "POST_HYPERHALOGENATION_SAMPLE",
         minimumDays,
         maximumDays,
-        `Collect a Legionella culture sample ${minimumDays}–${maximumDays} days after summertime hyperhalogenation.`,
+        `${profileKind === "CUSTOM" ? "Company or customer policy: c" : "C"}ollect a Legionella culture sample ${minimumDays}–${maximumDays} days after summertime hyperhalogenation.`,
         "CRITICAL",
         config.sourceCitations?.hyperhalogenation ?? NYC_CITATION,
       ),
     );
-    projection.reporting.push(
-      reportingObligation(
-        event,
-        "HYPERHALOGENATION_DECLARATION",
-        RULES.hyperDeclarationDays,
-        "Submit the summertime hyperhalogenation declaration within 30 days of completion.",
-        "WARNING",
-        config.sourceCitations?.hyperhalogenation ?? NYC_CITATION,
-      ),
-    );
+    if (config.isNyc)
+      projection.reporting.push(
+        reportingObligation(
+          event,
+          "HYPERHALOGENATION_DECLARATION",
+          RULES.hyperDeclarationDays,
+          "Submit the summertime hyperhalogenation declaration within 30 days of completion.",
+          "WARNING",
+          config.sourceCitations?.hyperhalogenation ?? NYC_CITATION,
+        ),
+      );
   }
 
   if (
-    event.type === "HIGH_LEGIONELLA_DISINFECTION" ||
-    event.type === "FULL_REMEDIATION"
+    profileKind !== "CUSTOM" &&
+    (event.type === "HIGH_LEGIONELLA_DISINFECTION" ||
+      event.type === "FULL_REMEDIATION")
   ) {
+    const retestMinimum = isNys ? 3 : RULES.retestMinimumDays;
+    const retestMaximum = isNys ? 7 : RULES.retestMaximumDays;
     projection.sample.push(
       windowObligation(
         event,
         "POST_DISINFECTION_RETEST",
-        RULES.retestMinimumDays,
-        RULES.retestMaximumDays,
-        `Collect the Legionella retest ${RULES.retestMinimumDays}–${RULES.retestMaximumDays} calendar days after ${event.type === "FULL_REMEDIATION" ? "full remediation" : "corrective disinfection"}. Weekend dates remain part of the legal window.`,
+        retestMinimum,
+        retestMaximum,
+        `Collect the Legionella retest ${retestMinimum}–${retestMaximum} calendar days after ${event.type === "FULL_REMEDIATION" ? "full remediation" : "corrective disinfection"}. Weekend dates remain part of the legal window.`,
+        "CRITICAL",
+        config.isNyc && config.includesNys
+          ? `${NYC_CITATION} | 10 NYCRR Appendix 4-A`
+          : isNys
+            ? "10 NYCRR Appendix 4-A"
+            : NYC_CITATION,
       ),
     );
   }
@@ -412,13 +590,15 @@ export function projectEventObligations(
       targetEndDate: due,
       latestDueDate: due,
       priority: "ROUTINE",
-      reason: `A qualified person must complete the next compliance inspection within ${inspectionInterval} days. The inspection does not itself create a separate Legionella sample.`,
-      ruleSetVersion: NYC_CHAPTER_8_RULESET_VERSION,
-      sourceCitation: config.sourceCitations?.inspection ?? NYC_CITATION,
+      reason: `${profileKind === "CUSTOM" ? "Company or customer operational requirement: " : ""}A qualified person must complete the next compliance inspection within ${inspectionInterval} days. The inspection does not itself create a separate Legionella sample.`,
+      ruleSetVersion: config.ruleSetVersion ?? NYC_CHAPTER_8_RULESET_VERSION,
+      sourceCitation:
+        config.sourceCitations?.inspection ??
+        (isNys ? "10 NYCRR §4-1.8" : NYC_CITATION),
     });
   }
 
-  if (EMERGENCY_TYPES.has(event.type)) {
+  if (EMERGENCY_TYPES.has(event.type) && profileKind !== "CUSTOM") {
     projection.sample.push({
       triggerEventId: event.id,
       obligationType: "EMERGENCY_SAMPLE",
@@ -430,11 +610,12 @@ export function projectEventObligations(
       reason:
         "This risk event requires additional emergency Legionella sampling. Schedule immediately; no precise legal window is invented unless the MPP supplies one.",
       ruleSetVersion: NYC_CHAPTER_8_RULESET_VERSION,
-      sourceCitation: NYC_CITATION,
+      sourceCitation: isNys ? "10 NYCRR §4-1.4(b)(3)" : NYC_CITATION,
     });
   }
 
   if (event.type === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT") {
+    if (!config.isNyc) return projection;
     const value = event.cfuPerMl ?? 0;
     if (
       value >= RULES.biologicalIndicatorThresholdCfuMl &&
@@ -474,10 +655,19 @@ export function projectEventObligations(
     }
   }
 
-  if (event.type === "LEGIONELLA_RESULT_RECEIVED") {
+  if (event.type === "LEGIONELLA_RESULT_RECEIVED" && profileKind !== "CUSTOM") {
     if (event.cfuPerMl == null || event.cfuPerMl < 0)
       throw new Error("A non-negative CFU/mL result is required.");
-    const response = correctiveAction(event.cfuPerMl, event.cfuPerMl > 0);
+    const response = isNys
+      ? {
+          level:
+            event.cfuPerMl < 20
+              ? "LEVEL_1"
+              : event.cfuPerMl < 1000
+                ? "LEVEL_2"
+                : "LEVEL_4",
+        }
+      : correctiveAction(event.cfuPerMl, event.cfuPerMl > 0);
     const level = response.level.startsWith("LEVEL_1")
       ? "LEVEL_1"
       : response.level;
@@ -491,8 +681,11 @@ export function projectEventObligations(
       chainClosed: level === "LEVEL_1",
     };
     if (level !== "LEVEL_1") {
-      const actionText =
-        level === "LEVEL_2"
+      const actionText = isNys
+        ? level === "LEVEL_2"
+          ? "Review the treatment program and immediately perform online disinfection."
+          : "Review the treatment program and immediately perform online decontamination."
+        : level === "LEVEL_2"
           ? "Increase or change biocide and review the treatment program within 24 hours."
           : level === "LEVEL_3"
             ? "Increase or change biocide within 24 hours and inspect/evaluate whether cleaning and further disinfection are needed."
@@ -501,7 +694,7 @@ export function projectEventObligations(
         reportingObligation(
           event,
           `${level}_CORRECTIVE_ACTION`,
-          1,
+          isNys ? 0 : 1,
           `${actionText} The result workflow records a date only; the exact hourly deadline requires human compliance review.`,
           "EMERGENCY",
         ),
@@ -510,14 +703,15 @@ export function projectEventObligations(
         windowObligation(
           event,
           `LEGIONELLA_${level}_RETEST`,
-          RULES.retestMinimumDays,
-          RULES.retestMaximumDays,
-          `${level.replace("_", " ")} requires corrective action and a retest 3–7 days after receipt. Continue the retest chain until Level 1 is reached.`,
+          isNys ? 3 : RULES.retestMinimumDays,
+          isNys ? 7 : RULES.retestMaximumDays,
+          `${level.replace("_", " ")} requires corrective action and a retest 3–7 days after receipt. Continue the retest chain until the applicable action level is cleared.`,
           "CRITICAL",
+          isNys ? "10 NYCRR Appendix 4-A" : NYC_CITATION,
         ),
       );
     }
-    if (level === "LEVEL_4") {
+    if (level === "LEVEL_4" && config.isNyc) {
       projection.reporting.push(
         reportingObligation(
           event,
@@ -537,13 +731,35 @@ export function projectEventObligations(
         ),
       );
     }
+    if (isNys && event.cfuPerMl > 1000)
+      projection.reporting.push(
+        reportingObligation(
+          event,
+          "NYS_LOCAL_HEALTH_DEPARTMENT_NOTIFICATION",
+          1,
+          "Notify the local health department within 24 hours after receiving a Legionella result exceeding 1,000 CFU/mL. The date-only workflow requires review of the exact hourly deadline.",
+          "EMERGENCY",
+          "10 NYCRR §4-1.6",
+        ),
+      );
   }
+
+  if (profileKind === "CUSTOM")
+    for (const rule of config.customRules ?? [])
+      if (rule.triggerEventType === event.type)
+        addCustomRuleObligation(
+          projection,
+          event,
+          rule,
+          config.ruleSetVersion ?? NYC_CHAPTER_8_RULESET_VERSION,
+        );
 
   if (config.ruleSetVersion)
     for (const obligation of [
       ...projection.sample,
       ...projection.inspection,
       ...projection.reporting,
+      ...projection.maintenance,
     ])
       obligation.ruleSetVersion = config.ruleSetVersion;
   return projection;
@@ -571,6 +787,27 @@ export function annualSummertimeHyperhalogenationObligation(
   };
 }
 
+export function annualNysCertificationObligation(
+  triggerEventId: string,
+  year: number,
+  ruleSetVersion: string,
+  sourceCitation = "10 NYCRR §4-1.8(b)",
+): ProjectedObligation {
+  return {
+    triggerEventId,
+    obligationType: "NYS_ANNUAL_CERTIFICATION",
+    earliestDueDate: `${year}-01-01`,
+    targetStartDate: `${year}-10-01`,
+    targetEndDate: `${year}-11-01`,
+    latestDueDate: `${year}-11-01`,
+    priority: "WARNING",
+    reason:
+      "Submit the annual New York State cooling tower certification by November 1. Certification submission is tracked separately from inspection and field work.",
+    ruleSetVersion,
+    sourceCitation,
+  };
+}
+
 export function obligationPriorityForDate(input: {
   today: string;
   latestDueDate: string | null;
@@ -594,6 +831,97 @@ export function canSampleSatisfyObligation(
   if (obligation.latestDueDate && collectionDate > obligation.latestDueDate)
     return false;
   return true;
+}
+
+export type OpenSampleObligationForImpact = {
+  id: string;
+  type: string;
+  earliest: string | null;
+  latest: string | null;
+  status: string;
+  sourceCitation?: string | null;
+};
+
+export function sampleObligationsCoveredByEvent(
+  event: Pick<RegulatoryEventInput, "type" | "date">,
+  obligations: readonly OpenSampleObligationForImpact[],
+) {
+  const sampleKind =
+    event.type === "BACTERIOLOGICAL_SAMPLE_COLLECTED"
+      ? "BACTERIOLOGICAL"
+      : event.type === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
+        ? "LEGIONELLA"
+        : null;
+  if (!sampleKind) return [];
+  return obligations.filter((obligation) => {
+    const bacteriological =
+      obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE";
+    if ((sampleKind === "BACTERIOLOGICAL") !== bacteriological) return false;
+    return canSampleSatisfyObligation(event.date, {
+      earliestDueDate: obligation.earliest,
+      latestDueDate: obligation.latest,
+    });
+  });
+}
+
+export function previewEventImpact(input: {
+  proposedEvent: RegulatoryEventInput;
+  ruleConfig: TowerRuleConfig;
+  openSampleObligations: readonly OpenSampleObligationForImpact[];
+  performedByResponsibility?:
+    "OUR_COMPANY" | "CUSTOMER" | "OTHER_VENDOR" | "NOT_TRACKED";
+}) {
+  const projection = projectEventObligations(
+    input.proposedEvent,
+    input.ruleConfig,
+  );
+  const covered = sampleObligationsCoveredByEvent(
+    input.proposedEvent,
+    input.openSampleObligations,
+  );
+  const satisfied = covered.filter((item) => item.status !== "MISSED");
+  const missedUnchanged = covered.filter((item) => item.status === "MISSED");
+  const messages: string[] = [];
+  if (input.performedByResponsibility === "CUSTOMER")
+    messages.push(
+      `This external ${input.proposedEvent.type === "LEGIONELLA_RESULT_RECEIVED" ? "result" : "sample"} will be recorded for reference. Legionella remains customer managed.`,
+    );
+  if (input.performedByResponsibility === "OTHER_VENDOR")
+    messages.push(
+      `This ${input.proposedEvent.type === "LEGIONELLA_RESULT_RECEIVED" ? "result" : "sample"} will be recorded as work performed by another vendor, not by our company.`,
+    );
+
+  if (input.proposedEvent.type === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED") {
+    if (satisfied.length)
+      messages.push(
+        "This sample will satisfy the open routine Legionella requirement.",
+      );
+    if (input.ruleConfig.isNyc && input.ruleConfig.includesNys)
+      messages.push(
+        "This one Legionella sample also counts toward the compatible New York State 90-day Legionella requirement; no duplicate sample is created.",
+      );
+  }
+  if (input.proposedEvent.type === "BACTERIOLOGICAL_SAMPLE_COLLECTED")
+    messages.push(
+      "This confirms the separate owner-managed cooling-tower bacteriological culture; it does not satisfy a Legionella requirement.",
+    );
+  if (missedUnchanged.length)
+    messages.push(
+      `This event will not restore ${missedUnchanged.length === 1 ? "the missed obligation" : `${missedUnchanged.length} missed obligations`}.`,
+    );
+
+  const generated = [
+    ...projection.sample,
+    ...projection.inspection,
+    ...projection.reporting,
+    ...projection.maintenance,
+  ];
+  if (!messages.length && !generated.length)
+    messages.push(
+      "This event does not affect any current compliance deadline.",
+    );
+
+  return { projection, generated, satisfied, missedUnchanged, messages };
 }
 
 export function windowsOverlap(

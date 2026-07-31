@@ -20,6 +20,7 @@ import {
 } from "@/lib/service-events";
 import { plainEnumLabel, requirementLabel } from "@/lib/labels";
 import { formatOperationalDate } from "@/lib/date";
+import { buttonClass } from "@/lib/button-variants";
 
 interface EditableEvent {
   id: string;
@@ -212,72 +213,22 @@ export function EventEditor({
             </>
           )}
           {isHyper && (
-            <>
-              <label>
-                <span className="label">Chemical</span>
-                <input
-                  className="field mt-1"
-                  name="chemical"
-                  required
-                  defaultValue={event.chemical}
-                />
-              </label>
-              <label>
-                <span className="label">Quantity</span>
-                <input
-                  className="field mt-1"
-                  name="quantity"
-                  required
-                  defaultValue={event.quantity}
-                />
-              </label>
-              <label>
-                <span className="label">Contact time</span>
-                <input
-                  className="field mt-1"
-                  name="contactTime"
-                  required
-                  defaultValue={event.contactTime}
-                />
-              </label>
-              <label>
-                <span className="label">pH</span>
-                <input
-                  className="field mt-1"
-                  name="ph"
-                  required
-                  defaultValue={event.ph}
-                />
-              </label>
-              <label>
-                <span className="label">Free halogen residual</span>
-                <input
-                  className="field mt-1"
-                  name="freeHalogenResidual"
-                  required
-                  defaultValue={event.freeHalogenResidual}
-                />
-              </label>
-              <label>
-                <span className="label">Technician</span>
-                <input
-                  className="field mt-1"
-                  name="technician"
-                  required
-                  defaultValue={event.technician}
-                />
-              </label>
-            </>
+            <p className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 md:col-span-2">
+              Record the date the summertime hyperhalogenation was completed.
+              Treatment details are maintained on the separate service form.
+            </p>
           )}
-          <label className="md:col-span-2">
-            <span className="label">Notes</span>
-            <textarea
-              className="field mt-1 min-h-28"
-              name="notes"
-              maxLength={2000}
-              defaultValue={event.notes}
-            />
-          </label>
+          {!isHyper && (
+            <label className="md:col-span-2">
+              <span className="label">Notes</span>
+              <textarea
+                className="field mt-1 min-h-28"
+                name="notes"
+                maxLength={2000}
+                defaultValue={event.notes}
+              />
+            </label>
+          )}
           <label className="md:col-span-2">
             <span className="label">Correction reason (required)</span>
             <textarea
@@ -290,10 +241,13 @@ export function EventEditor({
           </label>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <button className="btn btn-primary">
+          <button className={buttonClass("primary")}>
             <Save size={17} /> Save corrected event
           </button>
-          <Link className="btn" href={`/systems/${systemId}`}>
+          <Link
+            className={buttonClass("secondary")}
+            href={`/systems/${systemId}`}
+          >
             Cancel
           </Link>
         </div>
@@ -386,7 +340,9 @@ export function EventEditor({
                 required
               />
             </label>
-            <button className="btn">Void event (audited)</button>
+            <button className={buttonClass("destructive")}>
+              Void event (audited)
+            </button>
           </form>
         </section>
       </div>

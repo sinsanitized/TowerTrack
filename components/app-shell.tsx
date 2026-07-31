@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Building2,
+  CalendarRange,
   History,
   FlaskConical,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import { ComplianceTodayProvider } from "@/components/compliance-date";
 const nav = [
   ["Action Center", "/", LayoutDashboard],
   ["Compliance Issues", "/work/overdue-towers", AlertTriangle],
+  ["All Tower Deadlines", "/deadlines", CalendarRange],
   ["Towers", "/towers", Building2],
   ["Samples", "/samples", FlaskConical],
   ["History", "/history", History],

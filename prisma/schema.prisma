@@ -24,6 +24,19 @@ enum JurisdictionMode {
   CUSTOM_JURISDICTION
 }
 
+enum TowerRuleConfiguration {
+  NYC_AND_NYS
+  NYS_ONLY
+  CUSTOM
+}
+
+enum ServiceResponsibility {
+  OUR_COMPANY
+  CUSTOMER
+  OTHER_VENDOR
+  NOT_TRACKED
+}
+
 enum SourceAuthority {
   REGULATORY
   GUIDANCE
@@ -146,6 +159,7 @@ enum PendingStatus {
 
 enum ServiceEventType {
   ROUTINE_LEGIONELLA_SAMPLE_COLLECTED
+  BACTERIOLOGICAL_SAMPLE_COLLECTED
   LEGIONELLA_RESULT_RECEIVED
   QUARTERLY_INSPECTION_COMPLETED
   STARTUP
@@ -205,32 +219,53 @@ enum ComplianceRisk {
   INACTIVE
 }
 
+enum LegacyImportBatchStatus {
+  PREVIEWED
+  CONFIRMED
+  PARTIAL
+  ROLLED_BACK
+}
+
+enum LegacyImportRowStatus {
+  READY
+  READY_WITH_WARNINGS
+  NEEDS_REVIEW
+  EXCLUDED
+  IMPORTED
+  SKIPPED
+  ROLLED_BACK
+}
+
 model Organization {
-  id        String     @id @default(cuid())
-  name      String
-  users     User[]
-  customers Customer[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id                  String              @id @default(cuid())
+  name                String
+  users               User[]
+  customers           Customer[]
+  legacyImportBatches LegacyImportBatch[]
+  ruleProfiles        RuleProfile[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 }
 
 model User {
-  id              String               @id @default(cuid())
-  organizationId  String
-  organization    Organization         @relation(fields: [organizationId], references: [id])
-  name            String
-  email           String               @unique
-  passwordHash    String
-  role            UserRole             @default(SCHEDULER)
-  active          Boolean              @default(true)
-  assignedSystems CoolingTowerSystem[] @relation("AssignedTechnician")
-  visits          Visit[]              @relation("AssignedVisitTechnician")
-  createdVisits   Visit[]              @relation("VisitCreator")
-  routes          Route[]
-  serviceEvents   ServiceEvent[]
-  auditLogs       AuditLog[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  id                     String                @id @default(cuid())
+  organizationId         String
+  organization           Organization          @relation(fields: [organizationId], references: [id])
+  name                   String
+  email                  String                @unique
+  passwordHash           String
+  role                   UserRole              @default(SCHEDULER)
+  active                 Boolean               @default(true)
+  assignedSystems        CoolingTowerSystem[]  @relation("AssignedTechnician")
+  visits                 Visit[]               @relation("AssignedVisitTechnician")
+  createdVisits          Visit[]               @relation("VisitCreator")
+  routes                 Route[]
+  serviceEvents          ServiceEvent[]
+  auditLogs              AuditLog[]
+  ruleAssignmentsChanged TowerRuleAssignment[] @relation("RuleAssignmentChangedBy")
+  legacyImportBatches    LegacyImportBatch[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 }
 
 model Customer {
@@ -291,25 +326,28 @@ model Jurisdiction {
 }
 
 model RuleProfile {
-  id                         String               @id
+  id                         String                @id
+  organizationId             String?
+  organization               Organization?         @relation(fields: [organizationId], references: [id])
   name                       String
   jurisdictionMode           JurisdictionMode
   jurisdictionId             String?
-  jurisdiction               Jurisdiction?        @relation(fields: [jurisdictionId], references: [id])
-  effectiveStartDate         DateTime?            @db.Date
-  effectiveEndDate           DateTime?            @db.Date
+  jurisdiction               Jurisdiction?         @relation(fields: [jurisdictionId], references: [id])
+  effectiveStartDate         DateTime?             @db.Date
+  effectiveEndDate           DateTime?             @db.Date
   description                String
-  isDefault                  Boolean              @default(false)
-  active                     Boolean              @default(true)
+  isDefault                  Boolean               @default(false)
+  active                     Boolean               @default(true)
   legionellaIntervalDays     Int?
   internalTargetIntervalDays Int?
-  appliesToPartialOperation  Boolean              @default(true)
+  appliesToPartialOperation  Boolean               @default(true)
   rules                      RuleDefinition[]
-  systems                    CoolingTowerSystem[]
+  systems                    CoolingTowerSystem[]  @relation("ActiveRuleProfile")
+  towerAssignments           TowerRuleAssignment[] @relation("RuleAssignmentProfile")
   activities                 VisitActivity[]
   requirements               Requirement[]
-  createdAt                  DateTime             @default(now())
-  updatedAt                  DateTime             @updatedAt
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
 }
 
 model RuleDefinition {
@@ -365,63 +403,88 @@ model PendingRegulation {
 }
 
 model CoolingTowerSystem {
-  id                     String                  @id @default(cuid())
-  buildingId             String
-  building               Building                @relation(fields: [buildingId], references: [id])
-  jurisdictionId         String
-  jurisdiction           Jurisdiction            @relation(fields: [jurisdictionId], references: [id])
-  ruleProfileId          String
-  ruleProfile            RuleProfile             @relation(fields: [ruleProfileId], references: [id])
-  pendingRegulationId    String?
-  pendingRegulation      PendingRegulation?      @relation(fields: [pendingRegulationId], references: [id])
-  internalJobNumber      String                  @unique
-  systemName             String
-  manufacturer           String?
-  modelNumber            String?
-  serialNumber           String?
-  towerLocation          String?
-  tonnage                Float?
-  NYCSystemId            String?
-  NYSSystemId            String?
-  registrationNumber     String?
-  operationPeriodType    String                  @default("YEAR_ROUND")
-  operatingStatus        OperatingStatus         @default(OPERATING)
-  seasonal               Boolean                 @default(false)
-  seasonStartMonth       Int                     @default(5)
-  seasonStartDay         Int                     @default(1)
-  seasonEndMonth         Int                     @default(10)
-  seasonEndDay           Int                     @default(31)
-  actualStartupDate      DateTime?               @db.Date
-  actualShutdownDate     DateTime?               @db.Date
-  preferredTargetDay     Int?
-  monthlyTargetStartDay  Int                     @default(15)
-  monthlyTargetEndDay    Int                     @default(22)
-  preferredWeekOfMonth   Int?
-  preferredDayOfWeek     Int?
-  routeZoneOverride      String?
-  assignedTechnicianId   String?
-  assignedTechnician     User?                   @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
-  warningDays            Int                     @default(7)
-  planningHorizonDays    Int                     @default(21)
-  mppVersion             String?
-  qualifiedPerson        String?
-  laboratory             String?
-  notes                  String?
-  active                 Boolean                 @default(true)
-  activities             VisitActivity[]
-  requirements           Requirement[]
-  correctiveCases        CorrectiveActionCase[]
-  operatingPeriods       OperatingPeriod[]
-  serviceEvents          ServiceEvent[]
-  sampleObligations      SampleObligation[]
-  inspectionObligations  InspectionObligation[]
-  reportingObligations   ReportingObligation[]
-  maintenanceObligations MaintenanceObligation[]
-  labResults             LabResult[]
-  complianceStatus       ComplianceStatus?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  deletedAt              DateTime?
+  id                             String                  @id @default(cuid())
+  buildingId                     String
+  building                       Building                @relation(fields: [buildingId], references: [id])
+  jurisdictionId                 String
+  jurisdiction                   Jurisdiction            @relation(fields: [jurisdictionId], references: [id])
+  ruleProfileId                  String
+  ruleProfile                    RuleProfile             @relation("ActiveRuleProfile", fields: [ruleProfileId], references: [id])
+  ruleConfiguration              TowerRuleConfiguration
+  ruleConfigurationEffectiveDate DateTime                @db.Date
+  ruleConfigurationConfirmed     Boolean                 @default(true)
+  legionellaResponsibility       ServiceResponsibility?
+  legionellaVendorName           String?
+  ruleAssignments                TowerRuleAssignment[]
+  pendingRegulationId            String?
+  pendingRegulation              PendingRegulation?      @relation(fields: [pendingRegulationId], references: [id])
+  internalJobNumber              String                  @unique
+  systemName                     String
+  manufacturer                   String?
+  modelNumber                    String?
+  serialNumber                   String?
+  towerLocation                  String?
+  tonnage                        Float?
+  NYCSystemId                    String?
+  NYSSystemId                    String?
+  registrationNumber             String?
+  operationPeriodType            String?
+  operatingStatus                OperatingStatus         @default(OPERATING)
+  seasonal                       Boolean                 @default(false)
+  seasonStartMonth               Int                     @default(5)
+  seasonStartDay                 Int                     @default(1)
+  seasonEndMonth                 Int                     @default(10)
+  seasonEndDay                   Int                     @default(31)
+  actualStartupDate              DateTime?               @db.Date
+  actualShutdownDate             DateTime?               @db.Date
+  preferredTargetDay             Int?
+  monthlyTargetStartDay          Int                     @default(20)
+  monthlyTargetEndDay            Int                     @default(25)
+  preferredWeekOfMonth           Int?
+  preferredDayOfWeek             Int?
+  routeZoneOverride              String?
+  assignedTechnicianId           String?
+  assignedTechnician             User?                   @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  warningDays                    Int                     @default(7)
+  planningHorizonDays            Int                     @default(21)
+  mppVersion                     String?
+  qualifiedPerson                String?
+  laboratory                     String?
+  notes                          String?
+  active                         Boolean                 @default(true)
+  activities                     VisitActivity[]
+  requirements                   Requirement[]
+  correctiveCases                CorrectiveActionCase[]
+  operatingPeriods               OperatingPeriod[]
+  serviceEvents                  ServiceEvent[]
+  sampleObligations              SampleObligation[]
+  inspectionObligations          InspectionObligation[]
+  reportingObligations           ReportingObligation[]
+  maintenanceObligations         MaintenanceObligation[]
+  labResults                     LabResult[]
+  complianceStatus               ComplianceStatus?
+  createdAt                      DateTime                @default(now())
+  updatedAt                      DateTime                @updatedAt
+  deletedAt                      DateTime?
+}
+
+model TowerRuleAssignment {
+  id                   String                 @id @default(cuid())
+  coolingTowerSystemId String
+  coolingTowerSystem   CoolingTowerSystem     @relation(fields: [coolingTowerSystemId], references: [id], onDelete: Cascade)
+  configuration        TowerRuleConfiguration
+  ruleProfileId        String
+  ruleProfile          RuleProfile            @relation("RuleAssignmentProfile", fields: [ruleProfileId], references: [id], onDelete: Restrict)
+  effectiveStartDate   DateTime               @db.Date
+  effectiveEndDate     DateTime?              @db.Date
+  requiresReview       Boolean                @default(false)
+  changedById          String?
+  changedBy            User?                  @relation("RuleAssignmentChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  reason               String
+  createdAt            DateTime               @default(now())
+
+  @@index([coolingTowerSystemId, effectiveStartDate, effectiveEndDate])
+  @@index([ruleProfileId])
 }
 
 model OperatingPeriod {
@@ -448,6 +511,9 @@ model ServiceEvent {
   status                          ServiceEventStatus      @default(ACTIVE)
   details                         Json?
   notes                           String?
+  performedByResponsibility       ServiceResponsibility  @default(OUR_COMPANY)
+  externalProviderName            String?
+  externalSource                  String?
   recordedById                    String
   recordedBy                      User                    @relation(fields: [recordedById], references: [id], onDelete: Restrict)
   correctedFromEventId            String?                 @unique
@@ -744,4 +810,57 @@ model ReviewItem {
   status      String        @default("OPEN")
   createdAt   DateTime      @default(now())
   resolvedAt  DateTime?
+}
+
+model LegacyImportBatch {
+  id              String                  @id @default(cuid())
+  organizationId  String
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  importedById    String
+  importedBy      User                    @relation(fields: [importedById], references: [id], onDelete: Restrict)
+  filename        String
+  fileHash        String
+  status          LegacyImportBatchStatus @default(PREVIEWED)
+  previewCounts   Json
+  confirmedCounts Json?
+  mapping         Json
+  warnings        Json?
+  rows            LegacyImportRow[]
+  createdAt       DateTime                @default(now())
+  confirmedAt     DateTime?
+  rolledBackAt    DateTime?
+
+  @@unique([organizationId, fileHash])
+  @@index([organizationId, createdAt])
+}
+
+model LegacyImportRow {
+  id                String                @id @default(cuid())
+  batchId           String
+  batch             LegacyImportBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sourceKey         String
+  worksheetName     String
+  sourceRow         Int
+  originalJobNumber String?
+  status            LegacyImportRowStatus
+  proposedData      Json
+  sourceCells       Json
+  recognizedEvents  Json
+  ambiguousCells    Json
+  warnings          Json
+  errors            Json
+  selected          Boolean               @default(false)
+  createdCustomerId String?
+  createdBuildingId String?
+  createdSystemId   String?
+  createdEventIds   Json?
+  createdReviewIds  Json?
+  importedAt        DateTime?
+  rolledBackAt      DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([batchId, worksheetName, sourceRow])
+  @@index([sourceKey])
+  @@index([batchId, status])
 }

@@ -1,8 +1,10 @@
 import { Download, Upload } from "lucide-react";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { SourceBadge } from "@/components/source-badge";
 import {
   createRuleDefinitionAction,
+  createCustomRuleProfileAction,
   createUserAction,
   setUserActiveAction,
   updateUserRoleAction,
@@ -14,6 +16,7 @@ import { db } from "@/lib/db";
 import { plainEnumLabel } from "@/lib/labels";
 import { nycRuleDisplayValues } from "@/lib/rule-profile";
 import { UserRole } from "@prisma/client";
+import { todayDateOnly } from "@/lib/date";
 
 const authorities = [
   "REGULATORY",
@@ -25,9 +28,36 @@ const authorities = [
 ] as const;
 const requirementTypes = [
   "ROUTINE_LEGIONELLA_SAMPLE",
+  "ROUTINE_BACTERIOLOGICAL_SAMPLE",
   "COMPLIANCE_INSPECTION",
   "PORTAL_SAMPLE_DATE",
+  "NYS_REGISTRY_REPORTING",
+  "ANNUAL_CERTIFICATION",
   "SUMMERTIME_HYPERHALOGENATION",
+  "ANNUAL_CLEANING",
+  "STARTUP_CLEANING_DISINFECTION",
+  "STARTUP_SAMPLE",
+  "SHUTDOWN_REQUIREMENT",
+  "POST_CLEANING_SAMPLE",
+  "POST_DISINFECTION_SAMPLE",
+  "CUSTOMER_RECURRING_EVENT",
+  "COMPANY_POLICY_OBLIGATION",
+] as const;
+const customTriggerActivities = [
+  "ROUTINE_LEGIONELLA_SAMPLE",
+  "ROUTINE_BACTERIOLOGICAL_SAMPLE",
+  "COMPLIANCE_INSPECTION",
+  "ROUTINE_CLEANING",
+  "CLEANING",
+  "STARTUP_CLEANING",
+  "CLEANING_AND_DISINFECTION",
+  "DISINFECTION",
+  "CORRECTIVE_DISINFECTION",
+  "FULL_REMEDIATION",
+  "SUMMERTIME_HYPERHALOGENATION",
+  "STARTUP",
+  "SHUTDOWN",
+  "OTHER",
 ] as const;
 const nycRuleDisplay = nycRuleDisplayValues();
 const userRoles = [
@@ -150,11 +180,16 @@ export default async function AdminPage({
   const [profiles, users] = await Promise.all([
     db.ruleProfile.findMany({
       where: {
-        systems: {
-          some: {
-            building: { customer: { organizationId: user.organizationId } },
+        OR: [
+          { organizationId: user.organizationId },
+          {
+            systems: {
+              some: {
+                building: { customer: { organizationId: user.organizationId } },
+              },
+            },
           },
-        },
+        ],
       },
       include: {
         jurisdiction: true,
@@ -184,6 +219,54 @@ export default async function AdminPage({
         title="Admin"
         description="Set the legal hard interval and the earlier internal service target, then review each obligation in plain English. Every save is audited and recalculates affected towers."
       />
+      <details className="panel mb-6 overflow-hidden">
+        <summary className="cursor-pointer list-none p-5 font-black text-emerald-900">
+          Create Custom / Out of State profile
+        </summary>
+        <form
+          action={createCustomRuleProfileAction}
+          className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2"
+        >
+          <label>
+            <span className="label">Profile name</span>
+            <input className="field mt-1" name="name" required />
+          </label>
+          <label>
+            <span className="label">Effective date</span>
+            <input
+              className="field mt-1"
+              name="effectiveDate"
+              type="date"
+              required
+            />
+          </label>
+          <label className="sm:col-span-2">
+            <span className="label">Description</span>
+            <input
+              className="field mt-1"
+              name="description"
+              defaultValue="Company or customer policy — verify all applicable local requirements"
+              required
+            />
+          </label>
+          <label className="sm:col-span-2">
+            <span className="label">Reason</span>
+            <input
+              className="field mt-1"
+              name="reason"
+              defaultValue="Create reviewed custom compliance profile"
+              required
+            />
+          </label>
+          <p className="text-sm font-bold text-amber-900 sm:col-span-2">
+            Safe default: the new profile starts with no enabled obligations and
+            never inherits NYC rules.
+          </p>
+          <button className="btn btn-primary sm:col-span-2">
+            Create empty custom profile
+          </button>
+        </form>
+      </details>
       {(saved.savedProfile || saved.savedRule) && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
           {saved.savedRule
@@ -639,11 +722,35 @@ export default async function AdminPage({
                               required
                             />
                           </label>
+                          {profile.jurisdictionMode ===
+                            "CUSTOM_JURISDICTION" && (
+                            <label>
+                              <span className="label">Trigger activity</span>
+                              <select
+                                className="field mt-1"
+                                name="triggerActivityType"
+                                defaultValue=""
+                              >
+                                <option value="">Not event-triggered</option>
+                                {customTriggerActivities.map((activity) => (
+                                  <option key={activity} value={activity}>
+                                    {plainEnumLabel(activity)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
                           <label>
                             <span className="label">Authority</span>
                             <select
                               className="field mt-1"
                               name="sourceAuthority"
+                              defaultValue={
+                                profile.jurisdictionMode ===
+                                "CUSTOM_JURISDICTION"
+                                  ? "COMPANY_POLICY"
+                                  : undefined
+                              }
                               required
                             >
                               {authorities.map((authority) => (
@@ -809,6 +916,22 @@ export default async function AdminPage({
                                 name="ruleId"
                                 value={rule.id}
                               />
+                              {profile.jurisdictionMode ===
+                                "CUSTOM_JURISDICTION" &&
+                                profile._count.systems > 0 && (
+                                  <label>
+                                    <span className="label">
+                                      New version effective date
+                                    </span>
+                                    <input
+                                      className="field mt-1"
+                                      name="effectiveDate"
+                                      type="date"
+                                      defaultValue={todayDateOnly()}
+                                      required
+                                    />
+                                  </label>
+                                )}
                               <label className="sm:col-span-2 xl:col-span-2">
                                 <span className="label">Rule name</span>
                                 <input
@@ -844,7 +967,9 @@ export default async function AdminPage({
                               </label>
                               {[
                                 "ROUTINE_LEGIONELLA_SAMPLE",
+                                "ROUTINE_BACTERIOLOGICAL_SAMPLE",
                                 "PORTAL_SAMPLE_DATE",
+                                "NYS_REGISTRY_REPORTING",
                                 "COMPLIANCE_INSPECTION",
                               ].includes(rule.requirementType) && (
                                 <label>
@@ -986,6 +1111,10 @@ export default async function AdminPage({
                 <Download size={17} />
                 Download template
               </a>
+              <Link className="btn" href="/admin/legacy-import">
+                <Upload size={17} />
+                Import legacy Excel workbook
+              </Link>
               <label className="btn cursor-not-allowed opacity-60">
                 <Upload size={17} />
                 Import preview (admin)

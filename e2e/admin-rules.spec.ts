@@ -2,8 +2,12 @@ import { expect, test } from "@playwright/test";
 
 test("administrator adds a supported jurisdiction rule", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("admin@towertrack.local");
-  await page.getByLabel("Password").fill("ChangeMe123!");
+  await page
+    .getByLabel("Email")
+    .fill(process.env.INITIAL_ADMIN_EMAIL ?? "admin@towertrack.local");
+  await page
+    .getByLabel("Password")
+    .fill(process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.goto("/admin");
 

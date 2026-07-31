@@ -2,9 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
-import { SourceBadge } from "@/components/source-badge";
-import { Why } from "@/components/why";
-import { EventRecorder } from "@/components/event-recorder";
+import { EventRecorderDrawer } from "@/components/event-recorder-drawer";
+import { TowerActionList } from "@/components/tower-action-list";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
 import { ComplianceTimeline } from "@/components/compliance-timeline";
@@ -15,7 +14,7 @@ import {
   updateMonthlyTargetWindowAction,
   voidServiceEventAction,
 } from "@/app/actions";
-import { complianceDashboardRows, planningRows } from "@/lib/queries";
+import { complianceDashboardRows } from "@/lib/queries";
 import { db } from "@/lib/db";
 import {
   formatDate,
@@ -25,32 +24,22 @@ import {
   nextWorkingDate,
   todayDateOnly,
 } from "@/lib/date";
-import {
-  activityLabel,
-  formatLegionellaResult,
-  plainEnumLabel,
-  requirementLabel,
-} from "@/lib/labels";
+import { formatLegionellaResult, plainEnumLabel } from "@/lib/labels";
 import { seasonLabel, seasonalStatus } from "@/lib/season";
 import { requireUser } from "@/lib/auth";
-import { compileTowerRuleConfig } from "@/lib/rule-profile";
-
-const cleaningTypes = new Set([
-  "ROUTINE_CLEANING",
-  "STARTUP_CLEANING",
-  "CLEANING",
-  "DISINFECTION",
-  "CLEANING_AND_DISINFECTION",
-  "CORRECTIVE_DISINFECTION",
-  "FULL_REMEDIATION",
-]);
-
-const cleaningEventTypes = new Set([
-  "CLEANING_COMPLETED",
-  "STARTUP_CLEANING_DISINFECTION",
-  "HIGH_LEGIONELLA_DISINFECTION",
-  "FULL_REMEDIATION",
-]);
+import {
+  compileTowerRuleConfig,
+  composeTowerRuleProfiles,
+} from "@/lib/rule-profile";
+import {
+  canViewTowerSettings,
+  resolveTowerDetailView,
+  selectOverviewObligations,
+  sortTowerObligations,
+} from "@/lib/tower-details";
+import { towerRuleConfigurationLabel } from "@/lib/tower-rule-configuration";
+import { buttonClass } from "@/lib/button-variants";
+import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
 
 export default async function SystemPage({
   params,
@@ -62,130 +51,190 @@ export default async function SystemPage({
   const { id } = await params;
   const query = await searchParams;
   const user = await requireUser();
+  const canViewSettings = canViewTowerSettings(user.role);
+  const canConfirmOwnerManaged = ["ADMIN", "OPERATIONS_MANAGER"].includes(
+    user.role,
+  );
   const recordedEventId =
     typeof query.event === "string" ? query.event : undefined;
+  const requestedView =
+    typeof query.view === "string"
+      ? query.view
+      : recordedEventId || query.correctedEvent || query.voidedEvent
+        ? "obligations"
+        : "overview";
+  const view = resolveTowerDetailView(requestedView, user.role);
   const requestedSampleEventId =
     typeof query.labSample === "string" ? query.labSample : undefined;
+  const externalLegionellaRequested = query.record === "external-legionella";
   const initialEventType =
     query.record === "sample"
       ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
-      : undefined;
-  const [system, row, dashboardRow, recordedEvent, technicians] =
-    await Promise.all([
-      db.coolingTowerSystem.findFirst({
-        where: {
-          id,
-          building: { customer: { organizationId: user.organizationId } },
+      : query.record === "hyperhalogenation"
+        ? ("SUMMERTIME_HYPERHALOGENATION" as const)
+        : query.record === "bacteriological"
+          ? ("BACTERIOLOGICAL_SAMPLE_COLLECTED" as const)
+          : externalLegionellaRequested
+            ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
+            : undefined;
+  const roleAllowedInitialEventType =
+    initialEventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
+    !canConfirmOwnerManaged
+      ? undefined
+      : initialEventType;
+  const [
+    system,
+    dashboardRow,
+    recordedEvent,
+    technicians,
+    profileAudit,
+    availableRuleProfiles,
+  ] = await Promise.all([
+    db.coolingTowerSystem.findFirst({
+      where: {
+        id,
+        building: { customer: { organizationId: user.organizationId } },
+      },
+      include: {
+        building: { include: { customer: true } },
+        jurisdiction: true,
+        ruleProfile: { include: { rules: true } },
+        pendingRegulation: true,
+        activities: {
+          orderBy: { scheduledDate: "desc" },
+          take: 25,
+          include: { visit: true },
         },
-        include: {
-          building: { include: { customer: true } },
-          jurisdiction: true,
-          ruleProfile: { include: { rules: true } },
-          pendingRegulation: true,
-          activities: {
-            orderBy: { scheduledDate: "desc" },
-            take: 25,
-            include: { visit: true },
+        serviceEvents: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            status: true,
+            eventType: true,
+            eventDate: true,
+            createdAt: true,
+            details: true,
+            performedByResponsibility: true,
+            externalProviderName: true,
+            externalSource: true,
+            correctedFromEventId: true,
+            labResultsForSample: { select: { id: true }, take: 1 },
           },
-          serviceEvents: {
-            orderBy: { createdAt: "desc" },
-            select: {
-              id: true,
-              status: true,
-              eventType: true,
-              eventDate: true,
-              createdAt: true,
-              details: true,
-              correctedFromEventId: true,
-              labResultsForSample: { select: { id: true }, take: 1 },
-            },
-          },
-          sampleObligations: {
-            where: {
-              status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
-            },
-            orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
-            include: {
-              triggerEvent: {
-                select: { id: true, eventType: true, eventDate: true },
-              },
-            },
-          },
-          inspectionObligations: {
-            where: {
-              status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
-            },
-            orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
-            include: {
-              triggerEvent: {
-                select: { id: true, eventType: true, eventDate: true },
-              },
-            },
-          },
-          reportingObligations: {
-            where: {
-              status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
-            },
-            orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
-            include: {
-              triggerEvent: {
-                select: { id: true, eventType: true, eventDate: true },
-              },
-            },
-          },
-          maintenanceObligations: {
-            where: {
-              status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
-            },
-            orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
-            include: {
-              triggerEvent: {
-                select: { id: true, eventType: true, eventDate: true },
-              },
-            },
-          },
-          labResults: {
-            orderBy: [{ receivedDate: "desc" }, { createdAt: "desc" }],
-            take: 10,
-            include: {
-              sampleEvent: { select: { eventDate: true } },
-            },
-          },
-          complianceStatus: true,
         },
-      }),
-      planningRows({
-        organizationId: user.organizationId,
-        systemId: id,
-      }).then((r) => r.find((x) => x.id === id)),
-      complianceDashboardRows({
-        organizationId: user.organizationId,
-        systemId: id,
-      }).then((r) => r.find((x) => x.id === id)),
-      recordedEventId
-        ? db.serviceEvent.findFirst({
-            where: {
-              id: recordedEventId,
-              coolingTowerSystem: {
-                id,
-                building: { customer: { organizationId: user.organizationId } },
-              },
+        sampleObligations: {
+          where: {
+            status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
+          },
+          orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
+          include: {
+            triggerEvent: {
+              select: { id: true, eventType: true, eventDate: true },
             },
-          })
-        : Promise.resolve(null),
-      ["ADMIN", "OPERATIONS_MANAGER", "SCHEDULER"].includes(user.role)
-        ? db.user.findMany({
-            where: {
-              organizationId: user.organizationId,
-              role: "TECHNICIAN",
-              active: true,
+          },
+        },
+        inspectionObligations: {
+          where: {
+            status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
+          },
+          orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
+          include: {
+            triggerEvent: {
+              select: { id: true, eventType: true, eventDate: true },
             },
-            orderBy: { name: "asc" },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-    ]);
-  if (!system || !row || !dashboardRow) notFound();
+          },
+        },
+        reportingObligations: {
+          where: {
+            status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
+          },
+          orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
+          include: {
+            triggerEvent: {
+              select: { id: true, eventType: true, eventDate: true },
+            },
+          },
+        },
+        maintenanceObligations: {
+          where: {
+            status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
+          },
+          orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
+          include: {
+            triggerEvent: {
+              select: { id: true, eventType: true, eventDate: true },
+            },
+          },
+        },
+        labResults: {
+          orderBy: [{ receivedDate: "desc" }, { createdAt: "desc" }],
+          take: 10,
+          include: {
+            sampleEvent: { select: { eventDate: true } },
+          },
+        },
+        complianceStatus: true,
+      },
+    }),
+    complianceDashboardRows({
+      organizationId: user.organizationId,
+      systemId: id,
+    }).then((r) => r.find((x) => x.id === id)),
+    recordedEventId
+      ? db.serviceEvent.findFirst({
+          where: {
+            id: recordedEventId,
+            coolingTowerSystem: {
+              id,
+              building: { customer: { organizationId: user.organizationId } },
+            },
+          },
+        })
+      : Promise.resolve(null),
+    ["ADMIN", "OPERATIONS_MANAGER", "SCHEDULER"].includes(user.role)
+      ? db.user.findMany({
+          where: {
+            organizationId: user.organizationId,
+            role: "TECHNICIAN",
+            active: true,
+          },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    db.auditLog.findFirst({
+      where: {
+        entityType: "CoolingTowerSystem",
+        entityId: id,
+        action: { in: ["CREATED", "UPDATED"] },
+      },
+      orderBy: { changedAt: "desc" },
+      include: { changedBy: { select: { name: true } } },
+    }),
+    db.ruleProfile.findMany({
+      where: {
+        active: true,
+        OR: [
+          {
+            jurisdictionMode: {
+              in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
+            },
+          },
+          { organizationId: user.organizationId },
+        ],
+      },
+      include: { rules: true },
+    }),
+  ]);
+  if (!system || !dashboardRow) notFound();
+  const allowedInitialEventType =
+    externalLegionellaRequested &&
+    canConfirmOwnerManaged &&
+    ["CUSTOMER", "OTHER_VENDOR"].includes(system.legionellaResponsibility ?? "")
+      ? roleAllowedInitialEventType
+      : roleAllowedInitialEventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&
+          system.legionellaResponsibility !== "OUR_COMPANY"
+        ? undefined
+        : roleAllowedInitialEventType;
   const activeCleaningPlan = system.activities.find((activity) => {
     const details = activity.details as { planType?: unknown } | null;
     return (
@@ -208,20 +257,6 @@ export default async function SystemPage({
     .at(-1)!;
   while (isWeekend(cleaningPlanEarliest))
     cleaningPlanEarliest = addDays(cleaningPlanEarliest, 1);
-  const latestCleaningActivity = system.activities.find(
-    (activity) =>
-      activity.performedDate && cleaningTypes.has(activity.activityType),
-  )?.performedDate;
-  const latestCleaningEvent = system.serviceEvents
-    .filter(
-      (event) =>
-        event.status === "ACTIVE" && cleaningEventTypes.has(event.eventType),
-    )
-    .map((event) => event.eventDate)
-    .sort((a, b) => b.getTime() - a.getTime())[0];
-  const latestCleaning = [latestCleaningActivity, latestCleaningEvent]
-    .filter((value): value is Date => Boolean(value))
-    .sort((a, b) => b.getTime() - a.getTime())[0];
   const latestMonthlySample = system.serviceEvents
     .filter(
       (event) =>
@@ -322,9 +357,30 @@ export default async function SystemPage({
       item.priority === "WARNING" ||
       (item.latest != null && item.latest < today),
   ).length;
+  const orderedOpenObligations = sortTowerObligations(
+    dashboardRow.openObligations,
+    today,
+  );
+  const overviewObligations = selectOverviewObligations(
+    dashboardRow.openObligations,
+    today,
+  );
+  const combinedObligationIds = new Set(
+    dashboardRow.visitOpportunity?.obligations.map(
+      ({ id: itemId }) => itemId,
+    ) ?? [],
+  );
   const mostRecentActiveEvent = system.serviceEvents.find(
     (event) => event.status === "ACTIVE",
   );
+  const recentActiveEvents = system.serviceEvents
+    .filter((event) => event.status === "ACTIVE")
+    .sort(
+      (a, b) =>
+        dateOnly(b.eventDate).localeCompare(dateOnly(a.eventDate)) ||
+        b.createdAt.getTime() - a.createdAt.getTime(),
+    )
+    .slice(0, 5);
   const timelineItems = nextRequired
     ? [
         nextRequired.trigger
@@ -364,7 +420,14 @@ export default async function SystemPage({
         },
       ].filter((item): item is NonNullable<typeof item> => item != null)
     : [];
-  const ruleConfig = compileTowerRuleConfig(system.ruleProfile, {
+  const composedRuleProfile = composeTowerRuleProfiles(
+    system.ruleConfiguration,
+    system.ruleConfiguration === "CUSTOM"
+      ? [system.ruleProfile]
+      : availableRuleProfiles,
+    system.ruleProfileId,
+  );
+  const ruleConfig = compileTowerRuleConfig(composedRuleProfile, {
     operating: !["FULLY_SHUT_DOWN", "SEASONALLY_INACTIVE"].includes(
       system.operatingStatus,
     ),
@@ -386,28 +449,92 @@ export default async function SystemPage({
         title={`${system.building.buildingName} — ${system.systemName}`}
         description={`${system.building.streetAddress}, ${system.building.city}, ${system.building.state} · ${system.internalJobNumber}`}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Link className="btn" href={`/systems/${id}/edit`}>
-              Edit customer & tower
-            </Link>
-          </div>
+          <EventRecorderDrawer
+            key={
+              recordedEventId ??
+              (typeof query.correctedEvent === "string"
+                ? query.correctedEvent
+                : undefined) ??
+              (typeof query.voidedEvent === "string"
+                ? query.voidedEvent
+                : undefined) ??
+              "event-recorder"
+            }
+            systemId={id}
+            defaultDate={today}
+            ruleConfig={ruleConfig}
+            samplesAwaitingResults={samplesAwaitingResults}
+            initialSampleEventId={initialSampleEventId}
+            initialEventType={allowedInitialEventType}
+            initialOpen={Boolean(
+              allowedInitialEventType || initialSampleEventId,
+            )}
+            canConfirmOwnerManaged={canConfirmOwnerManaged}
+            legionellaResponsibility={system.legionellaResponsibility}
+            legionellaVendorName={system.legionellaVendorName}
+            openSampleObligations={system.sampleObligations.map((item) => ({
+              id: item.id,
+              type: item.obligationType,
+              earliest: item.earliestDueDate
+                ? dateOnly(item.earliestDueDate)
+                : null,
+              latest: item.latestDueDate ? dateOnly(item.latestDueDate) : null,
+              status: item.status,
+              sourceCitation: item.sourceCitation,
+            }))}
+          />
         }
       />
+      {system.legionellaResponsibility === "NOT_TRACKED" && (
+        <div className="mb-5 rounded-xl border border-purple-300 bg-purple-50 p-4 font-bold text-purple-900">
+          Legionella compliance is not tracked in TowerTrack for this tower.
+          This does not mean no legal obligation applies.
+        </div>
+      )}
+      {!system.legionellaResponsibility && (
+        <div className="mb-5 rounded-xl border border-purple-300 bg-purple-50 p-4 font-bold text-purple-900">
+          Legionella responsibility must be confirmed.
+          {canViewSettings && (
+            <Link className="ml-2 underline" href={`/systems/${id}/edit`}>
+              Configure service responsibility
+            </Link>
+          )}
+        </div>
+      )}
+      <section className="panel mb-5 p-4">
+        <div className="label">Service Responsibility</div>
+        <div className="mt-2 text-sm">
+          <span className="font-black">Legionella sampling and results:</span>{" "}
+          {serviceResponsibilityLabel(system.legionellaResponsibility)}
+          {system.legionellaVendorName
+            ? ` — ${system.legionellaVendorName}`
+            : ""}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          Inspection, cleaning, and treatment remain independently tracked
+          services.
+        </div>
+      </section>
       <nav
         className="panel mb-6 flex gap-1 overflow-x-auto p-2"
         aria-label="Tower workspace"
       >
         {[
-          ["Overview", "#overview"],
-          ["Obligations", "#obligations"],
-          ["Events", "#record-event"],
-          ["Samples", "#samples"],
-          ["Compliance History", "#compliance-history"],
-        ].map(([label, href]) => (
+          ["Overview", "overview"],
+          ["Obligations", "obligations"],
+          ["History", "history"],
+          ["Tower Information", "information"],
+          ...(canViewSettings ? [["Settings", "settings"]] : []),
+        ].map(([label, tab]) => (
           <Link
-            key={href}
-            className="min-h-11 min-w-max rounded-lg px-4 py-3 text-sm font-black text-emerald-900 hover:bg-emerald-50"
-            href={href}
+            key={tab}
+            className={`min-h-11 min-w-max rounded-lg px-4 py-3 text-sm font-black ${
+              view === tab
+                ? "bg-emerald-800 text-white"
+                : "text-emerald-900 hover:bg-emerald-50"
+            }`}
+            href={`/systems/${id}?view=${tab}`}
+            aria-current={view === tab ? "page" : undefined}
           >
             {label}
           </Link>
@@ -415,8 +542,8 @@ export default async function SystemPage({
       </nav>
       {generated && (
         <section className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
-          <div className="label">Event impact</div>
-          <h2 className="mt-1 font-black">What changed</h2>
+          <div className="label">Authoritative recalculation</div>
+          <h2 className="mt-1 font-black">Compliance Updated</h2>
           <ul className="mt-3 grid gap-2 text-sm font-bold sm:grid-cols-2">
             <li>✓ Event recorded and regulatory history updated</li>
             <li>
@@ -524,7 +651,10 @@ export default async function SystemPage({
           obligation was recalculated from the remaining active events.
         </div>
       )}
-      <section id="overview" className="panel mb-6 scroll-mt-6 p-5">
+      <section
+        id="overview"
+        className={`${view === "overview" ? "panel mb-6" : "hidden"} scroll-mt-6 p-5`}
+      >
         <div className="label">Tower compliance dashboard</div>
         <div className="mt-3 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <div>
@@ -540,46 +670,74 @@ export default async function SystemPage({
             </p>
           </div>
           <div>
-            <div className="label">Next required action</div>
+            <div className="label">Operating status</div>
             <div className="mt-2 font-black">
-              {nextRequired
-                ? plainEnumLabel(nextRequired.type)
-                : "No open obligation"}
+              {plainEnumLabel(system.operatingStatus)}
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              {nextRequired?.reason ??
-                "Record the next verified event when work is completed."}
+              {seasonLabel(system)} · {seasonalStatus(system)}
             </p>
           </div>
-          <ComplianceDate
-            value={nextRequired?.latest}
-            label="Controlling legal deadline"
-            deadline
-            empty={
-              nextRequired?.priority === "EMERGENCY"
-                ? "Immediate / follow MPP"
-                : "No legal deadline open"
-            }
-          />
           <div>
-            <div className="label">Work intelligence</div>
+            <div className="label">Compliance Rules</div>
             <div className="mt-2 font-black">
-              {dashboardRow.openCount} open obligation
-              {dashboardRow.openCount === 1 ? "" : "s"}
+              {towerRuleConfigurationLabel(system.ruleConfiguration)}
             </div>
-            <p className="mt-1 text-sm font-bold text-slate-600">
-              {warningCount} warning{warningCount === 1 ? "" : "s"} requiring
-              attention
+            <p className="mt-2 text-sm text-slate-600">
+              {system.ruleProfile.name} · Effective{" "}
+              {formatDate(system.ruleConfigurationEffectiveDate)}
             </p>
-            <p className="mt-2 text-sm font-black text-emerald-900">
-              {dashboardRow.visitOpportunity?.obligations.length
-                ? `Best visit can complete ${dashboardRow.visitOpportunity.obligations.length} obligation${dashboardRow.visitOpportunity.obligations.length === 1 ? "" : "s"}.`
-                : "No safe field-service intersection is open."}
+            {!system.ruleConfigurationConfirmed && (
+              <p className="mt-2 text-sm font-black text-purple-800">
+                Compliance rules must be confirmed.
+              </p>
+            )}
+          </div>
+          <div>
+            <div className="label">Route zone</div>
+            <div className="mt-2 font-black">
+              {system.routeZoneOverride || system.building.routeZone}
+            </div>
+            <p className="mt-2 text-sm font-bold text-slate-600">
+              {dashboardRow.openCount} open obligation
+              {dashboardRow.openCount === 1 ? "" : "s"} · {warningCount} urgent
             </p>
           </div>
         </div>
       </section>
-      <section className="mb-6" aria-labelledby="key-compliance-dates">
+      {view === "overview" && (
+        <section className="panel mb-6 p-5" aria-labelledby="next-actions">
+          <div className="label">Daily work</div>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="next-actions" className="mt-1 text-xl font-black">
+                Next required actions
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                All urgent items are shown first, followed by the next three
+                upcoming obligations.
+              </p>
+            </div>
+            <Link className="btn" href={`/systems/${id}?view=obligations`}>
+              View all obligations
+            </Link>
+          </div>
+          <div className="mt-5">
+            <TowerActionList
+              systemId={id}
+              today={today}
+              items={overviewObligations}
+              combinedObligationIds={combinedObligationIds}
+              canConfirmOwnerManaged={canConfirmOwnerManaged}
+              legionellaResponsibility={system.legionellaResponsibility}
+            />
+          </div>
+        </section>
+      )}
+      <section
+        className={view === "history" ? "mb-6" : "hidden"}
+        aria-labelledby="key-compliance-dates"
+      >
         <div className="mb-3">
           <div className="label">Recurring compliance snapshot</div>
           <h2 id="key-compliance-dates" className="mt-1 text-xl font-black">
@@ -699,19 +857,11 @@ export default async function SystemPage({
           </article>
         </div>
       </section>
-      <div className="mb-6">
-        <EventRecorder
-          key={initialSampleEventId ?? initialEventType ?? "default"}
-          systemId={id}
-          defaultDate={today}
-          ruleConfig={ruleConfig}
-          samplesAwaitingResults={samplesAwaitingResults}
-          initialSampleEventId={initialSampleEventId}
-          initialEventType={initialEventType}
-        />
-      </div>
       {system.labResults.length > 0 && (
-        <section id="samples" className="panel mb-6 scroll-mt-6 p-5">
+        <section
+          id="samples"
+          className={`${view === "history" ? "panel mb-6" : "hidden"} scroll-mt-6 p-5`}
+        >
           <div className="label">Legionella result history</div>
           <h2 className="mt-1 text-xl font-black">Recent Legionella results</h2>
           <p className="mt-1 text-sm text-slate-600">
@@ -788,146 +938,67 @@ export default async function SystemPage({
           </div>
         </section>
       )}
+      {view === "obligations" && (
+        <section className="panel mb-6 p-5">
+          <div className="label">Active compliance work</div>
+          <h2 className="mt-1 text-xl font-black">All open obligations</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Urgent items appear first. Dates show the operational target,
+            allowable window, hard deadline, and working time remaining.
+          </p>
+          <div className="mt-5">
+            <TowerActionList
+              systemId={id}
+              today={today}
+              items={orderedOpenObligations}
+              canConfirmOwnerManaged={canConfirmOwnerManaged}
+              legionellaResponsibility={system.legionellaResponsibility}
+              combinedObligationIds={combinedObligationIds}
+              emptyMessage="No open obligations are currently recorded for this tower."
+            />
+          </div>
+        </section>
+      )}
       {nextRequired && (
-        <div className="mb-6">
+        <div className={view === "obligations" ? "mb-6" : "hidden"}>
           <ComplianceTimeline
             title={plainEnumLabel(nextRequired.type)}
             items={timelineItems}
           />
         </div>
       )}
-      <div
-        id="obligations"
-        className="mb-6 grid scroll-mt-6 gap-4 xl:grid-cols-2"
+      <details
+        className={`${view === "obligations" ? "panel mb-6 p-5" : "hidden"} scroll-mt-6`}
+        open={Boolean(
+          recordedEventId || query.correctedEvent || query.voidedEvent,
+        )}
       >
-        <section className="panel p-5">
-          <div className="label">Sampling obligations</div>
-          <h2 className="mt-1 font-black">
-            Open Legionella sampling obligations
-          </h2>
-          <div className="mt-4 space-y-3">
-            {system.sampleObligations.length ? (
-              system.sampleObligations.map((item) => (
-                <ObligationIntelligenceCard
-                  key={item.id}
-                  today={today}
-                  obligation={{
-                    id: item.id,
-                    type: item.obligationType,
-                    category: "SAMPLE",
-                    earliest: item.earliestDueDate,
-                    targetStart: item.targetStartDate,
-                    targetEnd: item.targetEndDate,
-                    latest: item.latestDueDate,
-                    priority: item.priority,
-                    status: item.status,
-                    reason: item.reason,
-                    sourceCitation: item.sourceCitation,
-                    trigger: {
-                      id: item.triggerEvent.id,
-                      type: item.triggerEvent.eventType,
-                      date: item.triggerEvent.eventDate,
-                    },
-                  }}
-                />
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">
-                No event-generated sample obligation is open.
-              </p>
-            )}
-          </div>
-        </section>
-        <section className="panel p-5">
-          <div className="label">Cleaning obligations</div>
-          <h2 className="mt-1 font-black">Startup maintenance requirements</h2>
-          <div className="mt-4 space-y-3">
-            {system.maintenanceObligations.length ? (
-              system.maintenanceObligations.map((item) => (
-                <ObligationIntelligenceCard
-                  key={item.id}
-                  today={today}
-                  obligation={{
-                    id: item.id,
-                    type: item.obligationType,
-                    category: "MAINTENANCE",
-                    earliest: item.earliestDueDate,
-                    targetStart: item.targetStartDate,
-                    targetEnd: item.targetEndDate,
-                    latest: item.latestDueDate,
-                    priority: item.priority,
-                    status: item.status,
-                    reason: item.reason,
-                    sourceCitation: item.sourceCitation,
-                    trigger: {
-                      id: item.triggerEvent.id,
-                      type: item.triggerEvent.eventType,
-                      date: item.triggerEvent.eventDate,
-                    },
-                  }}
-                />
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">
-                No startup cleaning obligation is open.
-              </p>
-            )}
-          </div>
-        </section>
-        <section className="panel p-5">
-          <div className="label">Inspection obligations</div>
-          <h2 className="mt-1 font-black">Qualified-person inspection</h2>
-          <div className="mt-4 space-y-3">
-            {system.inspectionObligations.length ? (
-              system.inspectionObligations.map((item) => (
-                <ObligationIntelligenceCard
-                  key={item.id}
-                  today={today}
-                  obligation={{
-                    id: item.id,
-                    type: "QUARTERLY_COMPLIANCE_INSPECTION",
-                    category: "INSPECTION",
-                    earliest: item.earliestDueDate,
-                    targetStart: item.targetStartDate,
-                    targetEnd: item.targetEndDate,
-                    latest: item.latestDueDate,
-                    priority: item.priority,
-                    status: item.status,
-                    reason: item.reason,
-                    sourceCitation: item.sourceCitation,
-                    trigger: {
-                      id: item.triggerEvent.id,
-                      type: item.triggerEvent.eventType,
-                      date: item.triggerEvent.eventDate,
-                    },
-                  }}
-                />
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">
-                Record a completed inspection to establish the next 90-day
-                obligation.
-              </p>
-            )}
-          </div>
-        </section>
-        <section className="panel p-5">
-          <div className="label">Reporting & action reminders</div>
-          <h2 className="mt-1 font-black">DOH and portal deadlines</h2>
-          <div className="mt-4 space-y-3">
-            {system.reportingObligations.length ? (
-              system.reportingObligations.map((item) => (
-                <section
-                  key={item.id}
-                  id={`reporting-${item.id}`}
-                  className="scroll-mt-6 rounded-lg bg-blue-50 p-3 text-sm"
-                >
+        <summary className="cursor-pointer text-base font-black text-emerald-900">
+          Rule details and obligation completion tools
+        </summary>
+        <p className="mt-2 text-sm text-slate-600">
+          Expand the source-triggered records and reporting controls when you
+          need the underlying rule detail.
+        </p>
+        <div
+          id="obligations"
+          className="mt-5 grid scroll-mt-6 gap-4 xl:grid-cols-2"
+        >
+          <section className="panel p-5">
+            <div className="label">Sampling obligations</div>
+            <h2 className="mt-1 font-black">
+              Open Legionella sampling obligations
+            </h2>
+            <div className="mt-4 space-y-3">
+              {system.sampleObligations.length ? (
+                system.sampleObligations.map((item) => (
                   <ObligationIntelligenceCard
+                    key={item.id}
                     today={today}
                     obligation={{
                       id: item.id,
                       type: item.obligationType,
-                      category: "REPORTING_ACTION",
+                      category: "SAMPLE",
                       earliest: item.earliestDueDate,
                       targetStart: item.targetStartDate,
                       targetEnd: item.targetEndDate,
@@ -943,75 +1014,197 @@ export default async function SystemPage({
                       },
                     }}
                   />
-                  {(item.obligationType.includes("NOTIFICATION") ||
-                    item.obligationType.includes("DECLARATION") ||
-                    item.obligationType === "PORTAL_SAMPLE_DATE") &&
-                  recordedReportingObligationIds.has(item.id) ? (
-                    <p className="mt-3 font-bold text-amber-900">
-                      Late submission recorded. The missed deadline remains in
-                      Compliance Issues.
-                    </p>
-                  ) : (
-                    (item.obligationType.includes("NOTIFICATION") ||
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No event-generated sample obligation is open.
+                </p>
+              )}
+            </div>
+          </section>
+          <section className="panel p-5">
+            <div className="label">Cleaning obligations</div>
+            <h2 className="mt-1 font-black">
+              Startup maintenance requirements
+            </h2>
+            <div className="mt-4 space-y-3">
+              {system.maintenanceObligations.length ? (
+                system.maintenanceObligations.map((item) => (
+                  <ObligationIntelligenceCard
+                    key={item.id}
+                    today={today}
+                    obligation={{
+                      id: item.id,
+                      type: item.obligationType,
+                      category: "MAINTENANCE",
+                      earliest: item.earliestDueDate,
+                      targetStart: item.targetStartDate,
+                      targetEnd: item.targetEndDate,
+                      latest: item.latestDueDate,
+                      priority: item.priority,
+                      status: item.status,
+                      reason: item.reason,
+                      sourceCitation: item.sourceCitation,
+                      trigger: {
+                        id: item.triggerEvent.id,
+                        type: item.triggerEvent.eventType,
+                        date: item.triggerEvent.eventDate,
+                      },
+                    }}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No startup cleaning obligation is open.
+                </p>
+              )}
+            </div>
+          </section>
+          <section className="panel p-5">
+            <div className="label">Inspection obligations</div>
+            <h2 className="mt-1 font-black">Qualified-person inspection</h2>
+            <div className="mt-4 space-y-3">
+              {system.inspectionObligations.length ? (
+                system.inspectionObligations.map((item) => (
+                  <ObligationIntelligenceCard
+                    key={item.id}
+                    today={today}
+                    obligation={{
+                      id: item.id,
+                      type: "QUARTERLY_COMPLIANCE_INSPECTION",
+                      category: "INSPECTION",
+                      earliest: item.earliestDueDate,
+                      targetStart: item.targetStartDate,
+                      targetEnd: item.targetEndDate,
+                      latest: item.latestDueDate,
+                      priority: item.priority,
+                      status: item.status,
+                      reason: item.reason,
+                      sourceCitation: item.sourceCitation,
+                      trigger: {
+                        id: item.triggerEvent.id,
+                        type: item.triggerEvent.eventType,
+                        date: item.triggerEvent.eventDate,
+                      },
+                    }}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Record a completed inspection to establish the next 90-day
+                  obligation.
+                </p>
+              )}
+            </div>
+          </section>
+          <section className="panel p-5">
+            <div className="label">Reporting & action reminders</div>
+            <h2 className="mt-1 font-black">DOH and portal deadlines</h2>
+            <div className="mt-4 space-y-3">
+              {system.reportingObligations.length ? (
+                system.reportingObligations.map((item) => (
+                  <section
+                    key={item.id}
+                    id={`reporting-${item.id}`}
+                    className="scroll-mt-6 rounded-lg bg-blue-50 p-3 text-sm"
+                  >
+                    <ObligationIntelligenceCard
+                      today={today}
+                      obligation={{
+                        id: item.id,
+                        type: item.obligationType,
+                        category: "REPORTING_ACTION",
+                        earliest: item.earliestDueDate,
+                        targetStart: item.targetStartDate,
+                        targetEnd: item.targetEndDate,
+                        latest: item.latestDueDate,
+                        priority: item.priority,
+                        status: item.status,
+                        reason: item.reason,
+                        sourceCitation: item.sourceCitation,
+                        trigger: {
+                          id: item.triggerEvent.id,
+                          type: item.triggerEvent.eventType,
+                          date: item.triggerEvent.eventDate,
+                        },
+                      }}
+                    />
+                    {(item.obligationType.includes("NOTIFICATION") ||
                       item.obligationType.includes("DECLARATION") ||
-                      item.obligationType === "PORTAL_SAMPLE_DATE") && (
-                      <form action={recordServiceEventAction} className="mt-3">
-                        {item.status === "MISSED" && (
-                          <p className="mb-2 font-bold text-red-900">
-                            Record this as a late historical submission. It will
-                            not repair the missed obligation.
-                          </p>
-                        )}
-                        <input type="hidden" name="systemId" value={id} />
-                        <input
-                          type="hidden"
-                          name="eventType"
-                          value="REPORT_SUBMITTED"
-                        />
-                        <input
-                          className="field mt-1"
-                          name="eventDate"
-                          type="date"
-                          max={today}
-                          aria-label="Submission date"
-                          defaultValue={today}
-                          required
-                        />
-                        <input
-                          type="hidden"
-                          name="reportType"
-                          value={item.obligationType}
-                        />
-                        <input
-                          type="hidden"
-                          name="reportingObligationId"
-                          value={item.id}
-                        />
-                        <input
-                          type="hidden"
-                          name="notes"
-                          value={`Completed ${plainEnumLabel(item.obligationType)}`}
-                        />
-                        <button className="btn mt-2">
-                          {item.obligationType === "PORTAL_SAMPLE_DATE"
-                            ? "Record NYC portal submission"
-                            : "Record submission"}
-                        </button>
-                      </form>
-                    )
-                  )}
-                </section>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">
-                No event-generated reporting reminder is open.
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
+                      item.obligationType === "PORTAL_SAMPLE_DATE") &&
+                    recordedReportingObligationIds.has(item.id) ? (
+                      <p className="mt-3 font-bold text-amber-900">
+                        Late submission recorded. The missed deadline remains in
+                        Compliance Issues.
+                      </p>
+                    ) : (
+                      (item.obligationType.includes("NOTIFICATION") ||
+                        item.obligationType.includes("DECLARATION") ||
+                        item.obligationType === "PORTAL_SAMPLE_DATE") && (
+                        <form
+                          action={recordServiceEventAction}
+                          className="mt-3"
+                        >
+                          {item.status === "MISSED" && (
+                            <p className="mb-2 font-bold text-red-900">
+                              Record this as a late historical submission. It
+                              will not repair the missed obligation.
+                            </p>
+                          )}
+                          <input type="hidden" name="systemId" value={id} />
+                          <input
+                            type="hidden"
+                            name="eventType"
+                            value="REPORT_SUBMITTED"
+                          />
+                          <input
+                            className="field mt-1"
+                            name="eventDate"
+                            type="date"
+                            max={today}
+                            aria-label="Submission date"
+                            defaultValue={today}
+                            required
+                          />
+                          <input
+                            type="hidden"
+                            name="reportType"
+                            value={item.obligationType}
+                          />
+                          <input
+                            type="hidden"
+                            name="reportingObligationId"
+                            value={item.id}
+                          />
+                          <input
+                            type="hidden"
+                            name="notes"
+                            value={`Completed ${plainEnumLabel(item.obligationType)}`}
+                          />
+                          <button className={buttonClass("primary", "mt-2")}>
+                            {item.obligationType === "PORTAL_SAMPLE_DATE"
+                              ? "Record NYC portal submission"
+                              : "Record submission"}
+                          </button>
+                        </form>
+                      )
+                    )}
+                  </section>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  No event-generated reporting reminder is open.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+      </details>
       <div className="mb-6 grid gap-4">
-        <div id="cleaning-plan" className="panel scroll-mt-6 p-5">
+        <div
+          id="cleaning-plan"
+          className={`${view === "obligations" ? "panel" : "hidden"} scroll-mt-6 p-5`}
+        >
           <div className="label">Annual cleaning coordination</div>
           <h2 className="mt-1 font-black">Two-day cleaning plan</h2>
           <p className="mt-1 text-sm text-slate-600">
@@ -1071,7 +1264,52 @@ export default async function SystemPage({
             </p>
           )}
         </div>
-        <div className="panel p-5">
+        {view === "information" && (
+          <div className="panel p-5">
+            <div className="label">Facility and identifiers</div>
+            <h2 className="mt-1 font-black">Tower location</h2>
+            <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+              <div>
+                <dt className="label">Customer</dt>
+                <dd className="font-bold">{system.building.customer.name}</dd>
+              </div>
+              <div>
+                <dt className="label">Facility</dt>
+                <dd className="font-bold">{system.building.buildingName}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="label">Address</dt>
+                <dd className="font-bold">
+                  {system.building.streetAddress}, {system.building.city},{" "}
+                  {system.building.state}
+                </dd>
+              </div>
+              <div>
+                <dt className="label">Internal job number</dt>
+                <dd className="font-bold">{system.internalJobNumber}</dd>
+              </div>
+              <div>
+                <dt className="label">Registration number</dt>
+                <dd className="font-bold">
+                  {system.registrationNumber || "Not recorded"}
+                </dd>
+              </div>
+              <div>
+                <dt className="label">NYC system ID</dt>
+                <dd className="font-bold">
+                  {system.NYCSystemId || "Not recorded"}
+                </dd>
+              </div>
+              <div>
+                <dt className="label">NYS system ID</dt>
+                <dd className="font-bold">
+                  {system.NYSSystemId || "Not recorded"}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+        <div className={view === "information" ? "panel p-5" : "hidden"}>
           <div className="label">Cooling tower information</div>
           <h2 className="mt-1 font-black">Equipment details</h2>
           <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
@@ -1107,40 +1345,7 @@ export default async function SystemPage({
             </div>
           </dl>
         </div>
-        <div className="panel p-5">
-          <h2 className="font-black">Recent records and priority</h2>
-          <div className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
-            <ComplianceDate
-              value={row.lastSample}
-              label="Last Legionella test"
-            />
-            <ComplianceDate value={latestCleaning} label="Last cleaning" />
-            <div>
-              <div className="label">Most urgent open obligation</div>
-              <div className="mt-1 font-black">
-                {nextRequired
-                  ? requirementLabel(nextRequired.type)
-                  : "No open obligation"}
-              </div>
-              {nextRequired && (
-                <div className="mt-2">
-                  <ComplianceDate
-                    value={nextRequired.latest}
-                    label="Deadline"
-                    deadline
-                    operational
-                    empty={
-                      nextRequired.priority === "EMERGENCY"
-                        ? "Immediate / follow MPP"
-                        : "No fixed legal deadline"
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="panel p-5">
+        <div className={view === "settings" ? "panel p-5" : "hidden"}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-black">Tower operation pattern</h2>
@@ -1156,7 +1361,7 @@ export default async function SystemPage({
           </div>
           <OperationPatternForm
             systemId={id}
-            seasonal={system.seasonal}
+            seasonal={system.operationPeriodType === "SEASONAL"}
             seasonStartMonth={system.seasonStartMonth}
             seasonStartDay={system.seasonStartDay}
             seasonEndMonth={system.seasonEndMonth}
@@ -1165,7 +1370,7 @@ export default async function SystemPage({
             currentStatus={seasonalStatus(system)}
           />
         </div>
-        <div className="panel p-5">
+        <div className={view === "settings" ? "panel p-5" : "hidden"}>
           <h2 className="font-black">
             Recommended monthly sample collection dates
           </h2>
@@ -1218,44 +1423,52 @@ export default async function SystemPage({
           </form>
         </div>
       </div>
-      <div className="mb-6 rounded-2xl bg-[#173f31] p-6 text-white">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row">
-          <div>
-            <StatusBadge color={row.status.color} label={row.status.label} />
-            <h2 className="mt-4 text-2xl font-black">
-              {nextRequired
-                ? requirementLabel(nextRequired.type)
-                : "No open obligation"}
-            </h2>
-            <p className="mt-2 text-white/70">
-              Deadline{" "}
-              {nextRequired?.latest
-                ? formatDate(nextRequired.latest)
-                : nextRequired?.priority === "EMERGENCY"
-                  ? "Immediate / follow MPP"
-                  : "No fixed deadline"}{" "}
-              · Target{" "}
-              {formatDate(
-                nextRequired?.targetStart ?? nextRequired?.earliest ?? null,
-              )}
-            </p>
-          </div>
-          <div className="sm:text-right">
-            <SourceBadge authority={row.authority} />
-            <div className="mt-2 max-w-xs text-sm text-white/70">
-              {system.ruleProfile.name}
-            </div>
-          </div>
-        </div>
-        <Why>{nextRequired?.reason ?? row.explanation}</Why>
-      </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="panel p-5">
-          <h2 className="font-black">Jurisdiction & rules</h2>
+        <section className={view === "settings" ? "panel p-5" : "hidden"}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 className="font-black">Jurisdiction & rules</h2>
+            <Link className="btn" href={`/systems/${id}/edit`}>
+              Edit customer & tower
+            </Link>
+          </div>
           <dl className="mt-4 space-y-4 text-sm">
             <div>
               <dt className="label">Profile</dt>
               <dd className="font-bold">{system.ruleProfile.name}</dd>
+            </div>
+            <div>
+              <dt className="label">Compliance Rules</dt>
+              <dd className="font-bold">
+                {towerRuleConfigurationLabel(system.ruleConfiguration)}
+              </dd>
+            </div>
+            <div>
+              <dt className="label">Profile version</dt>
+              <dd className="break-all font-mono text-xs">
+                {dashboardRow.profileVersion}
+              </dd>
+            </div>
+            <div>
+              <dt className="label">Effective date</dt>
+              <dd className="font-bold">
+                {formatDate(dashboardRow.profileEffectiveDate)}
+              </dd>
+            </div>
+            <div>
+              <dt className="label">Profile review</dt>
+              <dd className="font-bold">
+                {dashboardRow.profileJurisdiction === "CUSTOM"
+                  ? "Review local requirements and enabled policy rules"
+                  : "Assigned profile active"}
+              </dd>
+            </div>
+            <div>
+              <dt className="label">Assigned / last changed by</dt>
+              <dd className="font-bold">
+                {profileAudit
+                  ? `${profileAudit.changedBy.name} · ${formatDate(profileAudit.changedAt)}`
+                  : "Historical assignment — audit detail unavailable"}
+              </dd>
             </div>
             <div>
               <dt className="label">Jurisdiction</dt>
@@ -1286,58 +1499,47 @@ export default async function SystemPage({
             )}
           </dl>
         </section>
-        <section className="panel p-5">
-          <h2 className="font-black">Legionella clock</h2>
-          <dl className="mt-4 space-y-4 text-sm">
+        <section
+          className={view === "overview" ? "panel p-5 lg:col-span-3" : "hidden"}
+        >
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <dt className="label">Last qualifying sample</dt>
-              <dd className="font-bold">{formatDate(row.lastSample)}</dd>
+              <div className="label">Latest completed records</div>
+              <h2 className="mt-1 font-black">Recent activity</h2>
             </div>
-            <div>
-              <dt className="label">Internal target</dt>
-              <dd className="font-bold">
-                {formatDate(
-                  dashboardRow.routineSample?.targetStart ??
-                    dashboardRow.routineSample?.earliest ??
-                    null,
-                )}
-                {dashboardRow.routineSample?.targetEnd &&
-                  dashboardRow.routineSample.targetEnd !==
-                    dashboardRow.routineSample.targetStart && (
-                    <>
-                      {" "}
-                      through {formatDate(dashboardRow.routineSample.targetEnd)}
-                    </>
-                  )}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Monthly sample deadline</dt>
-              <dd className="font-black">
-                {formatDate(dashboardRow.routineSample?.latest)}
-              </dd>
-            </div>
-          </dl>
-        </section>
-        <section className="panel p-5">
-          <h2 className="font-black">Recent activity</h2>
+            <Link className="btn" href={`/systems/${id}?view=history`}>
+              View full history
+            </Link>
+          </div>
           <div className="mt-4 space-y-3">
-            {system.activities.map((a) => (
-              <div key={a.id} className="border-b pb-3 text-sm">
-                <div className="font-bold capitalize">
-                  {activityLabel(a.activityType)}
+            {recentActiveEvents.map((event) => (
+              <Link
+                key={event.id}
+                href={`/systems/${id}/events/${event.id}`}
+                className="block border-b pb-3 text-sm last:border-0"
+              >
+                <div className="font-bold">
+                  {plainEnumLabel(event.eventType)}
                 </div>
                 <div className="text-slate-500">
-                  {formatDate(a.performedDate || a.scheduledDate)} ·{" "}
-                  {plainEnumLabel(a.status)}
+                  <time dateTime={dateOnly(event.eventDate)}>
+                    {formatDate(event.eventDate)}
+                  </time>{" "}
+                  · {plainEnumLabel(event.status)}
                 </div>
-              </div>
+              </Link>
             ))}
+            {!recentActiveEvents.length && (
+              <p className="text-sm text-slate-500">No events recorded yet.</p>
+            )}
           </div>
         </section>
       </div>
       <span id="compliance-history" className="block scroll-mt-6" />
-      <section id="regulatory-events" className="panel mt-6 scroll-mt-6 p-5">
+      <section
+        id="regulatory-events"
+        className={`${view === "history" ? "panel mt-6" : "hidden"} scroll-mt-6 p-5`}
+      >
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <div className="label">Replayable history</div>
@@ -1369,7 +1571,9 @@ export default async function SystemPage({
                     name="reason"
                     value="Undo most recently recorded active event"
                   />
-                  <button className="btn">Confirm undo last event</button>
+                  <button className={buttonClass("destructive")}>
+                    Confirm undo last event
+                  </button>
                 </form>
               </details>
             )}
@@ -1396,6 +1600,16 @@ export default async function SystemPage({
                       ? " · corrected replacement"
                       : ""}
                   </div>
+                  {event.performedByResponsibility !== "OUR_COMPANY" && (
+                    <div className="mt-1 text-xs font-bold text-purple-800">
+                      {serviceResponsibilityLabel(
+                        event.performedByResponsibility,
+                      )}
+                      {event.externalProviderName
+                        ? ` — ${event.externalProviderName}`
+                        : ""}
+                    </div>
+                  )}
                 </Link>
                 <div className="flex flex-wrap items-center gap-2 self-center text-sm font-black text-emerald-800">
                   {samplesAwaitingResultIds.has(event.id) && (

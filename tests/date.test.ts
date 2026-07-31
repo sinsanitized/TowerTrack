@@ -5,10 +5,13 @@ import {
   complianceDateInfo,
   dateTimeLocalValue,
   formatComplianceDate,
+  formatLongDate,
+  formatLongDateRange,
   formatOperationalDate,
   formatComplianceDateTime,
   formatRelativeDate,
   formatRelativeWorkingDate,
+  formatWorkingDaysLeft,
   isWeekend,
   lastWorkingDayBefore,
   parseDateTimeInTimeZone,
@@ -23,6 +26,13 @@ describe("compliance date presentation", () => {
   it("formats date-only values with a weekday without local-time rollover", () => {
     expect(formatComplianceDate("2026-08-10")).toBe("Mon, Aug 10, 2026");
     expect(formatOperationalDate("2026-01-05")).toBe("Monday 01/05/2026");
+    expect(formatLongDate("2026-08-04")).toBe("Tuesday, August 4, 2026");
+    expect(formatLongDateRange("2026-08-03", "2026-08-07")).toBe(
+      "Monday, August 3 – Friday, August 7, 2026",
+    );
+    expect(formatLongDateRange("2026-07-30", "2026-08-04")).toBe(
+      "Thursday, July 30 – Tuesday, August 4, 2026",
+    );
   });
 
   it("formats exact compliance timestamps in New York time", () => {
@@ -102,6 +112,19 @@ describe("working-day intelligence", () => {
     expect(workingDaysRemaining("2026-07-17", "2026-07-20")).toBe(-1);
     expect(formatRelativeWorkingDate("2026-07-17", "2026-07-20")).toBe(
       "Overdue by 1 working day",
+    );
+    expect(formatWorkingDaysLeft("2026-07-20", "2026-07-20")).toBe("Due today");
+    expect(formatWorkingDaysLeft("2026-07-21", "2026-07-20")).toBe(
+      "1 working day left",
+    );
+    expect(formatWorkingDaysLeft("2026-07-17", "2026-07-20")).toBe(
+      "Overdue by 1 working day",
+    );
+    expect(formatWorkingDaysLeft("2026-07-17", "2026-07-18")).toBe(
+      "Overdue; no working days have elapsed",
+    );
+    expect(formatWorkingDaysLeft("2026-07-19", "2026-07-18")).toBe(
+      "Due before the next working day",
     );
   });
 

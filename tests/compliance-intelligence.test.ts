@@ -47,7 +47,7 @@ describe("home attention grouping", () => {
     ).toBe("URGENT");
   });
 
-  it("sorts overdue outside the actionable priority queue", () => {
+  it("sorts overdue first when presenting every urgent tower obligation", () => {
     const today = "2026-07-16";
     const overdue = { latest: "2026-07-15", priority: "ROUTINE" };
     const emergency = { latest: null, priority: "EMERGENCY" };
@@ -55,7 +55,7 @@ describe("home attention grouping", () => {
     const sorted = [dueSoon, emergency, overdue].sort((a, b) =>
       compareUrgentAttention(a, b, today),
     );
-    expect(sorted).toEqual([emergency, dueSoon, overdue]);
+    expect(sorted).toEqual([overdue, emergency, dueSoon]);
     expect(getUrgentAttentionPriority(overdue, today).label).toBe(
       "Overdue — compliance issue",
     );

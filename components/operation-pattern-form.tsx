@@ -50,7 +50,7 @@ export function OperationPatternForm({
     <form action={updateSeasonalSettingsAction} className="mt-4 space-y-4">
       <input type="hidden" name="systemId" value={systemId} />
       <fieldset>
-        <legend className="label">Choose one operation pattern</legend>
+        <legend className="label">Operating Schedule</legend>
         <div className="mt-2 grid gap-3 md:grid-cols-2">
           <label
             className={`cursor-pointer rounded-xl border-2 p-4 ${
@@ -69,7 +69,7 @@ export function OperationPatternForm({
                 className="mt-1 size-5 accent-emerald-800"
               />
               <span>
-                <span className="block font-black">Year-Round Tower</span>
+                <span className="block font-black">Year-round</span>
                 <span className="mt-1 block text-sm text-slate-600">
                   Operates throughout the year. Routine compliance clocks remain
                   active.
@@ -94,7 +94,7 @@ export function OperationPatternForm({
                 className="mt-1 size-5 accent-emerald-800"
               />
               <span>
-                <span className="block font-black">Seasonal Tower</span>
+                <span className="block font-black">Seasonal</span>
                 <span className="mt-1 block text-sm text-slate-600">
                   Operates during a recurring part of the year. Configure the
                   expected season below.
@@ -210,7 +210,7 @@ export function OperationPatternForm({
             defaultValue="Update tower operation pattern"
           />
         </label>
-        <button className="btn btn-primary">Save operation pattern</button>
+        <button className="btn btn-primary">Save operating schedule</button>
       </div>
     </form>
   );

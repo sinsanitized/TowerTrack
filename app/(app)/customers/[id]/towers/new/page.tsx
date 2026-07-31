@@ -2,7 +2,14 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { createCoolingTowerSystemAction } from "@/app/actions";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { UserRole } from "@prisma/client";
+import { todayDateOnly } from "@/lib/date";
+import { OperatingScheduleFields } from "@/components/operating-schedule-fields";
+import {
+  towerRuleConfigurationForMode,
+  towerRuleConfigurationLabel,
+} from "@/lib/tower-rule-configuration";
 
 function jurisdictionLabel(jurisdiction: {
   city: string | null;
@@ -27,7 +34,7 @@ export default async function NewCoolingTowerPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ buildingId?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const { id } = await params;
   const { buildingId } = await searchParams;
   const [customer, profiles, jurisdictions] = await Promise.all([
@@ -36,7 +43,10 @@ export default async function NewCoolingTowerPage({
       include: { buildings: { where: { active: true } } },
     }),
     db.ruleProfile.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        OR: [{ organizationId: null }, { organizationId: user.organizationId }],
+      },
       include: { jurisdiction: true },
       orderBy: { name: "asc" },
     }),
@@ -92,7 +102,7 @@ export default async function NewCoolingTowerPage({
             />
           </label>
           <label>
-            <span className="label">Tonnage</span>
+            <span className="label">Cooling Tower Tonnage</span>
             <input
               className="field mt-1"
               name="tonnage"
@@ -101,6 +111,36 @@ export default async function NewCoolingTowerPage({
               step="0.1"
               required
             />
+          </label>
+          <OperatingScheduleFields />
+          <label>
+            <span className="label">Legionella Responsibility</span>
+            <select
+              className="field mt-1"
+              name="legionellaResponsibility"
+              defaultValue=""
+              required
+            >
+              <option value="" disabled>
+                Choose responsibility
+              </option>
+              <option value="OUR_COMPANY">
+                Our company manages Legionella
+              </option>
+              <option value="CUSTOMER">Customer manages Legionella</option>
+              <option value="OTHER_VENDOR">
+                Another vendor manages Legionella
+              </option>
+              <option value="NOT_TRACKED">
+                Do not track Legionella in TowerTrack
+              </option>
+            </select>
+          </label>
+          <label>
+            <span className="label">
+              Legionella vendor name (when applicable)
+            </span>
+            <input className="field mt-1" name="legionellaVendorName" />
           </label>
           <div>
             <label className="label" htmlFor="new-tower-jurisdiction">
@@ -124,8 +164,29 @@ export default async function NewCoolingTowerPage({
             </select>
           </div>
           <div>
+            <label className="label" htmlFor="new-tower-rule-configuration">
+              Compliance Rules
+            </label>
+            <select
+              id="new-tower-rule-configuration"
+              className="field mt-1"
+              name="ruleConfiguration"
+              defaultValue=""
+              required
+            >
+              <option value="" disabled>
+                Choose configuration
+              </option>
+              <option value="NYC_AND_NYS">
+                NYC Chapter 8 + New York State
+              </option>
+              <option value="NYS_ONLY">New York State Only</option>
+              <option value="CUSTOM">Custom / Out of State</option>
+            </select>
+          </div>
+          <div>
             <label className="label" htmlFor="new-tower-rule-profile">
-              Rule profile
+              Profile version
             </label>
             <select
               id="new-tower-rule-profile"
@@ -139,11 +200,24 @@ export default async function NewCoolingTowerPage({
               </option>
               {profiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
-                  {profile.name}
+                  {towerRuleConfigurationLabel(
+                    towerRuleConfigurationForMode(profile.jurisdictionMode),
+                  )}{" "}
+                  — {profile.name}
                 </option>
               ))}
             </select>
           </div>
+          <label>
+            <span className="label">Effective date</span>
+            <input
+              className="field mt-1"
+              name="ruleEffectiveDate"
+              type="date"
+              defaultValue={todayDateOnly()}
+              required
+            />
+          </label>
           <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
             <p className="mt-2 text-xs text-slate-500">
               Jurisdiction and rules are stored on this cooling tower. NYC rules

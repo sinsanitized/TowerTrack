@@ -173,7 +173,7 @@ export function getUrgentAttentionPriority(
   today = todayDateOnly(),
 ): UrgentAttentionPriority {
   if (obligation.latest != null && obligation.latest < today)
-    return { rank: 9, label: "Overdue — compliance issue" };
+    return { rank: 0, label: "Overdue — compliance issue" };
   if (obligation.priority === "EMERGENCY")
     return { rank: 1, label: "Emergency — act immediately" };
   if (obligation.latest === today) return { rank: 2, label: "Due today" };
@@ -213,7 +213,7 @@ export function getAttentionBucket(
   >,
   today = todayDateOnly(),
 ): AttentionBucket {
-  if (obligation.latest != null && obligation.latest < today) return "UPCOMING";
+  if (obligation.latest != null && obligation.latest < today) return "URGENT";
   const workingDays = obligation.latest
     ? actionableWorkingDaysRemaining(obligation.latest, today)
     : null;

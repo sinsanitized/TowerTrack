@@ -4,6 +4,7 @@ import {
   type ServiceEventTypeValue,
 } from "@/lib/service-events";
 import { parseDateTimeInTimeZone, todayInTimeZone } from "@/lib/date";
+import { serviceResponsibilityValues } from "@/lib/service-responsibility";
 
 const optionalText = (maximum: number) =>
   z.preprocess(
@@ -31,6 +32,11 @@ const serviceEventInputSchema = z.object({
   ph: optionalText(100),
   freeHalogenResidual: optionalText(500),
   technician: optionalText(200),
+  performedByResponsibility: z
+    .enum(serviceResponsibilityValues)
+    .default("OUR_COMPANY"),
+  externalProviderName: optionalText(200),
+  externalSource: optionalText(500),
   notes: optionalText(2000),
 });
 
@@ -50,6 +56,9 @@ export type ServiceEventCommand = {
     ph: string | null;
     freeHalogenResidual: string | null;
     technician: string | null;
+    performedByResponsibility: (typeof serviceResponsibilityValues)[number];
+    externalProviderName: string | null;
+    externalSource: string | null;
   };
   notes: string | null;
 };
@@ -99,21 +108,6 @@ export function parseServiceEventCommand(
   if (parsed.eventType === "REPORT_SUBMITTED" && !parsed.reportType)
     throw new Error("Choose the reporting obligation that was submitted.");
 
-  if (
-    parsed.eventType === "SUMMERTIME_HYPERHALOGENATION" &&
-    ![
-      parsed.chemical,
-      parsed.quantity,
-      parsed.contactTime,
-      parsed.ph,
-      parsed.freeHalogenResidual,
-      parsed.technician,
-    ].every(Boolean)
-  )
-    throw new Error(
-      "Record chemical, quantity, contact time, pH, free halogen residuals, and technician.",
-    );
-
   return {
     eventType: parsed.eventType,
     eventDate: parsed.eventDate,
@@ -134,6 +128,9 @@ export function parseServiceEventCommand(
       ph: parsed.ph,
       freeHalogenResidual: parsed.freeHalogenResidual,
       technician: parsed.technician,
+      performedByResponsibility: parsed.performedByResponsibility,
+      externalProviderName: parsed.externalProviderName,
+      externalSource: parsed.externalSource,
     },
     notes: parsed.notes,
   };
@@ -157,6 +154,9 @@ export function serviceEventInputFromFormData(formData: FormData) {
     ph: text("ph"),
     freeHalogenResidual: text("freeHalogenResidual"),
     technician: text("technician"),
+    performedByResponsibility: text("performedByResponsibility", "OUR_COMPANY"),
+    externalProviderName: text("externalProviderName"),
+    externalSource: text("externalSource"),
     notes: text("notes"),
   };
 }
@@ -175,6 +175,8 @@ export function serviceEventTypeForActivity(
 ): ServiceEventTypeValue | null {
   if (SAMPLE_ACTIVITY_TYPES.has(activityType))
     return "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED";
+  if (activityType === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
+    return "BACTERIOLOGICAL_SAMPLE_COLLECTED";
   if (qualifiesForInspection || activityType === "COMPLIANCE_INSPECTION")
     return "QUARTERLY_INSPECTION_COMPLETED";
   if (

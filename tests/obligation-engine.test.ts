@@ -403,3 +403,179 @@ describe("obligation coverage and bundling", () => {
     ).toBe(false);
   });
 });
+
+describe("New York State profile", () => {
+  const nysConfig = {
+    ...config,
+    isNyc: false,
+    includesNys: true,
+    profileKind: "NYS" as const,
+    routineSampleMaxGapDays: 90,
+    routineSampleEnabled: true,
+    inspectionIntervalDays: 90,
+    inspectionEnabled: true,
+    bacteriologicalSampleIntervalDays: 30,
+    bacteriologicalSampleEnabled: true,
+    registryReportingIntervalDays: 90,
+    registryReportingEnabled: true,
+    sampleDateReportingEnabled: false,
+    hyperhalogenationEnabled: false,
+    ruleSetVersion: "nys-only[nys-rules@1]",
+  };
+
+  it("uses separate 90-day Legionella and 30-day bacteriological clocks", () => {
+    const legionella = projectEventObligations(
+      event("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"),
+      nysConfig,
+    );
+    const bacteriological = projectEventObligations(
+      event("BACTERIOLOGICAL_SAMPLE_COLLECTED"),
+      nysConfig,
+    );
+    expect(legionella.sample[0]).toMatchObject({
+      obligationType: "ROUTINE_OPERATING_SAMPLE",
+      latestDueDate: "2026-09-29",
+    });
+    expect(bacteriological.sample[0]).toMatchObject({
+      obligationType: "ROUTINE_BACTERIOLOGICAL_SAMPLE",
+      latestDueDate: "2026-07-31",
+    });
+  });
+
+  it("creates the startup sample within 14 days and no NYC startup notice", () => {
+    const projection = projectEventObligations(event("STARTUP"), nysConfig);
+    expect(
+      projection.sample.find(
+        ({ obligationType }) => obligationType === "STARTUP_SAMPLE",
+      ),
+    ).toMatchObject({
+      obligationType: "STARTUP_SAMPLE",
+      earliestDueDate: "2026-07-01",
+      latestDueDate: "2026-07-15",
+    });
+    expect(
+      projection.sample.find(
+        ({ obligationType }) =>
+          obligationType === "ROUTINE_BACTERIOLOGICAL_SAMPLE",
+      ),
+    ).toMatchObject({
+      latestDueDate: "2026-07-31",
+      sourceCitation: "10 NYCRR §4-1.4(b)(1)",
+    });
+    expect(
+      projection.reporting.some(
+        (item) => item.obligationType === "STARTUP_DOH_NOTIFICATION",
+      ),
+    ).toBe(false);
+  });
+
+  it("never creates NYC summertime obligations for NYS-only towers", () => {
+    expect(
+      projectEventObligations(event("SUMMERTIME_HYPERHALOGENATION"), nysConfig),
+    ).toMatchObject({ sample: [], reporting: [] });
+  });
+
+  it("composes NYC and NYS follow-ups without duplicating the sample action", () => {
+    const combined = {
+      ...nysConfig,
+      isNyc: true,
+      includesNys: true,
+      profileKind: "NYC" as const,
+      routineSampleMaxGapDays: 31,
+      sampleDateReportingEnabled: true,
+      sampleDateReportDays: 5,
+      hyperhalogenationEnabled: true,
+    };
+    const projection = projectEventObligations(
+      event("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"),
+      combined,
+    );
+    expect(projection.sample).toHaveLength(1);
+    expect(projection.sample[0].latestDueDate).toBe("2026-08-01");
+    expect(
+      projection.reporting.map(({ obligationType }) => obligationType),
+    ).toEqual(
+      expect.arrayContaining([
+        "PORTAL_SAMPLE_DATE",
+        "NYS_LEGIONELLA_RESULT_REPORTING",
+      ]),
+    );
+  });
+
+  it("uses Appendix 4-A thresholds and the separate state notification rule", () => {
+    const lower = projectEventObligations(
+      event("LEGIONELLA_RESULT_RECEIVED", { cfuPerMl: 19 }),
+      nysConfig,
+    );
+    const action = projectEventObligations(
+      event("LEGIONELLA_RESULT_RECEIVED", { cfuPerMl: 1001 }),
+      nysConfig,
+    );
+    expect(lower.labResult?.level).toBe("LEVEL_1");
+    expect(action.labResult?.level).toBe("LEVEL_4");
+    expect(
+      action.reporting.some(
+        (item) =>
+          item.obligationType === "NYS_LOCAL_HEALTH_DEPARTMENT_NOTIFICATION",
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("empty custom profile safety", () => {
+  const customConfig = {
+    ...config,
+    isNyc: false,
+    profileKind: "CUSTOM" as const,
+    routineSampleEnabled: false,
+    inspectionEnabled: false,
+    hyperhalogenationEnabled: false,
+    bacteriologicalSampleEnabled: false,
+  };
+
+  it("does not inherit NYC event or corrective-action obligations", () => {
+    for (const input of [
+      event("STARTUP"),
+      event("SUMMERTIME_HYPERHALOGENATION"),
+      event("POWER_FAILURE"),
+      event("LEGIONELLA_RESULT_RECEIVED", { cfuPerMl: 1500 }),
+    ]) {
+      expect(projectEventObligations(input, customConfig)).toMatchObject({
+        sample: [],
+        inspection: [],
+        reporting: [],
+        maintenance: [],
+      });
+    }
+  });
+
+  it("generates only the configured customer follow-up with a clear source label", () => {
+    const projection = projectEventObligations(event("CLEANING_COMPLETED"), {
+      ...customConfig,
+      ruleSetVersion: "customer-v3[post-cleaning@3]",
+      customRules: [
+        {
+          requirementType: "POST_CLEANING_SAMPLE",
+          ruleName: "Collect post-cleaning Legionella culture",
+          sourceAuthority: "CONTRACT_REQUIREMENT",
+          sourceCitation: "Customer MPP section 4",
+          triggerEventType: "CLEANING_COMPLETED",
+          frequencyDays: null,
+          minimumDaysAfterTrigger: 3,
+          maximumDaysAfterTrigger: 7,
+        },
+      ],
+    });
+    expect(projection.sample).toEqual([
+      expect.objectContaining({
+        obligationType: "POST_CLEANING_SAMPLE",
+        earliestDueDate: "2026-07-04",
+        latestDueDate: "2026-07-08",
+        reason:
+          "Customer requirement: Collect post-cleaning Legionella culture",
+        sourceCitation: "Customer MPP section 4",
+      }),
+    ]);
+    expect(projection.reporting).toEqual([]);
+  });
+});

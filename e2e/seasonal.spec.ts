@@ -2,8 +2,12 @@ import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("admin@towertrack.local");
-  await page.getByLabel("Password").fill("ChangeMe123!");
+  await page
+    .getByLabel("Email")
+    .fill(process.env.INITIAL_ADMIN_EMAIL ?? "admin@towertrack.local");
+  await page
+    .getByLabel("Password")
+    .fill(process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 });
@@ -11,18 +15,25 @@ test.beforeEach(async ({ page }) => {
 test("operations manager can edit seasonal operation settings from a job", async ({
   page,
 }) => {
-  const search = page.getByRole("combobox", { name: "Search towers" });
-  await search.fill("100 Park Avenue");
-  await search.press("Enter");
+  await page.goto("/deadlines");
+  const systemUrl = await page
+    .getByRole("table", { name: "All cooling tower deadline obligations" })
+    .getByRole("row")
+    .nth(1)
+    .getByRole("link")
+    .first()
+    .getAttribute("href");
+  expect(systemUrl).toMatch(/^\/systems\//);
+  await page.goto(`${systemUrl}?view=settings`);
 
   const seasonalForm = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Save operation pattern" }),
+    has: page.getByRole("button", { name: "Save operating schedule" }),
   });
 
   const seasonalChoice = seasonalForm.getByRole("radio", {
-    name: /^Seasonal Tower/,
+    name: /^Seasonal/,
   });
-  await seasonalForm.getByRole("radio", { name: /^Year-Round Tower/ }).check();
+  await seasonalForm.getByRole("radio", { name: /^Year-round/ }).check();
   await expect(seasonalForm.getByLabel("Season start month")).toHaveCount(0);
   await expect(seasonalForm.getByLabel("Season end month")).toHaveCount(0);
   if (!(await seasonalChoice.isChecked())) {
@@ -37,19 +48,14 @@ test("operations manager can edit seasonal operation settings from a job", async
     .getByLabel("Reason for change")
     .fill("Confirm seasonal May through October operation");
   await seasonalForm
-    .getByRole("button", { name: "Save operation pattern" })
+    .getByRole("button", { name: "Save operating schedule" })
     .click();
 
   await expect(page).toHaveURL(/operationPattern=1/);
   await expect(
     page.getByText("Seasonal Tower · May 1–Oct 31").first(),
   ).toBeVisible();
-  await expect(
-    page.getByText("Seasonal Tower · May 1–Oct 31 · Operating season", {
-      exact: true,
-    }),
-  ).toBeVisible();
-
+  await page.goto(`${systemUrl}?view=settings&operationPattern=1`);
   await expect(
     page.getByText(/Changing this configuration does not prove/),
   ).toBeVisible();

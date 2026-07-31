@@ -18,12 +18,13 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://towertrack:towertrack@db:5432/towertrack?schema=public
-      AUTH_SECRET: ${AUTH_SECRET:-local-development-secret-change-before-use-123456}
-      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@towertrack.local}
-      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-ChangeMe123!}
-      INITIAL_ORGANIZATION_NAME: ${INITIAL_ORGANIZATION_NAME:-TowerTrack Demo Water Treatment}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:?Set INITIAL_ADMIN_EMAIL in .env}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?Set INITIAL_ADMIN_PASSWORD in .env}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-TowerTrack Administrator}
+      INITIAL_ORGANIZATION_NAME: ${INITIAL_ORGANIZATION_NAME:-TowerTrack}
       SEED_ON_EMPTY: "true"
-      DEMO_MODE: "true"
+      DEMO_MODE: ${DEMO_MODE:-false}
       TZ: America/New_York
     volumes:
       - uploads:/app/uploads

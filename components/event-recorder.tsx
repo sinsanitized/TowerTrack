@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { recordServiceEventAction } from "@/app/actions";
 import {
-  projectEventObligations,
+  previewEventImpact,
+  type OpenSampleObligationForImpact,
   type RegulatoryEventType,
   type TowerRuleConfig,
 } from "@/lib/obligation-engine";
@@ -23,26 +24,31 @@ import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { LegionellaResultInput } from "@/components/legionella-result-input";
 import { plainEnumLabel, requirementLabel } from "@/lib/labels";
 import { formatOperationalDate } from "@/lib/date";
+import { eventDefinitionsForLocation } from "@/lib/event-workflow";
+import { buttonClass } from "@/lib/button-variants";
+import {
+  canRecordExternalLegionella,
+  serviceResponsibilityLabel,
+  type ServiceResponsibility,
+} from "@/lib/service-responsibility";
 
-const commonEventButtons = [
-  ["Add sample", "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED", FlaskConical],
-  ["Add lab result", "LEGIONELLA_RESULT_RECEIVED", Beaker],
-  ["Add inspection", "QUARTERLY_INSPECTION_COMPLETED", ClipboardCheck],
-  ["Add cleaning", "CLEANING_COMPLETED", BrushCleaning],
-] as const;
+const eventIcons = {
+  ROUTINE_LEGIONELLA_SAMPLE_COLLECTED: FlaskConical,
+  BACTERIOLOGICAL_SAMPLE_COLLECTED: FlaskConical,
+  LEGIONELLA_RESULT_RECEIVED: Beaker,
+  QUARTERLY_INSPECTION_COMPLETED: ClipboardCheck,
+  CLEANING_COMPLETED: BrushCleaning,
+  STARTUP: Play,
+  SHUTDOWN: Power,
+  SUMMERTIME_HYPERHALOGENATION: Sparkles,
+  HIGH_LEGIONELLA_DISINFECTION: Droplets,
+  POWER_FAILURE: AlertTriangle,
+  WEEKLY_BIOLOGICAL_INDICATOR_RESULT: ShieldAlert,
+} as const;
 
-const additionalEventButtons = [
-  ["Add startup", "STARTUP", Play],
-  ["Add shutdown", "SHUTDOWN", Power],
-  ["Add hyperhalogenation", "SUMMERTIME_HYPERHALOGENATION", Sparkles],
-  ["Add disinfection or remediation", "HIGH_LEGIONELLA_DISINFECTION", Droplets],
-  ["Add emergency event", "POWER_FAILURE", AlertTriangle],
-  [
-    "Add weekly biological indicator",
-    "WEEKLY_BIOLOGICAL_INDICATOR_RESULT",
-    ShieldAlert,
-  ],
-] as const;
+const primaryEvents = eventDefinitionsForLocation("PRIMARY");
+const moreEvents = eventDefinitionsForLocation("MORE");
+const officeEvents = eventDefinitionsForLocation("OFFICE_ONLY");
 
 const emergencyTypes = [
   ["Power failure", "POWER_FAILURE"],
@@ -60,6 +66,11 @@ export function EventRecorder({
   samplesAwaitingResults,
   initialSampleEventId,
   initialEventType,
+  canConfirmOwnerManaged = false,
+  openSampleObligations = [],
+  legionellaResponsibility,
+  legionellaVendorName,
+  onCancel,
 }: {
   systemId: string;
   defaultDate: string;
@@ -67,6 +78,11 @@ export function EventRecorder({
   samplesAwaitingResults: Array<{ id: string; date: string }>;
   initialSampleEventId?: string;
   initialEventType?: RegulatoryEventType;
+  canConfirmOwnerManaged?: boolean;
+  openSampleObligations?: OpenSampleObligationForImpact[];
+  legionellaResponsibility: ServiceResponsibility | null;
+  legionellaVendorName?: string | null;
+  onCancel?: () => void;
 }) {
   const responseTimings = ruleConfig.responseTimings;
   const [ready, setReady] = useState(false);
@@ -98,13 +114,16 @@ export function EventRecorder({
     "HIGH_LEGIONELLA_DISINFECTION",
     "FULL_REMEDIATION",
   ].includes(eventType);
+  const externalLegionella = canRecordExternalLegionella(
+    legionellaResponsibility,
+  );
   const preview = useMemo(() => {
     if (!eventDate || (isResult && cfuPerMl === ""))
       return { impact: null, error: null };
     try {
       return {
-        impact: projectEventObligations(
-          {
+        impact: previewEventImpact({
+          proposedEvent: {
             id: "preview",
             type: eventType as RegulatoryEventType,
             date: eventDate,
@@ -113,7 +132,16 @@ export function EventRecorder({
             residualRestoredWithin3Days: null,
           },
           ruleConfig,
-        ),
+          openSampleObligations,
+          performedByResponsibility:
+            externalLegionella &&
+            [
+              "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+              "LEGIONELLA_RESULT_RECEIVED",
+            ].includes(eventType)
+              ? (legionellaResponsibility ?? undefined)
+              : "OUR_COMPANY",
+        }),
         error: null,
       };
     } catch (error) {
@@ -125,15 +153,24 @@ export function EventRecorder({
             : "The compliance impact could not be calculated.",
       };
     }
-  }, [cfuPerMl, eventDate, eventType, isResult, ruleConfig]);
-  const projectedObligations = preview.impact
-    ? [
-        ...preview.impact.sample,
-        ...preview.impact.inspection,
-        ...preview.impact.reporting,
-        ...preview.impact.maintenance,
-      ]
-    : [];
+  }, [
+    cfuPerMl,
+    eventDate,
+    eventType,
+    isResult,
+    openSampleObligations,
+    ruleConfig,
+    externalLegionella,
+    legionellaResponsibility,
+  ]);
+  const projectedObligations = preview.impact ? preview.impact.generated : [];
+  const visiblePrimaryEvents = primaryEvents.filter(
+    ({ type }) =>
+      ![
+        "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+        "LEGIONELLA_RESULT_RECEIVED",
+      ].includes(type) || legionellaResponsibility === "OUR_COMPANY",
+  );
   const selectEvent = (value: string) => {
     if (
       value === "LEGIONELLA_RESULT_RECEIVED" &&
@@ -155,43 +192,22 @@ export function EventRecorder({
           </p>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {commonEventButtons.map(([label, value, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => selectEvent(value)}
-              disabled={
-                !ready ||
-                (value === "LEGIONELLA_RESULT_RECEIVED" &&
-                  !samplesAwaitingResults.length)
-              }
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
-                !ready ||
-                (value === "LEGIONELLA_RESULT_RECEIVED" &&
-                  !samplesAwaitingResults.length)
-                  ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                  : eventSelected && eventType === value
-                    ? "border-emerald-800 bg-emerald-50 text-emerald-900"
-                    : "border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              <Icon size={17} /> {label}
-            </button>
-          ))}
-        </div>
-        <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-          <summary className="cursor-pointer text-sm font-black text-emerald-800">
-            More event types
-          </summary>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {additionalEventButtons.map(([label, value, Icon]) => (
+          {visiblePrimaryEvents.map(({ label, type: value }) => {
+            const Icon = eventIcons[value as keyof typeof eventIcons];
+            return (
               <button
                 key={value}
                 type="button"
-                disabled={!ready}
                 onClick={() => selectEvent(value)}
+                disabled={
+                  !ready ||
+                  (value === "LEGIONELLA_RESULT_RECEIVED" &&
+                    !samplesAwaitingResults.length)
+                }
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
-                  !ready
+                  !ready ||
+                  (value === "LEGIONELLA_RESULT_RECEIVED" &&
+                    !samplesAwaitingResults.length)
                     ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                     : eventSelected && eventType === value
                       ? "border-emerald-800 bg-emerald-50 text-emerald-900"
@@ -200,8 +216,95 @@ export function EventRecorder({
               >
                 <Icon size={17} /> {label}
               </button>
-            ))}
+            );
+          })}
+        </div>
+        <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+          <summary
+            className={buttonClass(
+              "secondary",
+              "w-full cursor-pointer text-sm",
+            )}
+          >
+            More event types
+          </summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {moreEvents.map(({ label, type: value }) => {
+              const Icon = eventIcons[value as keyof typeof eventIcons];
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={!ready}
+                  onClick={() => selectEvent(value)}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
+                    !ready
+                      ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                      : eventSelected && eventType === value
+                        ? "border-emerald-800 bg-emerald-50 text-emerald-900"
+                        : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                >
+                  <Icon size={17} /> {label}
+                </button>
+              );
+            })}
           </div>
+          {canConfirmOwnerManaged && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="label">Office confirmation</div>
+              <p className="mt-1 text-sm text-slate-600">
+                These obligations belong to the cooling-tower owner or an
+                external provider and are not assigned to technicians.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {officeEvents.map(({ label, type: value }) => {
+                  const Icon = eventIcons[value as keyof typeof eventIcons];
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={!ready}
+                      onClick={() => selectEvent(value)}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-bold text-slate-700"
+                    >
+                      <Icon size={17} /> {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {canConfirmOwnerManaged && externalLegionella && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="label">
+                Record External Legionella Information
+              </div>
+              <p className="mt-1 text-sm text-slate-600">
+                {serviceResponsibilityLabel(legionellaResponsibility)}. These
+                records are attributed externally, not to our technicians.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  className={buttonClass("secondary")}
+                  type="button"
+                  onClick={() =>
+                    selectEvent("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED")
+                  }
+                >
+                  Record external sample date
+                </button>
+                <button
+                  className={buttonClass("secondary")}
+                  type="button"
+                  disabled={!samplesAwaitingResults.length}
+                  onClick={() => selectEvent("LEGIONELLA_RESULT_RECEIVED")}
+                >
+                  Record external result
+                </button>
+              </div>
+            </div>
+          )}
         </details>
         {!samplesAwaitingResults.length && (
           <p className="mt-3 text-sm font-bold text-slate-600">
@@ -227,8 +330,57 @@ export function EventRecorder({
           </div>
           <input type="hidden" name="systemId" value={systemId} />
           <input type="hidden" name="eventType" value={eventType} />
-          <label>
-            <span className="label">Event date</span>
+          <input
+            type="hidden"
+            name="performedByResponsibility"
+            value={
+              externalLegionella &&
+              [
+                "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+                "LEGIONELLA_RESULT_RECEIVED",
+              ].includes(eventType)
+                ? legionellaResponsibility!
+                : "OUR_COMPANY"
+            }
+          />
+          {externalLegionella &&
+            [
+              "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+              "LEGIONELLA_RESULT_RECEIVED",
+            ].includes(eventType) && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 lg:col-span-4">
+                <div className="font-black">Externally completed</div>
+                <div className="mt-1 text-sm text-slate-600">
+                  Performed by{" "}
+                  {legionellaResponsibility === "CUSTOMER"
+                    ? "customer"
+                    : "another vendor"}
+                  ; date supplied to our office.
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className="label">Provider name (optional)</span>
+                    <input
+                      className="field mt-1"
+                      name="externalProviderName"
+                      defaultValue={legionellaVendorName ?? ""}
+                    />
+                  </label>
+                  <label>
+                    <span className="label">Source or document (optional)</span>
+                    <input
+                      className="field mt-1"
+                      name="externalSource"
+                      placeholder="Lab report, email, chain of custody"
+                    />
+                  </label>
+                </div>
+              </div>
+            )}
+          <label className={isHyper ? "lg:col-span-4 lg:max-w-sm" : ""}>
+            <span className="label">
+              {isHyper ? "Date Performed" : "Event date"}
+            </span>
             <input
               className="field mt-1"
               name="eventDate"
@@ -239,6 +391,24 @@ export function EventRecorder({
               onChange={(event) => setEventDate(event.target.value)}
             />
           </label>
+          {isHyper && (
+            <p className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 lg:col-span-4">
+              Record the date the summertime hyperhalogenation was completed.
+              Treatment details are maintained on the separate service form.
+            </p>
+          )}
+          {eventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 lg:col-span-4">
+              <div className="font-black">
+                Owner-managed cooling-tower culture
+              </div>
+              <p className="mt-1">
+                Confirm a documented heterotrophic bacterial culture performed
+                by the owner or external provider. This is not potable-water
+                testing and does not satisfy a Legionella culture obligation.
+              </p>
+            </div>
+          )}
           {isEmergency && (
             <label>
               <span className="label">Emergency trigger</span>
@@ -414,57 +584,21 @@ export function EventRecorder({
               </select>
             </label>
           )}
-          {isHyper && (
-            <>
-              <label>
-                <span className="label">Chemical</span>
-                <input className="field mt-1" name="chemical" required />
-              </label>
-              <label>
-                <span className="label">Quantity</span>
-                <input className="field mt-1" name="quantity" required />
-              </label>
-              <label>
-                <span className="label">Contact time</span>
+          {!isHyper && (
+            <details className="rounded-lg border border-slate-200 p-3 lg:col-span-4">
+              <summary className="cursor-pointer text-sm font-black text-emerald-800">
+                Add notes (optional)
+              </summary>
+              <label className="mt-3 block">
+                <span className="label">Notes</span>
                 <input
                   className="field mt-1"
-                  name="contactTime"
-                  required
-                  placeholder="6 hours"
+                  name="notes"
+                  placeholder="Condition, source record, or field context"
                 />
               </label>
-              <label>
-                <span className="label">pH</span>
-                <input className="field mt-1" name="ph" required />
-              </label>
-              <label>
-                <span className="label">Free halogen residual</span>
-                <input
-                  className="field mt-1"
-                  name="freeHalogenResidual"
-                  required
-                  placeholder="ppm readings"
-                />
-              </label>
-              <label>
-                <span className="label">Technician</span>
-                <input className="field mt-1" name="technician" required />
-              </label>
-            </>
+            </details>
           )}
-          <details className="rounded-lg border border-slate-200 p-3 lg:col-span-4">
-            <summary className="cursor-pointer text-sm font-black text-emerald-800">
-              Add notes (optional)
-            </summary>
-            <label className="mt-3 block">
-              <span className="label">Notes</span>
-              <input
-                className="field mt-1"
-                name="notes"
-                placeholder="Condition, source record, or field context"
-              />
-            </label>
-          </details>
           {preview.error && (
             <p
               className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-950 lg:col-span-4"
@@ -473,65 +607,75 @@ export function EventRecorder({
               Preview unavailable: {preview.error}
             </p>
           )}
-          <div className="flex items-end lg:col-span-4 lg:justify-end">
-            <button
-              className="btn btn-primary min-h-11 w-full lg:w-auto"
-              type="submit"
-              disabled={Boolean(preview.error)}
-            >
-              Save completed event
-            </button>
-          </div>
-          <details className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950 lg:col-span-4">
-            <summary className="cursor-pointer font-black">
-              Preview compliance impact
-            </summary>
+          <section
+            className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950 lg:col-span-4"
+            aria-live="polite"
+          >
+            <div className="label">Before saving</div>
+            <h3 className="mt-1 font-black">Expected Compliance Impact</h3>
             <div className="mt-3">
               {preview.error ? (
                 <p className="text-sm font-bold">
                   Correct the validation issue above before saving.
                 </p>
+              ) : !eventDate ? (
+                <p className="text-sm font-bold">
+                  Select an event date to preview the compliance impact.
+                </p>
               ) : isResult && cfuPerMl === "" ? (
                 <p className="text-sm font-bold">
-                  Enter the CFU/mL result to preview the exact response level
-                  and generated obligations.
+                  Compliance impact cannot be calculated until the CFU/mL result
+                  is entered.
                 </p>
-              ) : projectedObligations.length ? (
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {projectedObligations.map((obligation) => (
-                    <article
-                      key={`${obligation.obligationType}-${obligation.latestDueDate}`}
-                      className="rounded-lg border border-blue-200 bg-white p-3"
-                    >
-                      <div className="font-black">
-                        Generates {requirementLabel(obligation.obligationType)}
-                      </div>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {obligation.reason}
-                      </p>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <ComplianceWindow
-                          start={
-                            obligation.targetStartDate ??
-                            obligation.earliestDueDate
-                          }
-                          end={
-                            obligation.targetEndDate ?? obligation.latestDueDate
-                          }
-                        />
-                        <ComplianceDate
-                          value={obligation.latestDueDate}
-                          label="Legal deadline"
-                          deadline
-                          empty={
-                            obligation.priority === "EMERGENCY"
-                              ? "Immediate / follow MPP"
-                              : "No fixed deadline"
-                          }
-                        />
-                      </div>
-                    </article>
-                  ))}
+              ) : preview.impact ? (
+                <div className="space-y-3">
+                  {preview.impact.messages.length > 0 && (
+                    <ul className="list-disc space-y-1 pl-5 text-sm font-bold">
+                      {preview.impact.messages.map((message) => (
+                        <li key={message}>{message}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {projectedObligations.length > 0 && (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {projectedObligations.map((obligation) => (
+                        <article
+                          key={`${obligation.obligationType}-${obligation.latestDueDate}`}
+                          className="rounded-lg border border-blue-200 bg-white p-3"
+                        >
+                          <div className="font-black">
+                            Generates{" "}
+                            {requirementLabel(obligation.obligationType)}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {obligation.reason}
+                          </p>
+                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <ComplianceWindow
+                              start={
+                                obligation.targetStartDate ??
+                                obligation.earliestDueDate
+                              }
+                              end={
+                                obligation.targetEndDate ??
+                                obligation.latestDueDate
+                              }
+                            />
+                            <ComplianceDate
+                              value={obligation.latestDueDate}
+                              label="Legal deadline"
+                              deadline
+                              empty={
+                                obligation.priority === "EMERGENCY"
+                                  ? "Immediate / follow MPP"
+                                  : "No fixed deadline"
+                              }
+                            />
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm font-bold">
@@ -545,7 +689,28 @@ export function EventRecorder({
                 Final obligations are generated only after the event is saved.
               </p>
             </div>
-          </details>
+          </section>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end lg:col-span-4">
+            {onCancel && (
+              <button
+                className={buttonClass(
+                  "secondary",
+                  "min-h-11 w-full sm:w-auto",
+                )}
+                type="button"
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              className={buttonClass("primary", "min-h-11 w-full lg:w-auto")}
+              type="submit"
+              disabled={Boolean(preview.error)}
+            >
+              Save Event
+            </button>
+          </div>
         </form>
       )}
       {eventType === "STARTUP_CLEANING_DISINFECTION" ||

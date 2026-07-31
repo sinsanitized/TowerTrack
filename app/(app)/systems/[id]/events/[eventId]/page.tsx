@@ -12,8 +12,12 @@ import {
   todayDateOnly,
 } from "@/lib/date";
 import { plainEnumLabel } from "@/lib/labels";
+import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
 import type { ServiceEventTypeValue } from "@/lib/service-events";
-import { compileTowerRuleConfig } from "@/lib/rule-profile";
+import {
+  compileTowerRuleConfig,
+  composeTowerRuleProfiles,
+} from "@/lib/rule-profile";
 
 function textDetail(details: Record<string, unknown>, key: string) {
   const value = details[key];
@@ -42,6 +46,10 @@ export default async function EventPage({
         include: {
           building: { include: { customer: true } },
           ruleProfile: { include: { rules: true } },
+          ruleAssignments: {
+            include: { ruleProfile: { include: { rules: true } } },
+            orderBy: { effectiveStartDate: "desc" },
+          },
           serviceEvents: {
             where: {
               status: "ACTIVE",
@@ -73,7 +81,40 @@ export default async function EventPage({
     !Array.isArray(event.details)
       ? (event.details as Record<string, unknown>)
       : {};
-  const ruleConfig = compileTowerRuleConfig(system.ruleProfile, {
+  const eventDate = dateOnly(event.eventDate);
+  const assignment = system.ruleAssignments.find(
+    (item) =>
+      dateOnly(item.effectiveStartDate) <= eventDate &&
+      (!item.effectiveEndDate || dateOnly(item.effectiveEndDate) >= eventDate),
+  );
+  const availableBaseProfiles = await db.ruleProfile.findMany({
+    where: {
+      jurisdictionMode: {
+        in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
+      },
+      OR: [
+        { effectiveStartDate: null },
+        { effectiveStartDate: { lte: event.eventDate } },
+      ],
+      AND: [
+        {
+          OR: [
+            { effectiveEndDate: null },
+            { effectiveEndDate: { gte: event.eventDate } },
+          ],
+        },
+      ],
+    },
+    include: { rules: true },
+  });
+  const assignedProfile = assignment?.ruleProfile ?? system.ruleProfile;
+  const configuration = assignment?.configuration ?? system.ruleConfiguration;
+  const composedProfile = composeTowerRuleProfiles(
+    configuration,
+    configuration === "CUSTOM" ? [assignedProfile] : availableBaseProfiles,
+    assignedProfile.id,
+  );
+  const ruleConfig = compileTowerRuleConfig(composedProfile, {
     operating: !["FULLY_SHUT_DOWN", "SEASONALLY_INACTIVE"].includes(
       system.operatingStatus,
     ),
@@ -105,6 +146,14 @@ export default async function EventPage({
     event.triggeredInspectionObligations.length +
     event.triggeredReportingObligations.length +
     event.triggeredMaintenanceObligations.length;
+  const historicalTreatmentDetails = [
+    ["Chemical", textDetail(details, "chemical")],
+    ["Quantity", textDetail(details, "quantity")],
+    ["Contact time", textDetail(details, "contactTime")],
+    ["pH", textDetail(details, "ph")],
+    ["Free halogen residual", textDetail(details, "freeHalogenResidual")],
+    ["Technician", textDetail(details, "technician")],
+  ].filter(([, value]) => value);
 
   return (
     <>
@@ -128,6 +177,24 @@ export default async function EventPage({
           </div>
         }
       />
+      {event.performedByResponsibility !== "OUR_COMPANY" && (
+        <section className="panel mb-5 p-4">
+          <div className="label">Work attribution</div>
+          <div className="mt-1 font-black text-purple-900">
+            {serviceResponsibilityLabel(event.performedByResponsibility)}
+            {event.externalProviderName
+              ? ` — ${event.externalProviderName}`
+              : ""}
+          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            This information was supplied externally and is not recorded as work
+            performed by our company.
+          </p>
+          {event.externalSource && (
+            <p className="mt-2 text-sm">Source: {event.externalSource}</p>
+          )}
+        </section>
+      )}
       <section className="panel mb-6 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -150,6 +217,24 @@ export default async function EventPage({
           )}
         </div>
       </section>
+      {event.eventType === "SUMMERTIME_HYPERHALOGENATION" &&
+        historicalTreatmentDetails.length > 0 && (
+          <section className="panel mb-6 p-5">
+            <div className="label">Historical service-form details</div>
+            <p className="mt-2 text-sm text-slate-600">
+              Preserved from the original TowerTrack record. New entries require
+              only the date performed.
+            </p>
+            <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+              {historicalTreatmentDetails.map(([label, value]) => (
+                <div key={label}>
+                  <dt className="label">{label}</dt>
+                  <dd className="font-bold">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
       {canEdit ? (
         <EventEditor
           systemId={id}

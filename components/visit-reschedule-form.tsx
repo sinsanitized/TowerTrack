@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { rescheduleVisitAction } from "@/app/actions";
+import { buttonClass } from "@/lib/button-variants";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 
 export function VisitRescheduleForm({
@@ -60,7 +61,9 @@ export function VisitRescheduleForm({
           />
         </label>
       </div>
-      <button className="btn mt-4">Confirm compliant reschedule</button>
+      <button className={buttonClass("primary", "mt-4")}>
+        Confirm compliant reschedule
+      </button>
     </form>
   );
 }

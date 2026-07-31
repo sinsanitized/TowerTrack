@@ -169,6 +169,39 @@ export function formatComplianceDate(value?: string | Date | null): string {
   }).format(asUtc(dateOnly(value)));
 }
 
+export function formatLongDate(value?: string | Date | null): string {
+  if (!value) return "Date unavailable";
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(asUtc(dateOnly(value)));
+}
+
+export function formatLongDateRange(
+  start?: string | Date | null,
+  end?: string | Date | null,
+): string {
+  if (!start && !end) return "Window unavailable";
+  if (!start || !end) return formatLongDate(start ?? end);
+  const startDate = dateOnly(start);
+  const endDate = dateOnly(end);
+  if (startDate === endDate) return formatLongDate(startDate);
+  const startParts = startDate.split("-");
+  const endParts = endDate.split("-");
+  const sameYear = startParts[0] === endParts[0];
+  const startText = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" as const }),
+    timeZone: "UTC",
+  }).format(asUtc(startDate));
+  return `${startText} – ${formatLongDate(endDate)}`;
+}
+
 export function formatOperationalDate(value?: string | Date | null): string {
   if (!value) return "Not recorded";
   const date = dateOnly(value);
@@ -261,6 +294,22 @@ export function formatRelativeWorkingDate(
   return days > 0
     ? `In ${days} working day${days === 1 ? "" : "s"}`
     : `Overdue by ${Math.abs(days)} working day${days === -1 ? "" : "s"}`;
+}
+
+export function formatWorkingDaysLeft(
+  value: string | Date,
+  today = todayDateOnly(),
+): string {
+  const due = dateOnly(value);
+  if (due === today) return "Due today";
+  const days = workingDaysRemaining(due, today);
+  if (days === 0)
+    return due > today
+      ? "Due before the next working day"
+      : "Overdue; no working days have elapsed";
+  if (days > 0) return `${days} working day${days === 1 ? "" : "s"} left`;
+  const overdue = Math.abs(days);
+  return `Overdue by ${overdue} working day${overdue === 1 ? "" : "s"}`;
 }
 
 export function actionableWorkingDaysRemaining(

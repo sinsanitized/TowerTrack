@@ -4,6 +4,7 @@ import { ComplianceDate } from "@/components/compliance-date";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatLegionellaResult, plainEnumLabel } from "@/lib/labels";
+import { buttonClass } from "@/lib/button-variants";
 
 export default async function SamplesPage() {
   const user = await requireUser();
@@ -64,7 +65,10 @@ export default async function SamplesPage() {
                 )}
               </div>
               <Link
-                className="btn min-h-11 justify-center"
+                className={buttonClass(
+                  result ? "secondary" : "primary",
+                  "min-h-11 justify-center",
+                )}
                 href={`/systems/${sample.coolingTowerSystemId}?sampleEventId=${sample.id}`}
               >
                 {result ? "Open tower" : "Add result"}

@@ -19,13 +19,19 @@ async function main() {
       "INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD are required for a new production database.",
     );
   }
+  if (password.length < 12) {
+    await db.$disconnect();
+    throw new Error(
+      "INITIAL_ADMIN_PASSWORD must contain at least 12 characters.",
+    );
+  }
 
   await db.organization.create({
     data: {
       name: process.env.INITIAL_ORGANIZATION_NAME || "TowerTrack",
       users: {
         create: {
-          name: "TowerTrack Administrator",
+          name: process.env.INITIAL_ADMIN_NAME || "TowerTrack Administrator",
           email: email.toLowerCase(),
           passwordHash: await bcrypt.hash(password, 12),
           role: UserRole.ADMIN,

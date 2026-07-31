@@ -17,6 +17,7 @@ const monthNames = [
 
 export type SeasonalFields = {
   seasonal: boolean;
+  operationPeriodType?: string | null;
   seasonStartMonth: number;
   seasonStartDay: number;
   seasonEndMonth: number;
@@ -30,6 +31,8 @@ function monthDay(month: number, day: number) {
 }
 
 export function seasonLabel(system: SeasonalFields) {
+  if ("operationPeriodType" in system && system.operationPeriodType == null)
+    return "Schedule not set";
   if (!system.seasonal) return "Year-Round Tower";
   return `Seasonal Tower · ${monthDay(
     system.seasonStartMonth,
@@ -41,6 +44,8 @@ export function seasonalStatus(
   system: SeasonalFields,
   today = todayDateOnly(),
 ) {
+  if ("operationPeriodType" in system && system.operationPeriodType == null)
+    return "Review required";
   if (!system.seasonal) return "Continuous operation";
   const year = today.slice(0, 4);
   const start = `${year}-${String(system.seasonStartMonth).padStart(2, "0")}-${String(

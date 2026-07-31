@@ -3,15 +3,21 @@ import { createHash } from "node:crypto";
 import { asUtc, dateOnly, todayDateOnly } from "@/lib/date";
 import {
   annualSummertimeHyperhalogenationObligation,
+  annualNysCertificationObligation,
   annualCleaningProgress,
-  canSampleSatisfyObligation,
+  sampleObligationsCoveredByEvent,
   obligationPriorityForDate,
   projectEventObligations,
   type ProjectedObligation,
   type ProjectionPriority,
   type RegulatoryEventInput,
 } from "@/lib/obligation-engine";
-import { compileTowerRuleConfig } from "@/lib/rule-profile";
+import { isUnverifiedLegacyEvent } from "@/lib/legacy-import/safety";
+import {
+  compileTowerRuleConfig,
+  composeTowerRuleProfiles,
+  type TowerRuleConfiguration,
+} from "@/lib/rule-profile";
 import { getComplianceStatus } from "@/lib/compliance-intelligence";
 
 type Tx = Prisma.TransactionClient;
@@ -101,6 +107,7 @@ async function completeCoveredSamples(
   systemId: string,
   eventId: string,
   collectionDate: string,
+  sampleKind: "LEGIONELLA" | "BACTERIOLOGICAL" = "LEGIONELLA",
 ) {
   const open = await tx.sampleObligation.findMany({
     where: {
@@ -108,15 +115,26 @@ async function completeCoveredSamples(
       status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
     },
   });
-  const covered = open.filter((obligation) =>
-    canSampleSatisfyObligation(collectionDate, {
-      earliestDueDate: obligation.earliestDueDate
+  const covered = sampleObligationsCoveredByEvent(
+    {
+      type:
+        sampleKind === "BACTERIOLOGICAL"
+          ? "BACTERIOLOGICAL_SAMPLE_COLLECTED"
+          : "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+      date: collectionDate,
+    },
+    open.map((obligation) => ({
+      id: obligation.id,
+      type: obligation.obligationType,
+      earliest: obligation.earliestDueDate
         ? dateOnly(obligation.earliestDueDate)
         : null,
-      latestDueDate: obligation.latestDueDate
+      latest: obligation.latestDueDate
         ? dateOnly(obligation.latestDueDate)
         : null,
-    }),
+      status: obligation.status,
+      sourceCitation: obligation.sourceCitation,
+    })),
   );
   if (covered.length)
     await tx.sampleObligation.updateMany({
@@ -183,18 +201,37 @@ export async function rebuildSystemComplianceProjections(
       ruleProfile: {
         include: { rules: true },
       },
+      ruleAssignments: {
+        include: { ruleProfile: { include: { rules: true } } },
+        orderBy: { effectiveStartDate: "asc" },
+      },
       serviceEvents: {
         where: { status: "ACTIVE" },
         orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
       },
     },
   });
+  system.serviceEvents = system.serviceEvents.filter(
+    (event) => !isUnverifiedLegacyEvent(event.details),
+  );
   const recordedSamples = await tx.serviceEvent.findMany({
     where: {
       coolingTowerSystemId: systemId,
       eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
     },
     orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
+  });
+  const verifiedRecordedSamples = recordedSamples.filter(
+    (event) => !isUnverifiedLegacyEvent(event.details),
+  );
+  const baseProfiles = await tx.ruleProfile.findMany({
+    where: {
+      jurisdictionMode: {
+        in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
+      },
+    },
+    include: { rules: true },
+    orderBy: { effectiveStartDate: "desc" },
   });
   const priorMissedRows = await Promise.all([
     tx.sampleObligation.findMany({
@@ -218,16 +255,28 @@ export async function rebuildSystemComplianceProjections(
     priorMissedRows.flat().map(({ id }) => id),
   );
   await tx.sampleObligation.deleteMany({
-    where: { coolingTowerSystemId: systemId },
+    where: {
+      coolingTowerSystemId: systemId,
+      status: { notIn: ["COMPLETED", "MISSED"] },
+    },
   });
   await tx.inspectionObligation.deleteMany({
-    where: { coolingTowerSystemId: systemId },
+    where: {
+      coolingTowerSystemId: systemId,
+      status: { notIn: ["COMPLETED", "MISSED"] },
+    },
   });
   await tx.reportingObligation.deleteMany({
-    where: { coolingTowerSystemId: systemId },
+    where: {
+      coolingTowerSystemId: systemId,
+      status: { notIn: ["COMPLETED", "MISSED"] },
+    },
   });
   await tx.maintenanceObligation.deleteMany({
-    where: { coolingTowerSystemId: systemId },
+    where: {
+      coolingTowerSystemId: systemId,
+      status: { notIn: ["COMPLETED", "MISSED"] },
+    },
   });
   await tx.labResult.deleteMany({ where: { coolingTowerSystemId: systemId } });
   await tx.operatingPeriod.deleteMany({
@@ -240,11 +289,38 @@ export async function rebuildSystemComplianceProjections(
   let openPeriodId: string | null = null;
   let latestOpenLabResultId: string | null = null;
   const usedSampleEventIds = new Set<string>();
-  const ruleConfig = compileTowerRuleConfig(system.ruleProfile, {
-    operating,
-    monthlyTargetStartDay: system.monthlyTargetStartDay,
-    monthlyTargetEndDay: system.monthlyTargetEndDay,
-  });
+  const assignmentForDate = (date: string) =>
+    [...system.ruleAssignments]
+      .reverse()
+      .find(
+        (assignment) =>
+          dateOnly(assignment.effectiveStartDate) <= date &&
+          (!assignment.effectiveEndDate ||
+            dateOnly(assignment.effectiveEndDate) >= date),
+      );
+  const ruleConfigForDate = (date: string, isOperating: boolean) => {
+    const assignment = assignmentForDate(date);
+    const configuration = (assignment?.configuration ??
+      system.ruleConfiguration) as TowerRuleConfiguration;
+    const assignedProfile = assignment?.ruleProfile ?? system.ruleProfile;
+    const datedBaseProfiles = baseProfiles.filter(
+      (profile) =>
+        (!profile.effectiveStartDate ||
+          dateOnly(profile.effectiveStartDate) <= date) &&
+        (!profile.effectiveEndDate ||
+          dateOnly(profile.effectiveEndDate) >= date),
+    );
+    const composed = composeTowerRuleProfiles(
+      configuration,
+      configuration === "CUSTOM" ? [assignedProfile] : datedBaseProfiles,
+      assignedProfile.id,
+    );
+    return compileTowerRuleConfig(composed, {
+      operating: isOperating,
+      monthlyTargetStartDay: system.monthlyTargetStartDay,
+      monthlyTargetEndDay: system.monthlyTargetEndDay,
+    });
+  };
 
   for (const stored of system.serviceEvents) {
     const event: RegulatoryEventInput = {
@@ -294,6 +370,14 @@ export async function rebuildSystemComplianceProjections(
 
     if (event.type === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED")
       await completeCoveredSamples(tx, systemId, event.id, event.date);
+    if (event.type === "BACTERIOLOGICAL_SAMPLE_COLLECTED")
+      await completeCoveredSamples(
+        tx,
+        systemId,
+        event.id,
+        event.date,
+        "BACTERIOLOGICAL",
+      );
 
     if (event.type === "QUARTERLY_INSPECTION_COMPLETED") {
       const open = await tx.inspectionObligation.findMany({
@@ -369,58 +453,70 @@ export async function rebuildSystemComplianceProjections(
       });
     }
 
-    const projection = projectEventObligations(event, {
-      ...ruleConfig,
-      operating,
-    });
+    const projection = projectEventObligations(
+      event,
+      ruleConfigForDate(event.date, operating),
+    );
     for (const obligation of projection.sample)
-      await tx.sampleObligation.create({
-        data: {
-          ...obligationData(
-            obligation,
-            systemId,
-            today,
-            "SAMPLE",
-            previouslyMissedIds,
-          ),
-          obligationType: obligation.obligationType,
-        },
+      await tx.sampleObligation.createMany({
+        data: [
+          {
+            ...obligationData(
+              obligation,
+              systemId,
+              today,
+              "SAMPLE",
+              previouslyMissedIds,
+            ),
+            obligationType: obligation.obligationType,
+          },
+        ],
+        skipDuplicates: true,
       });
     for (const obligation of projection.inspection)
-      await tx.inspectionObligation.create({
-        data: obligationData(
-          obligation,
-          systemId,
-          today,
-          "INSPECTION",
-          previouslyMissedIds,
-        ),
+      await tx.inspectionObligation.createMany({
+        data: [
+          obligationData(
+            obligation,
+            systemId,
+            today,
+            "INSPECTION",
+            previouslyMissedIds,
+          ),
+        ],
+        skipDuplicates: true,
       });
     for (const obligation of projection.reporting)
-      await tx.reportingObligation.create({
-        data: {
-          ...obligationData(
-            obligation,
-            systemId,
-            today,
-            "REPORTING_ACTION",
-            previouslyMissedIds,
-          ),
-          obligationType: obligation.obligationType,
-        },
+      await tx.reportingObligation.createMany({
+        data: [
+          {
+            ...obligationData(
+              obligation,
+              systemId,
+              today,
+              "REPORTING_ACTION",
+              previouslyMissedIds,
+            ),
+            obligationType: obligation.obligationType,
+          },
+        ],
+        skipDuplicates: true,
       });
     for (const obligation of projection.maintenance)
-      await tx.maintenanceObligation.create({
-        data: {
-          ...obligationData(
-            obligation,
-            systemId,
-            today,
-            "MAINTENANCE",
-            previouslyMissedIds,
-          ),
-          obligationType: obligation.obligationType,
-        },
+      await tx.maintenanceObligation.createMany({
+        data: [
+          {
+            ...obligationData(
+              obligation,
+              systemId,
+              today,
+              "MAINTENANCE",
+              previouslyMissedIds,
+            ),
+            obligationType: obligation.obligationType,
+          },
+        ],
+        skipDuplicates: true,
       });
     if (projection.labResult) {
       const explicitSampleEventId = detailString(
@@ -428,7 +524,7 @@ export async function rebuildSystemComplianceProjections(
         "sampleEventId",
       );
       const explicitSample = explicitSampleEventId
-        ? recordedSamples.find(
+        ? verifiedRecordedSamples.find(
             (candidate) =>
               candidate.id === explicitSampleEventId &&
               candidate.eventDate <= stored.eventDate,
@@ -509,10 +605,11 @@ export async function rebuildSystemComplianceProjections(
     });
   }
 
+  const currentRuleConfig = ruleConfigForDate(today, operating);
   if (
-    ruleConfig.isNyc &&
+    currentRuleConfig.isNyc &&
     system.serviceEvents.length &&
-    ruleConfig.hyperhalogenationEnabled !== false
+    currentRuleConfig.hyperhalogenationEnabled !== false
   ) {
     const currentYear = Number(today.slice(0, 4));
     const completedThisYear = system.serviceEvents.some((item) => {
@@ -547,10 +644,50 @@ export async function rebuildSystemComplianceProjections(
       const annual = annualSummertimeHyperhalogenationObligation(
         system.serviceEvents[0].id,
         obligationYear,
-        ruleConfig.ruleSetVersion,
+        currentRuleConfig.ruleSetVersion,
       );
-      await tx.reportingObligation.create({
-        data: {
+      await tx.reportingObligation.createMany({
+        data: [
+          {
+            ...obligationData(
+              annual,
+              systemId,
+              today,
+              "REPORTING_ACTION",
+              previouslyMissedIds,
+            ),
+            obligationType: annual.obligationType,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  if (
+    currentRuleConfig.includesNys &&
+    system.serviceEvents.length &&
+    currentRuleConfig.annualCertificationEnabled
+  ) {
+    const currentYear = Number(today.slice(0, 4));
+    const completedCurrentYear = system.serviceEvents.find((item) => {
+      const details = item.details as { reportType?: unknown } | null;
+      return (
+        item.eventType === "REPORT_SUBMITTED" &&
+        details?.reportType === "NYS_ANNUAL_CERTIFICATION" &&
+        dateOnly(item.eventDate).startsWith(`${currentYear}-`)
+      );
+    });
+    const obligationYear = completedCurrentYear ? currentYear + 1 : currentYear;
+    const annual = annualNysCertificationObligation(
+      system.serviceEvents[0].id,
+      obligationYear,
+      currentRuleConfig.ruleSetVersion ?? system.ruleProfile.id,
+      currentRuleConfig.sourceCitations?.annualCertification ?? undefined,
+    );
+    await tx.reportingObligation.createMany({
+      data: [
+        {
           ...obligationData(
             annual,
             systemId,
@@ -560,8 +697,9 @@ export async function rebuildSystemComplianceProjections(
           ),
           obligationType: annual.obligationType,
         },
-      });
-    }
+      ],
+      skipDuplicates: true,
+    });
   }
 
   const markMissed = {

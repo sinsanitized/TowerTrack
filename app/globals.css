@@ -45,7 +45,8 @@ textarea {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #8c5fd3;
   outline-offset: 2px;
 }
@@ -80,6 +81,37 @@ select:focus-visible {
   background: var(--forest);
   color: white;
   border-color: var(--forest);
+}
+.btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+.btn-primary:hover:not(:disabled) {
+  border-color: #14532d;
+  background: #14532d;
+}
+.btn-destructive:hover:not(:disabled) {
+  border-color: #991b1b;
+  background: #991b1b;
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.btn-destructive {
+  background: #b91c1c;
+  color: white;
+  border-color: #b91c1c;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: transparent;
+  background: #f1f5f9;
 }
 .btn-accent {
   background: var(--lime);
