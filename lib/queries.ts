@@ -20,6 +20,7 @@ import {
   getUrgency,
   inactiveComplianceStatus,
 } from "@/lib/compliance-intelligence";
+import { responsibilityForServiceObligation } from "@/lib/service-responsibility";
 
 const cleaningServiceEventTypes = new Set([
   "CLEANING_COMPLETED",
@@ -279,6 +280,14 @@ export async function planningRows({
       profile: system.ruleProfile.name,
       ruleConfiguration: system.ruleConfiguration,
       legionellaResponsibility: system.legionellaResponsibility,
+      laboratoryResultResponsibility: system.laboratoryResultResponsibility,
+      bacteriologicalResponsibility: system.bacteriologicalResponsibility,
+      inspectionResponsibility: system.inspectionResponsibility,
+      cleaningResponsibility: system.cleaningResponsibility,
+      waterTreatmentResponsibility: system.waterTreatmentResponsibility,
+      regulatoryReportingResponsibility:
+        system.regulatoryReportingResponsibility,
+      certificationResponsibility: system.certificationResponsibility,
       legionellaVendorName: system.legionellaVendorName,
       ruleConfigurationConfirmed: system.ruleConfigurationConfirmed,
       profileJurisdiction,
@@ -577,7 +586,15 @@ export async function complianceDashboardRows({
         ? [{ ...cleaningObligation, category: "MAINTENANCE" as const }]
         : []),
     ];
-    const visitOpportunity = bestVisitOpportunity(openObligations, today);
+    const companyFieldObligations = openObligations.filter(
+      (item) =>
+        responsibilityForServiceObligation(item.type, item.category, system) ===
+        "OUR_COMPANY",
+    );
+    const visitOpportunity = bestVisitOpportunity(
+      companyFieldObligations,
+      today,
+    );
     const complianceHealth =
       inactiveComplianceStatus(system.operatingStatus) ??
       complianceBaselineReview({
@@ -662,6 +679,14 @@ export async function complianceDashboardRows({
       profile: system.ruleProfile.name,
       ruleConfiguration: system.ruleConfiguration,
       legionellaResponsibility: system.legionellaResponsibility,
+      laboratoryResultResponsibility: system.laboratoryResultResponsibility,
+      bacteriologicalResponsibility: system.bacteriologicalResponsibility,
+      inspectionResponsibility: system.inspectionResponsibility,
+      cleaningResponsibility: system.cleaningResponsibility,
+      waterTreatmentResponsibility: system.waterTreatmentResponsibility,
+      regulatoryReportingResponsibility:
+        system.regulatoryReportingResponsibility,
+      certificationResponsibility: system.certificationResponsibility,
       legionellaVendorName: system.legionellaVendorName,
       ruleConfigurationConfirmed: system.ruleConfigurationConfirmed,
       profileJurisdiction,

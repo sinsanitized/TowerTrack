@@ -66,6 +66,75 @@ describe("all tower deadline rows", () => {
       responsibilityLabel: "Customer managed",
     });
   });
+
+  it("keeps unconfirmed responsibility visible in the default company view", () => {
+    const unknown = buildTowerDeadlineRows(
+      [
+        {
+          ...tower("unknown", "Unknown", [obligation("unknown-obligation")]),
+          legionellaResponsibility: null,
+        },
+      ],
+      "2026-07-20",
+    );
+    expect(filterTowerDeadlineRows(unknown, "2026-07-20", {})).toHaveLength(1);
+    expect(unknown[0]).toMatchObject({
+      responsibility: null,
+      executionState: "Waiting",
+      primaryActionLabel: "Review issue",
+    });
+  });
+
+  it.each([
+    ["PENDING", "Unscheduled"],
+    ["SCHEDULED", "Scheduled—still open"],
+    ["COMPLETED", "Completed"],
+  ])("shows %s as %s", (status, executionState) => {
+    const [row] = buildTowerDeadlineRows(
+      [tower("tower-state", "State tower", [obligation("state", { status })])],
+      "2026-07-20",
+    );
+    expect(row.executionState).toBe(executionState);
+  });
+
+  it("maps each obligation family to a working focused completion path", () => {
+    const rows = buildTowerDeadlineRows(
+      [
+        tower("tower-actions", "Action tower", [
+          obligation("sample"),
+          obligation("inspection", {
+            type: "QUARTERLY_COMPLIANCE_INSPECTION",
+            category: "INSPECTION",
+          }),
+          obligation("cleaning", {
+            type: "ANNUAL_CLEANING",
+            category: "MAINTENANCE",
+          }),
+          obligation("corrective", {
+            type: "LEVEL_3_CORRECTIVE_ACTION",
+            category: "REPORTING_ACTION",
+          }),
+          obligation("report", {
+            type: "PORTAL_SAMPLE_DATE",
+            category: "REPORTING_ACTION",
+          }),
+        ]),
+      ],
+      "2026-07-20",
+    );
+    expect(
+      Object.fromEntries(rows.map((row) => [row.id, row.primaryActionHref])),
+    ).toMatchObject({
+      sample: expect.stringContaining("record=sample"),
+      inspection: expect.stringContaining("record=inspection"),
+      cleaning: expect.stringContaining("record=cleaning"),
+      corrective: expect.stringContaining("record=disinfection"),
+      report: expect.stringContaining("#reporting-report"),
+    });
+    expect(
+      rows.every((row) => !row.primaryActionHref.includes("record=event")),
+    ).toBe(true);
+  });
   it("uses non-overlapping calendar-week and month buckets", () => {
     expect(deadlinePeriodBounds("2026-07-06")).toMatchObject({
       thisWeekEnd: "2026-07-12",
@@ -194,8 +263,8 @@ describe("all tower deadline rows", () => {
     expect(row.hardDueDateDisplay).toBe("Mon, Aug 3");
     expect(row.workingDaysDisplay).toBe("2 days");
     expect(row.workingDaysAccessible).toBe("2 working days left");
-    expect(row.status).toBe("Due Soon");
-    expect(row.primaryActionLabel).toBe("Record");
+    expect(row.status).toBe("Due Next Week");
+    expect(row.primaryActionLabel).toBe("Complete obligation");
   });
 
   it("uses concise overdue and review states", () => {
@@ -216,12 +285,12 @@ describe("all tower deadline rows", () => {
     expect(rows.find(({ id }) => id === "overdue")).toMatchObject({
       workingDaysDisplay: "3 overdue",
       status: "Overdue",
-      primaryActionLabel: "Open",
+      primaryActionLabel: "Review issue",
     });
     expect(rows.find(({ id }) => id === "review")).toMatchObject({
       workingDaysDisplay: "Review",
-      status: "Review",
-      primaryActionLabel: "Review",
+      status: "Review Required",
+      primaryActionLabel: "Review issue",
     });
   });
 

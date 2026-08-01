@@ -16,7 +16,10 @@ import {
 import { formatDate, todayDateOnly } from "@/lib/date";
 import { OperationPatternForm } from "@/components/operation-pattern-form";
 import { seasonLabel, seasonalStatus } from "@/lib/season";
-import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
+import {
+  serviceResponsibilityFamilies,
+  serviceResponsibilityLabel,
+} from "@/lib/service-responsibility";
 
 function jurisdictionLabel(jurisdiction: {
   city: string | null;
@@ -203,33 +206,6 @@ export default async function EditCustomerTowerPage({
           </div>
         </section>
         <section className="panel p-6">
-          <div className="label">Jurisdiction</div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="label" htmlFor="edit-tower-jurisdiction">
-                Jurisdiction
-              </label>
-              <select
-                id="edit-tower-jurisdiction"
-                className="field mt-1"
-                name="jurisdictionId"
-                defaultValue={system.jurisdictionId}
-                required
-              >
-                {jurisdictions.map((jurisdiction) => (
-                  <option key={jurisdiction.id} value={jurisdiction.id}>
-                    {jurisdictionLabel(jurisdiction)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="text-sm text-slate-600 sm:col-span-2">
-              This identifies the service location. It does not change which
-              compliance rules generate obligations.
-            </p>
-          </div>
-        </section>
-        <section className="panel p-6">
           <label>
             <span className="label">Reason for changes</span>
             <input
@@ -247,14 +223,17 @@ export default async function EditCustomerTowerPage({
       </form>
       <section className="panel mx-auto mt-6 max-w-4xl p-6">
         <div className="label">Service Responsibility</div>
-        <h2 className="mt-1 text-xl font-black">Legionella management</h2>
+        <h2 className="mt-1 text-xl font-black">
+          Contracted service ownership
+        </h2>
         <p className="mt-2 text-sm text-slate-600">
           This controls operational ownership only. It does not change the legal
           requirements assigned to this tower.
         </p>
-        {!system.legionellaResponsibility && (
+        {serviceResponsibilityFamilies.some(([key]) => system[key] == null) && (
           <div className="mt-4 rounded-lg border border-purple-300 bg-purple-50 p-3 text-sm font-bold text-purple-900">
-            Legionella responsibility must be confirmed.
+            One or more service responsibilities must be confirmed. Unknown work
+            remains visible until ownership is assigned.
           </div>
         )}
         <form
@@ -262,29 +241,25 @@ export default async function EditCustomerTowerPage({
           className="mt-4 grid gap-4 sm:grid-cols-2"
         >
           <input type="hidden" name="systemId" value={system.id} />
-          <label>
-            <span className="label">Legionella Responsibility</span>
-            <select
-              className="field mt-1"
-              name="legionellaResponsibility"
-              defaultValue={system.legionellaResponsibility ?? ""}
-              required
-            >
-              <option value="" disabled>
-                Choose responsibility
-              </option>
-              <option value="OUR_COMPANY">
-                Our company manages Legionella
-              </option>
-              <option value="CUSTOMER">Customer manages Legionella</option>
-              <option value="OTHER_VENDOR">
-                Another vendor manages Legionella
-              </option>
-              <option value="NOT_TRACKED">
-                Do not track Legionella in TowerTrack
-              </option>
-            </select>
-          </label>
+          {serviceResponsibilityFamilies.map(([key, label]) => (
+            <label key={key}>
+              <span className="label">{label}</span>
+              <select
+                className="field mt-1"
+                name={key}
+                defaultValue={system[key] ?? ""}
+                required
+              >
+                <option value="" disabled>
+                  Choose responsibility
+                </option>
+                <option value="OUR_COMPANY">Our company</option>
+                <option value="CUSTOMER">Customer</option>
+                <option value="OTHER_VENDOR">Another vendor</option>
+                <option value="NOT_TRACKED">Reference only</option>
+              </select>
+            </label>
+          ))}
           <label>
             <span className="label">Vendor name (when applicable)</span>
             <input
@@ -298,14 +273,18 @@ export default async function EditCustomerTowerPage({
             <input
               className="field mt-1"
               name="reason"
-              defaultValue="Confirm contracted Legionella service responsibility"
+              defaultValue="Confirm contracted service responsibility"
               minLength={8}
               required
             />
           </label>
-          <div className="text-sm text-slate-600 sm:col-span-2">
-            Current:{" "}
-            {serviceResponsibilityLabel(system.legionellaResponsibility)}
+          <div className="grid gap-1 text-sm text-slate-600 sm:col-span-2 sm:grid-cols-2">
+            {serviceResponsibilityFamilies.map(([key, label]) => (
+              <div key={key}>
+                <span className="font-bold">{label}:</span>{" "}
+                {serviceResponsibilityLabel(system[key])}
+              </div>
+            ))}
           </div>
           <button className="btn btn-primary sm:col-span-2">
             Save Service Responsibility
@@ -380,6 +359,21 @@ export default async function EditCustomerTowerPage({
               </select>
             </label>
             <label>
+              <span className="label">Jurisdiction</span>
+              <select
+                className="field mt-1"
+                name="jurisdictionId"
+                defaultValue={system.jurisdictionId}
+                required
+              >
+                {jurisdictions.map((jurisdiction) => (
+                  <option key={jurisdiction.id} value={jurisdiction.id}>
+                    {jurisdictionLabel(jurisdiction)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
               <span className="label">Assigned profile version</span>
               <select
                 className="field mt-1"
@@ -404,6 +398,7 @@ export default async function EditCustomerTowerPage({
                 name="effectiveDate"
                 type="date"
                 min={todayDateOnly()}
+                max={todayDateOnly()}
                 defaultValue={todayDateOnly()}
                 required
               />
@@ -418,11 +413,33 @@ export default async function EditCustomerTowerPage({
                 required
               />
             </label>
-            <p className="text-sm text-slate-600 sm:col-span-2">
-              NYC + NYS composes both legal profiles into one operational set.
-              Equivalent work is consolidated using the strictest deadline.
-              Custom requirements retain company or customer authority labels.
-            </p>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 sm:col-span-2">
+              <div className="font-black">Compliance impact preview</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>
+                  The current assignment will end the day before the effective
+                  date.
+                </li>
+                <li>
+                  Open obligations will be recalculated under the selected
+                  jurisdiction and profile.
+                </li>
+                <li>
+                  Historical events and prior effective-dated assignments remain
+                  unchanged.
+                </li>
+              </ul>
+              <label className="mt-3 flex items-start gap-2 font-bold">
+                <input
+                  name="impactConfirmed"
+                  type="checkbox"
+                  value="yes"
+                  required
+                />
+                I reviewed the jurisdiction, effective date, and recalculation
+                impact.
+              </label>
+            </div>
             <button className="btn btn-primary sm:col-span-2">
               Change Compliance Rules
             </button>

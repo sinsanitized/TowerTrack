@@ -403,69 +403,76 @@ model PendingRegulation {
 }
 
 model CoolingTowerSystem {
-  id                             String                  @id @default(cuid())
-  buildingId                     String
-  building                       Building                @relation(fields: [buildingId], references: [id])
-  jurisdictionId                 String
-  jurisdiction                   Jurisdiction            @relation(fields: [jurisdictionId], references: [id])
-  ruleProfileId                  String
-  ruleProfile                    RuleProfile             @relation("ActiveRuleProfile", fields: [ruleProfileId], references: [id])
-  ruleConfiguration              TowerRuleConfiguration
-  ruleConfigurationEffectiveDate DateTime                @db.Date
-  ruleConfigurationConfirmed     Boolean                 @default(true)
-  legionellaResponsibility       ServiceResponsibility?
-  legionellaVendorName           String?
-  ruleAssignments                TowerRuleAssignment[]
-  pendingRegulationId            String?
-  pendingRegulation              PendingRegulation?      @relation(fields: [pendingRegulationId], references: [id])
-  internalJobNumber              String                  @unique
-  systemName                     String
-  manufacturer                   String?
-  modelNumber                    String?
-  serialNumber                   String?
-  towerLocation                  String?
-  tonnage                        Float?
-  NYCSystemId                    String?
-  NYSSystemId                    String?
-  registrationNumber             String?
-  operationPeriodType            String?
-  operatingStatus                OperatingStatus         @default(OPERATING)
-  seasonal                       Boolean                 @default(false)
-  seasonStartMonth               Int                     @default(5)
-  seasonStartDay                 Int                     @default(1)
-  seasonEndMonth                 Int                     @default(10)
-  seasonEndDay                   Int                     @default(31)
-  actualStartupDate              DateTime?               @db.Date
-  actualShutdownDate             DateTime?               @db.Date
-  preferredTargetDay             Int?
-  monthlyTargetStartDay          Int                     @default(20)
-  monthlyTargetEndDay            Int                     @default(25)
-  preferredWeekOfMonth           Int?
-  preferredDayOfWeek             Int?
-  routeZoneOverride              String?
-  assignedTechnicianId           String?
-  assignedTechnician             User?                   @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
-  warningDays                    Int                     @default(7)
-  planningHorizonDays            Int                     @default(21)
-  mppVersion                     String?
-  qualifiedPerson                String?
-  laboratory                     String?
-  notes                          String?
-  active                         Boolean                 @default(true)
-  activities                     VisitActivity[]
-  requirements                   Requirement[]
-  correctiveCases                CorrectiveActionCase[]
-  operatingPeriods               OperatingPeriod[]
-  serviceEvents                  ServiceEvent[]
-  sampleObligations              SampleObligation[]
-  inspectionObligations          InspectionObligation[]
-  reportingObligations           ReportingObligation[]
-  maintenanceObligations         MaintenanceObligation[]
-  labResults                     LabResult[]
-  complianceStatus               ComplianceStatus?
-  createdAt                      DateTime                @default(now())
-  updatedAt                      DateTime                @updatedAt
-  deletedAt                      DateTime?
+  id                                String                  @id @default(cuid())
+  buildingId                        String
+  building                          Building                @relation(fields: [buildingId], references: [id])
+  jurisdictionId                    String
+  jurisdiction                      Jurisdiction            @relation(fields: [jurisdictionId], references: [id])
+  ruleProfileId                     String
+  ruleProfile                       RuleProfile             @relation("ActiveRuleProfile", fields: [ruleProfileId], references: [id])
+  ruleConfiguration                 TowerRuleConfiguration
+  ruleConfigurationEffectiveDate    DateTime                @db.Date
+  ruleConfigurationConfirmed        Boolean                 @default(true)
+  legionellaResponsibility          ServiceResponsibility?
+  legionellaVendorName              String?
+  laboratoryResultResponsibility    ServiceResponsibility?
+  bacteriologicalResponsibility     ServiceResponsibility?
+  inspectionResponsibility          ServiceResponsibility?
+  cleaningResponsibility            ServiceResponsibility?
+  waterTreatmentResponsibility      ServiceResponsibility?
+  regulatoryReportingResponsibility ServiceResponsibility?
+  certificationResponsibility       ServiceResponsibility?
+  ruleAssignments                   TowerRuleAssignment[]
+  pendingRegulationId               String?
+  pendingRegulation                 PendingRegulation?      @relation(fields: [pendingRegulationId], references: [id])
+  internalJobNumber                 String                  @unique
+  systemName                        String
+  manufacturer                      String?
+  modelNumber                       String?
+  serialNumber                      String?
+  towerLocation                     String?
+  tonnage                           Float?
+  NYCSystemId                       String?
+  NYSSystemId                       String?
+  registrationNumber                String?
+  operationPeriodType               String?
+  operatingStatus                   OperatingStatus         @default(OPERATING)
+  seasonal                          Boolean                 @default(false)
+  seasonStartMonth                  Int                     @default(5)
+  seasonStartDay                    Int                     @default(1)
+  seasonEndMonth                    Int                     @default(10)
+  seasonEndDay                      Int                     @default(31)
+  actualStartupDate                 DateTime?               @db.Date
+  actualShutdownDate                DateTime?               @db.Date
+  preferredTargetDay                Int?
+  monthlyTargetStartDay             Int                     @default(20)
+  monthlyTargetEndDay               Int                     @default(25)
+  preferredWeekOfMonth              Int?
+  preferredDayOfWeek                Int?
+  routeZoneOverride                 String?
+  assignedTechnicianId              String?
+  assignedTechnician                User?                   @relation("AssignedTechnician", fields: [assignedTechnicianId], references: [id])
+  warningDays                       Int                     @default(7)
+  planningHorizonDays               Int                     @default(21)
+  mppVersion                        String?
+  qualifiedPerson                   String?
+  laboratory                        String?
+  notes                             String?
+  active                            Boolean                 @default(true)
+  activities                        VisitActivity[]
+  requirements                      Requirement[]
+  correctiveCases                   CorrectiveActionCase[]
+  operatingPeriods                  OperatingPeriod[]
+  serviceEvents                     ServiceEvent[]
+  sampleObligations                 SampleObligation[]
+  inspectionObligations             InspectionObligation[]
+  reportingObligations              ReportingObligation[]
+  maintenanceObligations            MaintenanceObligation[]
+  labResults                        LabResult[]
+  complianceStatus                  ComplianceStatus?
+  createdAt                         DateTime                @default(now())
+  updatedAt                         DateTime                @updatedAt
+  deletedAt                         DateTime?
 }
 
 model TowerRuleAssignment {
@@ -511,7 +518,7 @@ model ServiceEvent {
   status                          ServiceEventStatus      @default(ACTIVE)
   details                         Json?
   notes                           String?
-  performedByResponsibility       ServiceResponsibility  @default(OUR_COMPANY)
+  performedByResponsibility       ServiceResponsibility   @default(OUR_COMPANY)
   externalProviderName            String?
   externalSource                  String?
   recordedById                    String

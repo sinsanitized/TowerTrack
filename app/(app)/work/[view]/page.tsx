@@ -205,7 +205,9 @@ export default async function WorkViewPage({
                   >
                     {view === "overdue-towers"
                       ? "Review history"
-                      : "Open tower & add event"}
+                      : view === "visit-opportunities"
+                        ? "View tower"
+                        : "Complete obligation"}
                   </Link>
                 </div>
               </div>
@@ -243,7 +245,7 @@ export default async function WorkViewPage({
                       className="btn btn-primary mt-3"
                       href={`/systems/${row.id}#record-event`}
                     >
-                      Open tower & record work
+                      Complete obligation
                     </Link>
                   </div>
                 </div>

@@ -7,6 +7,7 @@ import {
 import { plainEnumLabel, requiredActionLabel } from "@/lib/labels";
 import {
   responsibilityForObligation,
+  responsibilityFamilyForObligation,
   serviceResponsibilityLabel,
   type ResponsibilityFilter,
   type ServiceResponsibility,
@@ -15,7 +16,10 @@ import {
 export type DeadlineCategory =
   "SAMPLE" | "INSPECTION" | "MAINTENANCE" | "REPORTING_ACTION";
 
-export type DeadlineStatus = "Overdue" | "Due Soon" | "Upcoming" | "Review";
+export type DeadlineStatus =
+  "Overdue" | "Due This Week" | "Due Next Week" | "Later" | "Review Required";
+export type DeadlineExecutionState =
+  "Unscheduled" | "Scheduled—still open" | "Waiting" | "Completed";
 
 export const deadlinePeriodValues = [
   "ALL",
@@ -68,6 +72,13 @@ export type DeadlineTowerInput = {
   operatingSchedule: OperatingSchedule;
   ruleConfiguration: "NYC_AND_NYS" | "NYS_ONLY" | "CUSTOM";
   legionellaResponsibility: ServiceResponsibility | null;
+  laboratoryResultResponsibility?: ServiceResponsibility | null;
+  bacteriologicalResponsibility?: ServiceResponsibility | null;
+  inspectionResponsibility?: ServiceResponsibility | null;
+  cleaningResponsibility?: ServiceResponsibility | null;
+  waterTreatmentResponsibility?: ServiceResponsibility | null;
+  regulatoryReportingResponsibility?: ServiceResponsibility | null;
+  certificationResponsibility?: ServiceResponsibility | null;
   openObligations: DeadlineObligationInput[];
 };
 
@@ -101,8 +112,21 @@ export type TowerDeadlineRow = {
   workingDaysDisplay: string;
   workingDaysAccessible: string;
   status: DeadlineStatus;
-  statusColor: "RED" | "YELLOW" | "GREEN" | "PURPLE";
-  primaryActionLabel: "Record" | "Open" | "Review";
+  statusColor: "RED" | "YELLOW" | "BLUE" | "GRAY" | "PURPLE";
+  executionState: DeadlineExecutionState;
+  executionStateColor: "BLUE" | "PURPLE" | "GREEN" | "GRAY";
+  executionLane:
+    | "Field work"
+    | "Laboratory work"
+    | "Office reporting"
+    | "Customer/vendor follow-up";
+  dependency: string | null;
+  primaryActionLabel:
+    | "Complete obligation"
+    | "Enter result"
+    | "Submit report"
+    | "Review issue"
+    | "View tower";
   primaryActionAccessible: string;
   primaryActionHref: string;
 };
@@ -153,7 +177,10 @@ export function filterTowerDeadlineRows(
       (period === "ALL" ||
         deadlinePeriodForDate(row.hardDueDate, today) === period) &&
       (action === "ALL" || row.category === action) &&
-      (responsibility === "ALL" || row.responsibility === responsibility) &&
+      (responsibility === "ALL" ||
+        (responsibility === "UNCONFIRMED" && row.responsibility == null) ||
+        row.responsibility === responsibility ||
+        (responsibility === "OUR_COMPANY" && row.responsibility == null)) &&
       (schedule === "ALL" ||
         (schedule === "NOT_SET"
           ? row.operatingSchedule == null
@@ -256,10 +283,12 @@ function statusFor(
     (obligation.latest != null && obligation.latest < today)
   )
     return { label: "Overdue", color: "RED" };
-  if (!obligation.latest) return { label: "Review", color: "PURPLE" };
-  const remaining = workingDaysRemaining(obligation.latest, today);
-  if (remaining <= 3) return { label: "Due Soon", color: "YELLOW" };
-  return { label: "Upcoming", color: "GREEN" };
+  if (!obligation.latest) return { label: "Review Required", color: "PURPLE" };
+  const period = deadlinePeriodForDate(obligation.latest, today);
+  if (period === "THIS_WEEK")
+    return { label: "Due This Week", color: "YELLOW" };
+  if (period === "NEXT_WEEK") return { label: "Due Next Week", color: "BLUE" };
+  return { label: "Later", color: "GRAY" };
 }
 
 function conciseWorkingDays(value: number | null) {
@@ -282,44 +311,143 @@ function conciseWorkingDays(value: number | null) {
   };
 }
 
+export function completionHrefForObligation(
+  towerId: string,
+  obligation: Pick<DeadlineObligationInput, "id" | "type" | "category">,
+) {
+  if (obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
+    return `/systems/${towerId}?record=bacteriological#record-event`;
+  const recordType =
+    obligation.category === "SAMPLE"
+      ? "sample"
+      : obligation.category === "INSPECTION"
+        ? "inspection"
+        : obligation.type === "SUMMERTIME_HYPERHALOGENATION_DUE"
+          ? "hyperhalogenation"
+          : obligation.type === "STARTUP_CLEANING_DISINFECTION"
+            ? "startup-cleaning"
+            : obligation.type === "ANNUAL_CLEANING"
+              ? "cleaning"
+              : obligation.type === "LEVEL_4_FULL_REMEDIATION"
+                ? "remediation"
+                : obligation.type.includes("CORRECTIVE_ACTION")
+                  ? "disinfection"
+                  : obligation.type ===
+                      "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+                    ? "biological"
+                    : null;
+  return recordType
+    ? `/systems/${towerId}?record=${recordType}#record-event`
+    : `/systems/${towerId}?view=obligations#reporting-${obligation.id}`;
+}
+
+export function executionStateFor(
+  obligation: Pick<DeadlineObligationInput, "status">,
+  responsibility: ServiceResponsibility | null,
+): {
+  label: DeadlineExecutionState;
+  color: TowerDeadlineRow["executionStateColor"];
+} {
+  if (obligation.status === "COMPLETED")
+    return { label: "Completed", color: "GREEN" };
+  if (obligation.status === "SCHEDULED")
+    return { label: "Scheduled—still open", color: "BLUE" };
+  if (
+    responsibility == null ||
+    responsibility === "CUSTOMER" ||
+    responsibility === "OTHER_VENDOR" ||
+    responsibility === "NOT_TRACKED"
+  )
+    return { label: "Waiting", color: "PURPLE" };
+  return { label: "Unscheduled", color: "GRAY" };
+}
+
+function executionDetails(
+  obligation: Pick<DeadlineObligationInput, "type" | "category">,
+  responsibility: ServiceResponsibility | null,
+): Pick<TowerDeadlineRow, "executionLane" | "dependency"> {
+  if (responsibility == null)
+    return {
+      executionLane: "Customer/vendor follow-up",
+      dependency: "Waiting on responsibility review",
+    };
+  if (responsibility === "CUSTOMER")
+    return {
+      executionLane: "Customer/vendor follow-up",
+      dependency: "Waiting on customer",
+    };
+  if (responsibility === "OTHER_VENDOR")
+    return {
+      executionLane: "Customer/vendor follow-up",
+      dependency: "Waiting on vendor",
+    };
+  if (obligation.type.includes("LAB_RESULT"))
+    return { executionLane: "Laboratory work", dependency: "Waiting on lab" };
+  if (obligation.category === "REPORTING_ACTION")
+    return { executionLane: "Office reporting", dependency: null };
+  return { executionLane: "Field work", dependency: null };
+}
+
 function primaryAction(
   towerId: string,
   towerName: string,
   obligation: DeadlineObligationInput,
   requiredAction: string,
   status: DeadlineStatus,
+  responsibility: ServiceResponsibility | null,
 ): Pick<
   TowerDeadlineRow,
   "primaryActionLabel" | "primaryActionAccessible" | "primaryActionHref"
 > {
+  if (responsibility == null)
+    return {
+      primaryActionLabel: "Review issue",
+      primaryActionAccessible: `Confirm service responsibility for ${towerName}`,
+      primaryActionHref: `/systems/${towerId}?view=obligations`,
+    };
+  if (
+    obligation.category === "SAMPLE" &&
+    (responsibility === "CUSTOMER" || responsibility === "OTHER_VENDOR")
+  )
+    return {
+      primaryActionLabel: "Complete obligation",
+      primaryActionAccessible: `Record externally completed ${requiredAction.toLowerCase()} for ${towerName}`,
+      primaryActionHref: `/systems/${towerId}?record=external-legionella#record-event`,
+    };
+  if (responsibility === "NOT_TRACKED")
+    return {
+      primaryActionLabel: "View tower",
+      primaryActionAccessible: `Review reference-only deadline for ${towerName}`,
+      primaryActionHref: `/systems/${towerId}?view=obligations`,
+    };
   if (obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
     return {
-      primaryActionLabel: "Review",
-      primaryActionAccessible: `Review owner-managed bacteriological sampling for ${towerName}`,
-      primaryActionHref: `/systems/${towerId}?view=obligations`,
+      primaryActionLabel: "Complete obligation",
+      primaryActionAccessible: `Record owner-managed bacteriological sampling for ${towerName}`,
+      primaryActionHref: completionHrefForObligation(towerId, obligation),
     };
   if (status === "Overdue")
     return {
-      primaryActionLabel: "Open",
+      primaryActionLabel: "Review issue",
       primaryActionAccessible: `Open overdue ${requiredAction.toLowerCase()} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (!obligation.targetStart && !obligation.latest)
     return {
-      primaryActionLabel: "Review",
+      primaryActionLabel: "Review issue",
       primaryActionAccessible: `Review ${requiredAction.toLowerCase()} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
-  const recordType =
-    obligation.category === "SAMPLE"
-      ? "sample"
-      : obligation.type === "SUMMERTIME_HYPERHALOGENATION_DUE"
-        ? "hyperhalogenation"
-        : "event";
   return {
-    primaryActionLabel: "Record",
+    primaryActionLabel:
+      obligation.category === "REPORTING_ACTION" &&
+      !obligation.type.includes("CORRECTIVE_ACTION") &&
+      obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
+      obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+        ? "Submit report"
+        : "Complete obligation",
     primaryActionAccessible: `Record ${requiredAction.toLowerCase()} for ${towerName}`,
-    primaryActionHref: `/systems/${towerId}?record=${recordType}#record-event`,
+    primaryActionHref: completionHrefForObligation(towerId, obligation),
   };
 }
 
@@ -338,17 +466,28 @@ export function buildTowerDeadlineRows(
       const targetWindowStart = obligation.targetStart ?? obligation.earliest;
       const targetWindowEnd = obligation.targetEnd ?? obligation.latest;
       const requiredAction = actionLabel(obligation);
-      const responsibility = responsibilityForObligation(
+      const responsibilityFamily = responsibilityFamilyForObligation(
         obligation.type,
-        tower.legionellaResponsibility,
+        obligation.category,
       );
+      const configuredResponsibility = tower[responsibilityFamily];
+      const responsibility =
+        configuredResponsibility === undefined
+          ? responsibilityForObligation(
+              obligation.type,
+              tower.legionellaResponsibility,
+            )
+          : configuredResponsibility;
       const action = primaryAction(
         tower.id,
         tower.systemName,
         obligation,
         requiredAction,
         status.label,
+        responsibility,
       );
+      const executionState = executionStateFor(obligation, responsibility);
+      const execution = executionDetails(obligation, responsibility);
       return {
         id: obligation.id,
         towerId: tower.id,
@@ -394,6 +533,9 @@ export function buildTowerDeadlineRows(
         workingDaysAccessible: days.accessible,
         status: status.label,
         statusColor: status.color,
+        executionState: executionState.label,
+        executionStateColor: executionState.color,
+        ...execution,
         ...action,
       } satisfies TowerDeadlineRow;
     }),

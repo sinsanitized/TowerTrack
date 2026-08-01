@@ -53,9 +53,11 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
         ? "Other vendor"
         : filters.responsibility === "NOT_TRACKED"
           ? "Not tracked"
-          : filters.responsibility === "ALL"
-            ? "All responsibilities"
-            : null,
+          : filters.responsibility === "UNCONFIRMED"
+            ? "Responsibility required"
+            : filters.responsibility === "ALL"
+              ? "All responsibilities"
+              : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -157,6 +159,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
                   ["CUSTOMER", "Customer"],
                   ["OTHER_VENDOR", "Other vendor"],
                   ["NOT_TRACKED", "Not tracked"],
+                  ["UNCONFIRMED", "Responsibility required"],
                   ["ALL", "All responsibilities"],
                 ].map(([value, label]) => (
                   <Link

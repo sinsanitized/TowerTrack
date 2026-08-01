@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
   Building2,
@@ -33,6 +36,23 @@ export function AppShell({
   children: React.ReactNode;
   user: { name: string; role: UserRole };
 }) {
+  const pathname = usePathname();
+  const visibleNav = nav.filter(
+    ([name]) =>
+      name !== "Settings" ||
+      ["ADMIN", "OPERATIONS_MANAGER"].includes(user.role),
+  );
+  const breadcrumb = pathname.startsWith("/systems/")
+    ? [
+        ["Towers", "/towers"],
+        ["Tower details", pathname],
+      ]
+    : pathname.startsWith("/customers/")
+      ? [
+          ["Customers", "/customers"],
+          ["Customer details", pathname],
+        ]
+      : [];
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[238px_1fr]">
       <aside className="bg-[#173f31] text-white lg:min-h-screen">
@@ -48,11 +68,16 @@ export function AppShell({
           </span>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:block lg:space-y-1">
-          {nav.map(([name, href, Icon]) => (
+          {visibleNav.map(([name, href, Icon]) => (
             <Link
               key={href}
               href={href}
-              className="flex min-w-max items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold text-white/80 hover:bg-white/10 hover:text-white"
+              aria-current={
+                pathname === href || (href !== "/" && pathname.startsWith(href))
+                  ? "page"
+                  : undefined
+              }
+              className={`flex min-w-max items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold ${pathname === href || (href !== "/" && pathname.startsWith(href)) ? "bg-white/15 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
             >
               <Icon size={18} />
               {name}
@@ -78,6 +103,20 @@ export function AppShell({
           <ThemeToggle />
         </header>
         <ComplianceTodayProvider>
+          {breadcrumb.length > 0 && (
+            <nav
+              aria-label="Breadcrumb"
+              className="border-b border-slate-200 bg-slate-50 px-5 py-2 text-xs font-bold text-slate-600 lg:px-8"
+            >
+              <Link href="/">Action Center</Link>
+              {breadcrumb.map(([label, href]) => (
+                <span key={label}>
+                  {" "}
+                  <span aria-hidden>›</span> <Link href={href}>{label}</Link>
+                </span>
+              ))}
+            </nav>
+          )}
           <div className="p-5 lg:p-8">{children}</div>
         </ComplianceTodayProvider>
       </main>

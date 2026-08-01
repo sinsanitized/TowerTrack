@@ -600,6 +600,13 @@ export async function updateServiceResponsibilityAction(formData: FormData) {
     .object({
       systemId: z.string().min(1),
       legionellaResponsibility: z.enum(serviceResponsibilityValues),
+      laboratoryResultResponsibility: z.enum(serviceResponsibilityValues),
+      bacteriologicalResponsibility: z.enum(serviceResponsibilityValues),
+      inspectionResponsibility: z.enum(serviceResponsibilityValues),
+      cleaningResponsibility: z.enum(serviceResponsibilityValues),
+      waterTreatmentResponsibility: z.enum(serviceResponsibilityValues),
+      regulatoryReportingResponsibility: z.enum(serviceResponsibilityValues),
+      certificationResponsibility: z.enum(serviceResponsibilityValues),
       legionellaVendorName: z.string().trim().max(200).optional(),
       reason: z.string().trim().min(8).max(2000),
     })
@@ -614,13 +621,31 @@ export async function updateServiceResponsibilityAction(formData: FormData) {
       id: parsed.systemId,
       building: { customer: { organizationId: user.organizationId } },
     },
-    select: { legionellaResponsibility: true, legionellaVendorName: true },
+    select: {
+      legionellaResponsibility: true,
+      laboratoryResultResponsibility: true,
+      bacteriologicalResponsibility: true,
+      inspectionResponsibility: true,
+      cleaningResponsibility: true,
+      waterTreatmentResponsibility: true,
+      regulatoryReportingResponsibility: true,
+      certificationResponsibility: true,
+      legionellaVendorName: true,
+    },
   });
   await db.$transaction(async (tx) => {
     await tx.coolingTowerSystem.update({
       where: { id: parsed.systemId },
       data: {
         legionellaResponsibility: parsed.legionellaResponsibility,
+        laboratoryResultResponsibility: parsed.laboratoryResultResponsibility,
+        bacteriologicalResponsibility: parsed.bacteriologicalResponsibility,
+        inspectionResponsibility: parsed.inspectionResponsibility,
+        cleaningResponsibility: parsed.cleaningResponsibility,
+        waterTreatmentResponsibility: parsed.waterTreatmentResponsibility,
+        regulatoryReportingResponsibility:
+          parsed.regulatoryReportingResponsibility,
+        certificationResponsibility: parsed.certificationResponsibility,
         legionellaVendorName:
           parsed.legionellaResponsibility === "OTHER_VENDOR"
             ? parsed.legionellaVendorName
@@ -631,7 +656,7 @@ export async function updateServiceResponsibilityAction(formData: FormData) {
       where: {
         entityType: "CoolingTowerSystem",
         entityId: parsed.systemId,
-        title: "Legionella responsibility must be confirmed",
+        title: { contains: "responsibility must be confirmed" },
         status: "OPEN",
       },
       data: { status: "RESOLVED", resolvedAt: new Date() },
@@ -2694,6 +2719,13 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
           parsed.legionellaResponsibility === "OTHER_VENDOR"
             ? parsed.legionellaVendorName
             : null,
+        laboratoryResultResponsibility: parsed.legionellaResponsibility,
+        bacteriologicalResponsibility: "CUSTOMER",
+        inspectionResponsibility: "OUR_COMPANY",
+        cleaningResponsibility: "OUR_COMPANY",
+        waterTreatmentResponsibility: "OUR_COMPANY",
+        regulatoryReportingResponsibility: "OUR_COMPANY",
+        certificationResponsibility: "CUSTOMER",
         internalJobNumber,
         systemName: parsed.systemName,
         manufacturer: parsed.manufacturer || null,
@@ -2756,6 +2788,13 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
           ruleConfiguration: parsed.ruleConfiguration,
           ruleEffectiveDate: parsed.ruleEffectiveDate,
           legionellaResponsibility: parsed.legionellaResponsibility,
+          laboratoryResultResponsibility: parsed.legionellaResponsibility,
+          bacteriologicalResponsibility: "CUSTOMER",
+          inspectionResponsibility: "OUR_COMPANY",
+          cleaningResponsibility: "OUR_COMPANY",
+          waterTreatmentResponsibility: "OUR_COMPANY",
+          regulatoryReportingResponsibility: "OUR_COMPANY",
+          certificationResponsibility: "CUSTOMER",
           legionellaVendorName: parsed.legionellaVendorName || null,
           internalJobNumber,
         },
@@ -2789,22 +2828,16 @@ export async function updateCustomerTowerAction(formData: FormData) {
         (value) => (value === "" ? undefined : value),
         z.coerce.number().positive().optional(),
       ),
-      jurisdictionId: z.string().min(1),
       reason: z.string().trim().min(8).max(2000),
     })
     .parse(Object.fromEntries(formData));
-  const [existing, jurisdiction] = await Promise.all([
-    db.coolingTowerSystem.findFirstOrThrow({
-      where: {
-        id: parsed.systemId,
-        building: { customer: { organizationId: user.organizationId } },
-      },
-      include: { building: { include: { customer: true } } },
-    }),
-    db.jurisdiction.findUniqueOrThrow({
-      where: { id: parsed.jurisdictionId },
-    }),
-  ]);
+  const existing = await db.coolingTowerSystem.findFirstOrThrow({
+    where: {
+      id: parsed.systemId,
+      building: { customer: { organizationId: user.organizationId } },
+    },
+    include: { building: { include: { customer: true } } },
+  });
   const state = parsed.state.toUpperCase();
   const buildingName =
     existing.building.buildingName === existing.building.customer.name
@@ -2836,7 +2869,6 @@ export async function updateCustomerTowerAction(formData: FormData) {
         serialNumber: parsed.serialNumber || null,
         towerLocation: parsed.towerLocation || null,
         tonnage: parsed.tonnage ?? null,
-        jurisdictionId: jurisdiction.id,
       },
     });
     await tx.auditLog.createMany({
@@ -2884,7 +2916,6 @@ export async function updateCustomerTowerAction(formData: FormData) {
             serialNumber: existing.serialNumber,
             towerLocation: existing.towerLocation,
             tonnage: existing.tonnage,
-            jurisdictionId: existing.jurisdictionId,
           },
           newValue: {
             systemName: parsed.systemName,
@@ -2893,7 +2924,6 @@ export async function updateCustomerTowerAction(formData: FormData) {
             serialNumber: parsed.serialNumber || null,
             towerLocation: parsed.towerLocation || null,
             tonnage: parsed.tonnage ?? null,
-            jurisdictionId: jurisdiction.id,
           },
         },
       ],
@@ -2913,11 +2943,13 @@ export async function changeTowerRuleConfigurationAction(formData: FormData) {
       systemId: z.string().min(1),
       ruleConfiguration: z.enum(towerRuleConfigurationValues),
       ruleProfileId: z.string().min(1),
+      jurisdictionId: z.string().min(1),
       effectiveDate: z.string().date(),
       reason: z.string().trim().min(8).max(2000),
+      impactConfirmed: z.literal("yes"),
     })
     .parse(Object.fromEntries(formData));
-  const [system, profile] = await Promise.all([
+  const [system, profile, jurisdiction] = await Promise.all([
     db.coolingTowerSystem.findFirstOrThrow({
       where: {
         id: parsed.systemId,
@@ -2939,7 +2971,18 @@ export async function changeTowerRuleConfigurationAction(formData: FormData) {
       },
       include: { rules: true },
     }),
+    db.jurisdiction.findUniqueOrThrow({
+      where: { id: parsed.jurisdictionId },
+    }),
   ]);
+  if (parsed.effectiveDate !== todayInTimeZone())
+    throw new Error(
+      "Jurisdiction and rule changes must take effect today. Future changes should be recorded when they become effective.",
+    );
+  if (profile.jurisdictionId && profile.jurisdictionId !== jurisdiction.id)
+    throw new Error(
+      "The selected compliance profile does not match the selected jurisdiction.",
+    );
   if (
     !profileMatchesTowerConfiguration(
       parsed.ruleConfiguration,
@@ -2998,6 +3041,7 @@ export async function changeTowerRuleConfigurationAction(formData: FormData) {
         ruleConfigurationEffectiveDate: asUtc(parsed.effectiveDate),
         ruleConfigurationConfirmed: !customNeedsReview,
         ruleProfileId: profile.id,
+        jurisdictionId: jurisdiction.id,
       },
     });
     await tx.reviewItem.updateMany({
@@ -3032,12 +3076,14 @@ export async function changeTowerRuleConfigurationAction(formData: FormData) {
           ? {
               configuration: current.configuration,
               ruleProfileId: current.ruleProfileId,
+              jurisdictionId: system.jurisdictionId,
               effectiveStartDate: current.effectiveStartDate,
             }
           : undefined,
         newValue: {
           configuration: parsed.ruleConfiguration,
           ruleProfileId: profile.id,
+          jurisdictionId: jurisdiction.id,
           effectiveDate: parsed.effectiveDate,
           requiresReview: customNeedsReview,
         },

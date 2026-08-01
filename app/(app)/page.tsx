@@ -7,8 +7,9 @@ import { getUrgency } from "@/lib/compliance-intelligence";
 import {
   deadlinePeriodBounds,
   deadlinePeriodForDate,
+  completionHrefForObligation,
 } from "@/lib/deadline-view";
-import { isOurOperationalResponsibility } from "@/lib/service-responsibility";
+import { responsibilityForServiceObligation } from "@/lib/service-responsibility";
 import { buttonClass } from "@/lib/button-variants";
 import { complianceDashboardRows } from "@/lib/queries";
 import { requirementLabel, requiredActionLabel } from "@/lib/labels";
@@ -18,6 +19,17 @@ import { asUtc, todayDateOnly } from "@/lib/date";
 type DashboardRows = Awaited<ReturnType<typeof complianceDashboardRows>>;
 type DashboardRow = DashboardRows[number];
 type DashboardObligation = DashboardRow["openObligations"][number];
+
+function operationalResponsibility(
+  row: DashboardRow,
+  obligation: DashboardObligation,
+) {
+  return responsibilityForServiceObligation(
+    obligation.type,
+    obligation.category,
+    row,
+  );
+}
 
 function ActionRow({
   row,
@@ -37,6 +49,19 @@ function ActionRow({
     latestDueDate: obligation.latest,
     targetStartDate: obligation.targetStart,
   });
+  const responsibility = operationalResponsibility(row, obligation);
+  const executionLabel =
+    obligation.status === "SCHEDULED"
+      ? "Scheduled—still open"
+      : responsibility == null
+        ? "Waiting on review"
+        : responsibility === "CUSTOMER"
+          ? "Waiting on customer"
+          : responsibility === "OTHER_VENDOR"
+            ? "Waiting on vendor"
+            : responsibility === "NOT_TRACKED"
+              ? "Reference only"
+              : "Unscheduled";
   return (
     <article
       className={`border-b p-4 last:border-b-0 sm:p-5 ${
@@ -71,6 +96,26 @@ function ActionRow({
               {row.profileSourceLabel}
             </p>
           </details>
+          {row.visitOpportunity?.obligations[0]?.id === obligation.id &&
+            row.visitOpportunity.obligations.length > 1 && (
+              <details className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+                <summary className="cursor-pointer font-black">
+                  Combine with {row.visitOpportunity.obligations.length - 1}{" "}
+                  other obligation
+                  {row.visitOpportunity.obligations.length === 2 ? "" : "s"}
+                </summary>
+                <p className="mt-2 font-bold">
+                  One visit can complete all listed field work from{" "}
+                  {row.visitOpportunity.start} through{" "}
+                  {row.visitOpportunity.end}.
+                </p>
+                <ul className="mt-2 list-disc pl-5">
+                  {row.visitOpportunity.obligations.map((item) => (
+                    <li key={item.id}>{requiredActionLabel(item.type)}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
         </div>
         <div>
           <ComplianceDate
@@ -83,21 +128,39 @@ function ActionRow({
           <div className="mt-2">
             <StatusBadge color={urgency.color} label={urgency.label} />
           </div>
+          <div className="mt-1">
+            <StatusBadge
+              color={
+                obligation.status === "SCHEDULED"
+                  ? "BLUE"
+                  : executionLabel.startsWith("Waiting") ||
+                      executionLabel === "Reference only"
+                    ? "PURPLE"
+                    : "GRAY"
+              }
+              label={executionLabel}
+            />
+          </div>
         </div>
         <Link
           className={buttonClass(
             obligation.category === "SAMPLE" ? "primary" : "secondary",
             "min-h-11 justify-center whitespace-nowrap",
           )}
-          href={`/systems/${row.id}${
-            obligation.type === "SUMMERTIME_HYPERHALOGENATION_DUE"
-              ? "?record=hyperhalogenation"
-              : obligation.category === "SAMPLE"
-                ? "?record=sample"
-                : ""
-          }#record-event`}
+          href={
+            responsibility == null
+              ? `/systems/${row.id}?view=obligations`
+              : completionHrefForObligation(row.id, obligation)
+          }
         >
-          {obligation.category === "SAMPLE" ? "Record sample" : "Open tower"}
+          {responsibility == null || obligation.status === "OVERDUE"
+            ? "Review issue"
+            : obligation.category === "REPORTING_ACTION" &&
+                !obligation.type.includes("CORRECTIVE_ACTION") &&
+                obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
+                obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+              ? "Submit report"
+              : "Complete obligation"}
         </Link>
       </div>
     </article>
@@ -133,9 +196,8 @@ export default async function ActionCenterPage() {
     row.openObligations
       .filter(
         (obligation) =>
-          isOurOperationalResponsibility(
-            obligation.type,
-            row.legionellaResponsibility,
+          ["OUR_COMPANY", null].includes(
+            operationalResponsibility(row, obligation),
           ) &&
           ![
             "MISSED",
@@ -187,9 +249,8 @@ export default async function ActionCenterPage() {
       count +
       row.openObligations.filter(
         (obligation) =>
-          isOurOperationalResponsibility(
-            obligation.type,
-            row.legionellaResponsibility,
+          ["OUR_COMPANY", null].includes(
+            operationalResponsibility(row, obligation),
           ) && ["MISSED", "OVERDUE"].includes(obligation.status),
       ).length,
     0,
@@ -204,6 +265,40 @@ export default async function ActionCenterPage() {
         description="Work that can still prevent a compliance failure, ordered by deadline."
       />
 
+      <section
+        className="mb-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="Deadline summary"
+      >
+        <Link
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-950"
+          href="/work/overdue-towers"
+        >
+          <div className="text-2xl font-black">{issueCount}</div>
+          <div className="text-sm font-bold">Overdue compliance issues</div>
+        </Link>
+        <Link
+          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950"
+          href="/deadlines?period=THIS_WEEK"
+        >
+          <div className="text-2xl font-black">{thisWeekItems.length}</div>
+          <div className="text-sm font-bold">Due this week</div>
+        </Link>
+        <Link
+          className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950"
+          href="/deadlines?period=NEXT_WEEK"
+        >
+          <div className="text-2xl font-black">{nextWeekItems.length}</div>
+          <div className="text-sm font-bold">Due next week</div>
+        </Link>
+        <Link
+          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950"
+          href="/deadlines"
+        >
+          <div className="text-2xl font-black">{actionable.length}</div>
+          <div className="text-sm font-bold">Open upcoming deadlines</div>
+        </Link>
+      </section>
+
       {(issueCount > 0 || immediateItems.length > 0) && (
         <section className="panel mb-7 overflow-hidden border-red-200">
           <div className="border-b border-red-200 bg-red-50 p-5">
@@ -214,13 +309,31 @@ export default async function ActionCenterPage() {
               Only visible when needed
             </p>
           </div>
+          {immediateItems.length > 0 && (
+            <div className="border-b border-red-200 bg-red-50/70 px-5 py-3">
+              <h3 className="font-black text-red-950">Act now</h3>
+              <p className="text-sm text-red-800">
+                Emergency work that can still be completed immediately.
+              </p>
+            </div>
+          )}
+          {immediateItems.map(({ row, obligation }) => (
+            <ActionRow
+              key={obligation.id}
+              row={row}
+              obligation={obligation}
+              today={today}
+              tone="immediate"
+            />
+          ))}
           {issueCount > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-red-200 bg-red-50/40 p-5 text-red-950">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 shrink-0" size={20} />
                 <div>
                   <h3 className="font-black">
-                    {issueCount} unresolved compliance{" "}
+                    Compliance failures requiring review · {issueCount}{" "}
+                    unresolved compliance{" "}
                     {issueCount === 1 ? "issue" : "issues"}
                   </h3>
                   <p className="mt-1 text-sm">
@@ -236,15 +349,6 @@ export default async function ActionCenterPage() {
               </Link>
             </div>
           )}
-          {immediateItems.map(({ row, obligation }) => (
-            <ActionRow
-              key={obligation.id}
-              row={row}
-              obligation={obligation}
-              today={today}
-              tone="immediate"
-            />
-          ))}
         </section>
       )}
 

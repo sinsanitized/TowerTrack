@@ -414,6 +414,25 @@ export async function rebuildSystemComplianceProjections(
       });
     }
 
+    if (
+      event.type === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT" &&
+      event.residualRestoredWithin3Days != null
+    ) {
+      await tx.reportingObligation.updateMany({
+        where: {
+          coolingTowerSystemId: systemId,
+          obligationType: "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING",
+          status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
+          earliestDueDate: { lte: stored.eventDate },
+          OR: [
+            { latestDueDate: null },
+            { latestDueDate: { gte: stored.eventDate } },
+          ],
+        },
+        data: { status: "COMPLETED", completedByEventId: event.id },
+      });
+    }
+
     const completedFieldActionTypes =
       event.type === "HIGH_LEGIONELLA_DISINFECTION"
         ? [

@@ -25,15 +25,21 @@ const icons = {
 export function StatusBadge({
   color,
   label,
+  compact = false,
 }: {
   color: keyof typeof styles;
   label: string;
+  compact?: boolean;
 }) {
   const Icon = icons[color];
   return (
     <span
       data-color={color}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-extrabold whitespace-nowrap ${styles[color]}`}
+      className={`inline-flex items-center rounded-full border font-extrabold ${
+        compact
+          ? "max-w-full gap-1 px-1.5 py-1 text-[10px] leading-tight whitespace-normal"
+          : "gap-1.5 px-2.5 py-1 text-xs whitespace-nowrap"
+      } ${styles[color]}`}
     >
       <Icon size={14} aria-hidden />
       {label}

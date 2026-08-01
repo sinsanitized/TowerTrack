@@ -39,7 +39,10 @@ import {
 } from "@/lib/tower-details";
 import { towerRuleConfigurationLabel } from "@/lib/tower-rule-configuration";
 import { buttonClass } from "@/lib/button-variants";
-import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
+import {
+  serviceResponsibilityFamilies,
+  serviceResponsibilityLabel,
+} from "@/lib/service-responsibility";
 
 export default async function SystemPage({
   params,
@@ -72,11 +75,23 @@ export default async function SystemPage({
       ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
       : query.record === "hyperhalogenation"
         ? ("SUMMERTIME_HYPERHALOGENATION" as const)
-        : query.record === "bacteriological"
-          ? ("BACTERIOLOGICAL_SAMPLE_COLLECTED" as const)
-          : externalLegionellaRequested
-            ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
-            : undefined;
+        : query.record === "inspection"
+          ? ("QUARTERLY_INSPECTION_COMPLETED" as const)
+          : query.record === "cleaning"
+            ? ("CLEANING_COMPLETED" as const)
+            : query.record === "startup-cleaning"
+              ? ("STARTUP_CLEANING_DISINFECTION" as const)
+              : query.record === "disinfection"
+                ? ("HIGH_LEGIONELLA_DISINFECTION" as const)
+                : query.record === "remediation"
+                  ? ("FULL_REMEDIATION" as const)
+                  : query.record === "biological"
+                    ? ("WEEKLY_BIOLOGICAL_INDICATOR_RESULT" as const)
+                    : query.record === "bacteriological"
+                      ? ("BACTERIOLOGICAL_SAMPLE_COLLECTED" as const)
+                      : externalLegionellaRequested
+                        ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
+                        : undefined;
   const roleAllowedInitialEventType =
     initialEventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
     !canConfirmOwnerManaged
@@ -503,16 +518,15 @@ export default async function SystemPage({
       )}
       <section className="panel mb-5 p-4">
         <div className="label">Service Responsibility</div>
-        <div className="mt-2 text-sm">
-          <span className="font-black">Legionella sampling and results:</span>{" "}
-          {serviceResponsibilityLabel(system.legionellaResponsibility)}
-          {system.legionellaVendorName
-            ? ` — ${system.legionellaVendorName}`
-            : ""}
-        </div>
-        <div className="mt-1 text-xs text-slate-500">
-          Inspection, cleaning, and treatment remain independently tracked
-          services.
+        <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          {serviceResponsibilityFamilies.map(([key, label]) => (
+            <div key={key}>
+              <div className="text-xs font-bold text-slate-500">{label}</div>
+              <div className="font-black">
+                {serviceResponsibilityLabel(system[key])}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
       <nav
@@ -730,6 +744,7 @@ export default async function SystemPage({
               combinedObligationIds={combinedObligationIds}
               canConfirmOwnerManaged={canConfirmOwnerManaged}
               legionellaResponsibility={system.legionellaResponsibility}
+              responsibilities={system}
             />
           </div>
         </section>
@@ -953,6 +968,7 @@ export default async function SystemPage({
               items={orderedOpenObligations}
               canConfirmOwnerManaged={canConfirmOwnerManaged}
               legionellaResponsibility={system.legionellaResponsibility}
+              responsibilities={system}
               combinedObligationIds={combinedObligationIds}
               emptyMessage="No open obligations are currently recorded for this tower."
             />
@@ -1129,18 +1145,20 @@ export default async function SystemPage({
                         },
                       }}
                     />
-                    {(item.obligationType.includes("NOTIFICATION") ||
-                      item.obligationType.includes("DECLARATION") ||
-                      item.obligationType === "PORTAL_SAMPLE_DATE") &&
+                    {!item.obligationType.includes("CORRECTIVE_ACTION") &&
+                    item.obligationType !== "LEVEL_4_FULL_REMEDIATION" &&
+                    item.obligationType !==
+                      "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
                     recordedReportingObligationIds.has(item.id) ? (
                       <p className="mt-3 font-bold text-amber-900">
                         Late submission recorded. The missed deadline remains in
                         Compliance Issues.
                       </p>
                     ) : (
-                      (item.obligationType.includes("NOTIFICATION") ||
-                        item.obligationType.includes("DECLARATION") ||
-                        item.obligationType === "PORTAL_SAMPLE_DATE") && (
+                      !item.obligationType.includes("CORRECTIVE_ACTION") &&
+                      item.obligationType !== "LEVEL_4_FULL_REMEDIATION" &&
+                      item.obligationType !==
+                        "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" && (
                         <form
                           action={recordServiceEventAction}
                           className="mt-3"

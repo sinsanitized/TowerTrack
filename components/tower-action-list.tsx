@@ -7,10 +7,13 @@ import { formatWorkingDaysLeft } from "@/lib/date";
 import { requiredActionLabel, requirementLabel } from "@/lib/labels";
 import { isOwnerManagedObligation } from "@/lib/event-workflow";
 import { buttonClass } from "@/lib/button-variants";
+import { completionHrefForObligation } from "@/lib/deadline-view";
 import {
   isLegionellaObligation,
+  responsibilityForServiceObligation,
   serviceResponsibilityLabel,
   type ServiceResponsibility,
+  type TowerServiceResponsibilities,
 } from "@/lib/service-responsibility";
 
 export type TowerActionItem = {
@@ -26,13 +29,6 @@ export type TowerActionItem = {
   reason: string;
 };
 
-function recordQuery(item: TowerActionItem) {
-  if (item.type === "SUMMERTIME_HYPERHALOGENATION_DUE")
-    return "hyperhalogenation";
-  if (item.category === "SAMPLE") return "sample";
-  return "event";
-}
-
 export function TowerActionList({
   systemId,
   today,
@@ -41,6 +37,7 @@ export function TowerActionList({
   emptyMessage = "No active obligation needs attention.",
   canConfirmOwnerManaged = false,
   legionellaResponsibility,
+  responsibilities,
 }: {
   systemId: string;
   today: string;
@@ -49,6 +46,7 @@ export function TowerActionList({
   emptyMessage?: string;
   canConfirmOwnerManaged?: boolean;
   legionellaResponsibility: ServiceResponsibility | null;
+  responsibilities: TowerServiceResponsibilities;
 }) {
   if (!items.length)
     return <p className="text-sm font-bold text-slate-600">{emptyMessage}</p>;
@@ -65,8 +63,12 @@ export function TowerActionList({
         });
         const ownerManaged = isOwnerManagedObligation(item.type);
         const legionella = isLegionellaObligation(item.type);
-        const externallyManaged =
-          legionella && legionellaResponsibility !== "OUR_COMPANY";
+        const responsibility = responsibilityForServiceObligation(
+          item.type,
+          item.category,
+          responsibilities,
+        );
+        const externallyManaged = responsibility !== "OUR_COMPANY";
         return (
           <article key={item.id} className="py-5 first:pt-0 last:pb-0">
             <div className="grid gap-4 xl:grid-cols-[minmax(250px,1.2fr)_minmax(210px,.8fr)_minmax(180px,.65fr)_auto] xl:items-center">
@@ -85,7 +87,7 @@ export function TowerActionList({
                 )}
                 {externallyManaged && (
                   <p className="mt-2 inline-flex rounded-full bg-purple-100 px-2.5 py-1 text-xs font-black text-purple-900">
-                    {serviceResponsibilityLabel(legionellaResponsibility)}
+                    {serviceResponsibilityLabel(responsibility)}
                   </p>
                 )}
                 {combinedObligationIds.has(item.id) && (
@@ -131,6 +133,7 @@ export function TowerActionList({
                 </div>
               </div>
               {externallyManaged ? (
+                legionella &&
                 canConfirmOwnerManaged &&
                 (legionellaResponsibility === "CUSTOMER" ||
                   legionellaResponsibility === "OTHER_VENDOR") ? (
@@ -141,15 +144,17 @@ export function TowerActionList({
                     )}
                     href={`/systems/${systemId}?record=external-legionella#record-event`}
                   >
-                    Record external information
+                    Complete obligation
                   </Link>
                 ) : (
                   <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-center text-sm font-black text-purple-900">
-                    {legionellaResponsibility === "NOT_TRACKED"
+                    {responsibility === "NOT_TRACKED"
                       ? "Not tracked in TowerTrack"
-                      : legionellaResponsibility
-                        ? "No technician action"
-                        : "Review required"}
+                      : responsibility === "CUSTOMER"
+                        ? "Waiting on customer"
+                        : responsibility === "OTHER_VENDOR"
+                          ? "Waiting on vendor"
+                          : "Waiting on responsibility review"}
                   </div>
                 )
               ) : ownerManaged ? (
@@ -161,7 +166,7 @@ export function TowerActionList({
                     )}
                     href={`/systems/${systemId}?record=bacteriological#record-event`}
                   >
-                    Confirm external completion
+                    Complete obligation
                   </Link>
                 ) : (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-center text-sm font-black text-blue-900">
@@ -171,9 +176,9 @@ export function TowerActionList({
               ) : (
                 <Link
                   className={buttonClass("primary", "min-h-11 justify-center")}
-                  href={`/systems/${systemId}?record=${recordQuery(item)}#record-event`}
+                  href={completionHrefForObligation(systemId, item)}
                 >
-                  Record completion
+                  Complete obligation
                 </Link>
               )}
             </div>

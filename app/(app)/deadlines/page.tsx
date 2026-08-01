@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { CalendarRange } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarRange,
+  Clock3,
+  SearchCheck,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { DeadlineFilterControls } from "@/components/deadline-filter-controls";
@@ -7,6 +12,7 @@ import { requireUser } from "@/lib/auth";
 import { buttonClass } from "@/lib/button-variants";
 import {
   buildTowerDeadlineRows,
+  deadlinePeriodForDate,
   deadlineActionValues,
   deadlinePeriodValues,
   deadlineScheduleValues,
@@ -53,6 +59,7 @@ export default async function DeadlinesPage({
     : "ALL";
   const responsibility: ResponsibilityFilter =
     requested.responsibility === "ALL" ||
+    requested.responsibility === "UNCONFIRMED" ||
     serviceResponsibilityValues.includes(requested.responsibility as never)
       ? (requested.responsibility as ResponsibilityFilter)
       : "OUR_COMPANY";
@@ -62,18 +69,24 @@ export default async function DeadlinesPage({
     today,
     includeMissed: true,
   });
-  const rows = filterTowerDeadlineRows(
-    buildTowerDeadlineRows(towers, today),
-    today,
-    {
-      period,
-      action,
-      schedule,
-      responsibility,
-      search,
-    },
-  );
-  const overdueCount = rows.filter((row) => row.status === "Overdue").length;
+  const allRows = buildTowerDeadlineRows(towers, today);
+  const rows = filterTowerDeadlineRows(allRows, today, {
+    period,
+    action,
+    schedule,
+    responsibility,
+    search,
+  });
+  const overdueCount = allRows.filter((row) => row.status === "Overdue").length;
+  const dueThisWeekCount = allRows.filter(
+    (row) => deadlinePeriodForDate(row.hardDueDate, today) === "THIS_WEEK",
+  ).length;
+  const dueNextWeekCount = allRows.filter(
+    (row) => deadlinePeriodForDate(row.hardDueDate, today) === "NEXT_WEEK",
+  ).length;
+  const unconfirmedCount = allRows.filter(
+    (row) => row.responsibility == null,
+  ).length;
   const towerCount = new Set(rows.map((row) => row.towerId)).size;
 
   return (
@@ -87,6 +100,62 @@ export default async function DeadlinesPage({
         filters={{ period, action, schedule, responsibility, search }}
       />
 
+      <section
+        className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="Deadline summary"
+        aria-live="polite"
+      >
+        <Link
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-950"
+          href="/deadlines?period=OVERDUE"
+        >
+          <AlertTriangle className="mb-2" size={19} />
+          <div className="text-2xl font-black">{overdueCount}</div>
+          <div className="text-sm font-bold">Overdue</div>
+        </Link>
+        <Link
+          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950"
+          href="/deadlines?period=THIS_WEEK"
+        >
+          <Clock3 className="mb-2" size={19} />
+          <div className="text-2xl font-black">{dueThisWeekCount}</div>
+          <div className="text-sm font-bold">Due this week</div>
+        </Link>
+        <Link
+          className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950"
+          href="/deadlines?period=NEXT_WEEK"
+        >
+          <CalendarRange className="mb-2" size={19} />
+          <div className="text-2xl font-black">{dueNextWeekCount}</div>
+          <div className="text-sm font-bold">Due next week</div>
+        </Link>
+        <Link
+          className="rounded-xl border border-purple-200 bg-purple-50 p-4 text-purple-950"
+          href="/deadlines?responsibility=UNCONFIRMED"
+        >
+          <SearchCheck className="mb-2" size={19} />
+          <div className="text-2xl font-black">{unconfirmedCount}</div>
+          <div className="text-sm font-bold">Responsibility required</div>
+        </Link>
+      </section>
+
+      <div
+        className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-700"
+        aria-label="Work state key"
+      >
+        <span className="mr-1 uppercase tracking-wide text-slate-500">
+          Work state
+        </span>
+        <StatusBadge color="GRAY" label="Unscheduled" />
+        <StatusBadge color="BLUE" label="Scheduled—still open" />
+        <StatusBadge color="PURPLE" label="Waiting" />
+        <StatusBadge color="GREEN" label="Completed" />
+        <span className="font-normal text-slate-500">
+          Completed work leaves this active-deadline list and remains in
+          Compliance History.
+        </span>
+      </div>
+
       <div className="mb-5 flex flex-wrap gap-3 text-sm font-bold text-slate-700">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
           <CalendarRange size={18} className="text-emerald-800" />
@@ -94,9 +163,6 @@ export default async function DeadlinesPage({
         </div>
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
           {towerCount} cooling tower{towerCount === 1 ? "" : "s"}
-        </div>
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-900">
-          {overdueCount} overdue
         </div>
       </div>
 
@@ -144,11 +210,17 @@ export default async function DeadlinesPage({
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className={
+                    className={`align-top border-l-4 ${
                       row.status === "Overdue"
-                        ? "bg-red-50/50 align-top"
-                        : "align-top"
-                    }
+                        ? "border-l-red-500 bg-red-50/60"
+                        : row.status === "Due This Week"
+                          ? "border-l-amber-500 bg-amber-50/50"
+                          : row.status === "Due Next Week"
+                            ? "border-l-blue-500 bg-blue-50/40"
+                            : row.status === "Review Required"
+                              ? "border-l-purple-500 bg-purple-50/40"
+                              : "border-l-slate-200 bg-white"
+                    }`}
                   >
                     <td className="break-words px-2 py-3 sm:px-3">
                       <Link
@@ -164,8 +236,14 @@ export default async function DeadlinesPage({
                     </td>
                     <td className="break-words px-2 py-3 font-bold text-slate-900 sm:px-3">
                       {row.requiredAction}
+                      <div className="mt-1 text-xs font-bold text-slate-500">
+                        {row.executionLane}
+                        {row.dependency ? ` · ${row.dependency}` : ""}
+                      </div>
                       {row.responsibility !== "OUR_COMPANY" && (
-                        <span className="ml-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">
+                        <span
+                          className={`ml-2 inline-flex rounded-full border px-2 py-1 text-[11px] font-bold ${row.responsibility == null ? "border-purple-300 bg-purple-50 text-purple-900" : "border-slate-200 bg-slate-100 text-slate-700"}`}
+                        >
                           {row.responsibilityLabel}
                         </span>
                       )}
@@ -190,25 +268,38 @@ export default async function DeadlinesPage({
                         {row.targetWindowDisplay}
                       </span>
                     </td>
-                    <td className="px-2 py-3 font-bold text-slate-900">
+                    <td
+                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due This Week" ? "text-amber-900" : row.status === "Due Next Week" ? "text-blue-800" : row.status === "Review Required" ? "text-purple-800" : "text-slate-800"}`}
+                    >
                       <span aria-label={row.hardDueDateAccessible}>
                         {row.hardDueDateDisplay}
                       </span>
                     </td>
                     <td
                       aria-label={row.workingDaysAccessible}
-                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due Soon" ? "text-amber-900" : "text-slate-800"}`}
+                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due This Week" ? "text-amber-900" : row.status === "Due Next Week" ? "text-blue-800" : row.status === "Review Required" ? "text-purple-800" : "text-slate-800"}`}
                     >
                       {row.workingDaysDisplay}
                     </td>
                     <td className="px-1 py-3">
                       <StatusBadge color={row.statusColor} label={row.status} />
+                      <div className="mt-1">
+                        <StatusBadge
+                          color={row.executionStateColor}
+                          label={row.executionState}
+                          compact
+                        />
+                      </div>
                     </td>
                     <td className="px-1 py-3">
                       <Link
                         aria-label={row.primaryActionAccessible}
                         className={buttonClass(
-                          row.primaryActionLabel === "Record"
+                          [
+                            "Complete obligation",
+                            "Enter result",
+                            "Submit report",
+                          ].includes(row.primaryActionLabel)
                             ? "primary"
                             : "secondary",
                           "min-h-9 px-1.5 py-1.5",

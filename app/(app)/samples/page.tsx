@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatLegionellaResult, plainEnumLabel } from "@/lib/labels";
 import { buttonClass } from "@/lib/button-variants";
+import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
 
 export default async function SamplesPage() {
   const user = await requireUser();
@@ -63,6 +64,24 @@ export default async function SamplesPage() {
                     {plainEnumLabel(result.level)}
                   </div>
                 )}
+                {!result && (
+                  <div className="mt-1 text-xs font-bold text-purple-800">
+                    {sample.coolingTowerSystem.laboratoryResultResponsibility ==
+                    null
+                      ? "Waiting on responsibility review"
+                      : sample.coolingTowerSystem
+                            .laboratoryResultResponsibility === "CUSTOMER"
+                        ? "Waiting on customer"
+                        : sample.coolingTowerSystem
+                              .laboratoryResultResponsibility === "OTHER_VENDOR"
+                          ? "Waiting on vendor"
+                          : sample.coolingTowerSystem
+                                .laboratoryResultResponsibility ===
+                              "NOT_TRACKED"
+                            ? "Reference only"
+                            : "Waiting on laboratory result"}
+                  </div>
+                )}
               </div>
               <Link
                 className={buttonClass(
@@ -71,7 +90,12 @@ export default async function SamplesPage() {
                 )}
                 href={`/systems/${sample.coolingTowerSystemId}?sampleEventId=${sample.id}`}
               >
-                {result ? "Open tower" : "Add result"}
+                {result
+                  ? "View tower"
+                  : sample.coolingTowerSystem.laboratoryResultResponsibility ===
+                      "OUR_COMPANY"
+                    ? "Enter result"
+                    : `Review · ${serviceResponsibilityLabel(sample.coolingTowerSystem.laboratoryResultResponsibility)}`}
               </Link>
             </article>
           );
