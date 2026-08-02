@@ -86,7 +86,7 @@ export function LegacyImportWorkflow({
     setMessage(
       result.existing
         ? "This workbook was analyzed previously. Existing batch loaded; no records were duplicated."
-        : "Analysis complete. No operational records have been written.",
+        : "Analysis complete. Nothing has been imported yet.",
     );
   }
 
@@ -105,7 +105,7 @@ export function LegacyImportWorkflow({
     setBusy(false);
     setMessage(
       response.ok
-        ? `Import ${result.status.toLowerCase()}: ${result.systemsCreated} systems and ${result.activitiesCreated} unverified activities created. Batch ${result.batchId}.`
+        ? `Import ${result.status.toLowerCase()}: ${result.systemsCreated} cooling towers and ${result.activitiesCreated} unverified historical records created. Batch ${result.batchId}.`
         : (result.error ?? "Import failed."),
     );
     if (response.ok) setPreview({ ...preview, status: result.status });
@@ -123,7 +123,7 @@ export function LegacyImportWorkflow({
     setBusy(false);
     setMessage(
       response.ok
-        ? `Rolled back ${result.rolledBack} untouched imported rows.${result.blocked.length ? ` ${result.blocked.length} rows were protected because they were edited or referenced.` : ""}`
+        ? `Removed ${result.rolledBack} imported records that had not been edited or used.${result.blocked.length ? ` ${result.blocked.length} records were kept because they were edited or used.` : ""}`
         : (result.error ?? "Rollback failed."),
     );
   }
@@ -252,7 +252,7 @@ export function LegacyImportWorkflow({
           <section className="panel overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 p-5">
               <div>
-                <h2 className="font-black">Proposed systems</h2>
+                <h2 className="font-black">Proposed cooling towers</h2>
                 <p className="mt-1 text-sm text-slate-600">
                   Only eligible checked rows will be imported.
                 </p>
@@ -354,7 +354,7 @@ export function LegacyImportWorkflow({
                         </div>
                         <details className="mt-1">
                           <summary className="cursor-pointer text-emerald-800">
-                            Source details
+                            Source data
                           </summary>
                           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs">
                             {JSON.stringify(

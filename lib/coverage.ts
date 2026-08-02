@@ -228,14 +228,14 @@ function serviceRecommendations(row: CoverageRow): WorkRecommendation[] {
       color,
       label: row.plannedDate
         ? covered.length > 1
-          ? "Planned visit covers multiple obligations"
+          ? "Planned visit covers multiple requirements"
           : "Covered by planned activity"
         : color === "RED"
           ? "Schedule visit now"
           : "Recommended visit",
       detail:
         covered.length > 1
-          ? `One visit can satisfy ${covered.length} obligations.`
+          ? `One visit can satisfy ${covered.length} requirements.`
           : covered[0]?.explanation || row.status.nextAction,
       activityLabels,
       coveredRequirements: covered,
@@ -258,7 +258,7 @@ function serviceRecommendations(row: CoverageRow): WorkRecommendation[] {
         .concat(
           combinesMultipleObligations
             ? [
-                `Combination: one visit can satisfy all ${covered.length} obligations.`,
+                `Combined visit: one visit can satisfy all ${covered.length} requirements.`,
               ]
             : [],
         ),
@@ -277,7 +277,7 @@ function followUpRecommendations(row: CoverageRow): WorkRecommendation[] {
       color: requirement.color,
       label:
         requirement.type === "LAB_RESULT"
-          ? "Waiting on lab"
+          ? "Waiting on laboratory"
           : requirement.type === "PORTAL_SAMPLE_DATE"
             ? "Portal follow-up"
             : "Office follow-up",

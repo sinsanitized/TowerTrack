@@ -8,7 +8,7 @@ const label: Record<string, string> = {
 };
 export function SourceBadge({ authority }: { authority: string }) {
   return (
-    <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700">
+    <span className="inline-flex max-w-full items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-bold leading-tight text-slate-700">
       {label[authority] ?? authority}
     </span>
   );

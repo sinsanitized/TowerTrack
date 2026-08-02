@@ -22,7 +22,7 @@ export function OperatingScheduleFields() {
 
   return (
     <fieldset className="rounded-xl border border-slate-200 p-4 sm:col-span-2">
-      <legend className="label px-1">Operating Schedule</legend>
+      <legend className="label px-1">Operating schedule</legend>
       <div className="grid gap-3 sm:grid-cols-2">
         {[
           ["YEAR_ROUND", "Year-round", "Operates throughout the year."],

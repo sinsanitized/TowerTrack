@@ -34,7 +34,7 @@ export function TowerActionList({
   today,
   items,
   combinedObligationIds = new Set<string>(),
-  emptyMessage = "No active obligation needs attention.",
+  emptyMessage = "No active requirement needs attention.",
   canConfirmOwnerManaged = false,
   legionellaResponsibility,
   responsibilities,
@@ -93,23 +93,23 @@ export function TowerActionList({
                 {combinedObligationIds.has(item.id) && (
                   <p className="mt-2 flex items-center gap-2 text-sm font-black text-emerald-900">
                     <Layers3 size={17} /> Can share a visit with another open
-                    obligation
+                    requirement
                   </p>
                 )}
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <ComplianceDate
                   value={item.targetStart}
-                  label="Target date"
+                  label="Recommended service date"
                   operational
-                  empty="No separate target"
+                  empty="No separate recommended date"
                 />
                 <ComplianceWindow
                   start={item.targetStart ?? item.earliest}
                   end={item.targetEnd ?? item.latest}
                   label={
                     item.targetStart || item.targetEnd
-                      ? "Target window"
+                      ? "Recommended service window"
                       : "Valid completion window"
                   }
                   operational
@@ -118,7 +118,7 @@ export function TowerActionList({
               <div>
                 <ComplianceDate
                   value={item.latest}
-                  label="Hard due date"
+                  label="Compliance deadline"
                   deadline
                   operational
                   empty={item.priority === "EMERGENCY" ? "Immediate" : "Open"}
@@ -140,11 +140,11 @@ export function TowerActionList({
                   <Link
                     className={buttonClass(
                       "secondary",
-                      "min-h-11 justify-center",
+                      "min-h-11 w-full justify-center text-center xl:w-auto",
                     )}
                     href={`/systems/${systemId}?record=external-legionella#record-event`}
                   >
-                    Complete obligation
+                    Record external sample
                   </Link>
                 ) : (
                   <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-center text-sm font-black text-purple-900">
@@ -162,11 +162,11 @@ export function TowerActionList({
                   <Link
                     className={buttonClass(
                       "secondary",
-                      "min-h-11 justify-center",
+                      "min-h-11 w-full justify-center text-center xl:w-auto",
                     )}
                     href={`/systems/${systemId}?record=bacteriological#record-event`}
                   >
-                    Complete obligation
+                    Record bacteriological sample
                   </Link>
                 ) : (
                   <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-center text-sm font-black text-blue-900">
@@ -175,10 +175,21 @@ export function TowerActionList({
                 )
               ) : (
                 <Link
-                  className={buttonClass("primary", "min-h-11 justify-center")}
+                  className={buttonClass(
+                    "primary",
+                    "min-h-11 w-full justify-center text-center xl:w-auto",
+                  )}
                   href={completionHrefForObligation(systemId, item)}
                 >
-                  Complete obligation
+                  {item.category === "REPORTING_ACTION"
+                    ? "Record submission"
+                    : item.category === "SAMPLE"
+                      ? "Record sample"
+                      : item.category === "INSPECTION"
+                        ? "Record inspection"
+                        : item.type.includes("CLEANING")
+                          ? "Record cleaning"
+                          : "Record completion"}
                 </Link>
               )}
             </div>

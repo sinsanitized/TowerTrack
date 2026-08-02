@@ -21,8 +21,8 @@ export default function OperationalError({
         <div>
           <h1 className="text-xl font-black">This screen could not load</h1>
           <p className="mt-2 text-sm text-slate-600">
-            No compliance record was changed. Retry the request; if it keeps
-            failing, give support the reference below.
+            No compliance record was changed. Try again; if it keeps failing,
+            give support the reference below.
           </p>
           {error.digest && (
             <p className="mt-3 font-mono text-xs text-slate-500">

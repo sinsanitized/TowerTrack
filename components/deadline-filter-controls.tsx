@@ -54,7 +54,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
         : filters.responsibility === "NOT_TRACKED"
           ? "Not tracked"
           : filters.responsibility === "UNCONFIRMED"
-            ? "Responsibility required"
+            ? "Responsibility not assigned"
             : filters.responsibility === "ALL"
               ? "All responsibilities"
               : null,
@@ -63,7 +63,10 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
   return (
     <section className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <form action="/deadlines" className="flex min-w-0 flex-1 gap-2">
+        <form
+          action="/deadlines"
+          className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row"
+        >
           {filters.period !== "ALL" && (
             <input type="hidden" name="period" value={filters.period} />
           )}
@@ -90,7 +93,10 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
               placeholder="Search tower, address, or action"
             />
           </label>
-          <button className={buttonClass("secondary")} type="submit">
+          <button
+            className={buttonClass("secondary", "justify-center")}
+            type="submit"
+          >
             Search
           </button>
         </form>
@@ -107,7 +113,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
           <summary
             className={buttonClass(
               "secondary",
-              "cursor-pointer whitespace-nowrap",
+              "w-full cursor-pointer justify-center whitespace-nowrap sm:w-auto",
             )}
             aria-label="More deadline filters"
             role="button"
@@ -121,7 +127,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
           </summary>
           <div className="mt-2 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-[34rem]">
             <div>
-              <div className="label mb-2">Operating Schedule</div>
+              <div className="label mb-2">Operating schedule</div>
               <nav
                 className="flex flex-wrap gap-2"
                 aria-label="Filter deadlines by operating schedule"
@@ -159,7 +165,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
                   ["CUSTOMER", "Customer"],
                   ["OTHER_VENDOR", "Other vendor"],
                   ["NOT_TRACKED", "Not tracked"],
-                  ["UNCONFIRMED", "Responsibility required"],
+                  ["UNCONFIRMED", "Responsibility not assigned"],
                   ["ALL", "All responsibilities"],
                 ].map(([value, label]) => (
                   <Link
@@ -218,7 +224,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
               ["OVERDUE", "Overdue"],
               ["THIS_WEEK", "Due this week"],
               ["NEXT_WEEK", "Due next week"],
-              ["LATER", "Later"],
+              ["LATER", "Due later"],
             ].map(([value, label]) => (
               <Link
                 key={value}

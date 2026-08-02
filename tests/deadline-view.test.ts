@@ -81,13 +81,13 @@ describe("all tower deadline rows", () => {
     expect(unknown[0]).toMatchObject({
       responsibility: null,
       executionState: "Waiting",
-      primaryActionLabel: "Review issue",
+      primaryActionLabel: "Assign responsibility",
     });
   });
 
   it.each([
     ["PENDING", "Unscheduled"],
-    ["SCHEDULED", "Scheduled—still open"],
+    ["SCHEDULED", "Scheduled (not completed)"],
     ["COMPLETED", "Completed"],
   ])("shows %s as %s", (status, executionState) => {
     const [row] = buildTowerDeadlineRows(
@@ -263,8 +263,8 @@ describe("all tower deadline rows", () => {
     expect(row.hardDueDateDisplay).toBe("Mon, Aug 3");
     expect(row.workingDaysDisplay).toBe("2 days");
     expect(row.workingDaysAccessible).toBe("2 working days left");
-    expect(row.status).toBe("Due Next Week");
-    expect(row.primaryActionLabel).toBe("Complete obligation");
+    expect(row.status).toBe("Due next week");
+    expect(row.primaryActionLabel).toBe("Record sample");
   });
 
   it("uses concise overdue and review states", () => {
@@ -285,12 +285,12 @@ describe("all tower deadline rows", () => {
     expect(rows.find(({ id }) => id === "overdue")).toMatchObject({
       workingDaysDisplay: "3 overdue",
       status: "Overdue",
-      primaryActionLabel: "Review issue",
+      primaryActionLabel: "Review missed deadline",
     });
     expect(rows.find(({ id }) => id === "review")).toMatchObject({
       workingDaysDisplay: "Review",
-      status: "Review Required",
-      primaryActionLabel: "Review issue",
+      status: "Review required",
+      primaryActionLabel: "Review requirement",
     });
   });
 

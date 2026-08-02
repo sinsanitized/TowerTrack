@@ -24,8 +24,8 @@ export default async function HistoryPage() {
     <>
       <PageHeader
         eyebrow="Audit trail"
-        title="Compliance History"
-        description="Chronological regulatory events, corrections, and preserved historical records."
+        title="All compliance records"
+        description="Records from every tower, newest first. Open a record to review its evidence, correction history, or satisfied requirement."
       />
       <ol className="panel divide-y divide-slate-200">
         {events.map((event) => (
@@ -52,7 +52,7 @@ export default async function HistoryPage() {
                 className="font-bold text-emerald-800"
                 href={`/systems/${event.coolingTowerSystemId}/events/${event.id}`}
               >
-                Review →
+                View record →
               </Link>
             </div>
           </li>

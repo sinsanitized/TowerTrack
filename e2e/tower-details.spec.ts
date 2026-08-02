@@ -11,9 +11,8 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 
-  const search = page.getByRole("combobox", { name: "Search towers" });
-  await search.fill("JOB-1001");
-  await search.press("Enter");
+  await page.goto("/towers");
+  await page.getByRole("link", { name: "Open tower" }).first().click();
   await expect(page).toHaveURL(/\/systems\//);
 });
 
@@ -28,64 +27,52 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "Two-day cleaning plan" }),
   ).toHaveCount(0);
 
-  const recordButton = page.getByRole("button", { name: "Record an event" });
+  const recordButton = page.getByRole("button", {
+    name: "Add compliance record",
+  });
   await recordButton.click();
-  const drawer = page.getByRole("dialog", { name: "Record an event" });
+  const drawer = page.getByRole("dialog", { name: "Add compliance record" });
   await expect(drawer).toBeVisible();
-  for (const action of [
-    "Record Legionella sample",
-    "Record Legionella result",
-    "Record inspection",
-    "Record disinfection",
-  ])
-    await expect(drawer.getByRole("button", { name: action })).toBeVisible();
   await expect(
-    drawer.getByRole("button", { name: "Record cleaning" }),
-  ).not.toBeVisible();
-  await expect(
-    drawer.getByRole("heading", { name: "Expected Compliance Impact" }),
+    drawer.getByRole("button", { name: "Inspection" }),
   ).toBeVisible();
-  await expect(drawer.getByText("Show Preview", { exact: true })).toHaveCount(
-    0,
-  );
-  await drawer.getByRole("button", { name: "Record inspection" }).click();
-  const saveEvent = drawer.getByRole("button", { name: "Save Event" });
+  await expect(drawer.getByRole("button", { name: "Cleaning" })).toBeVisible();
+  await drawer.getByRole("button", { name: "Inspection" }).click();
+  const saveEvent = drawer.getByRole("button", { name: "Save record" });
   const cancel = drawer.getByRole("button", { name: "Cancel", exact: true });
   await expect(saveEvent).toHaveClass(/btn-primary/);
   await expect(cancel).not.toHaveClass(/btn-primary/);
   await expect(
-    drawer.getByRole("heading", { name: "Expected Compliance Impact" }),
+    drawer.getByRole("heading", { name: "What saving this record will do" }),
   ).toBeVisible();
-  const moreEvents = drawer.getByText("More event types", { exact: true });
+  const moreEvents = drawer.getByText("Other work and special conditions", {
+    exact: true,
+  });
   await moreEvents.focus();
   await expect(moreEvents).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(
-    drawer.getByRole("button", { name: "Record cleaning" }),
-  ).toBeVisible();
   await expect(
     drawer.getByRole("button", {
       name: "Confirm owner-managed bacteriological sample",
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Close event recorder" }),
-  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(recordButton).toBeFocused();
 
-  await page.getByRole("link", { name: "Obligations", exact: true }).click();
+  await page.getByRole("link", { name: "Requirements", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "All open obligations" }),
+    page.getByRole("heading", { name: "All open requirements" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Two-day cleaning plan" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "History", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Records & History", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "Regulatory events" }),
+    page.getByRole("heading", { name: "Compliance records" }),
   ).toBeVisible();
 
   await page
@@ -93,6 +80,9 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     .click();
   await expect(
     page.getByRole("heading", { name: "Tower location" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Who handles each service" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Equipment details" }),
@@ -107,6 +97,25 @@ test("tower details uses focused role-aware views", async ({ page }) => {
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Jurisdiction & rules" }),
+  ).toBeVisible();
+});
+
+test("samples prioritize action and expose clear status views", async ({
+  page,
+}) => {
+  await page.getByRole("link", { name: "Samples", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Samples" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Action needed/ }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("link", { name: /Waiting on another party/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Completed/ })).toBeVisible();
+  await expect(
+    page.getByRole("searchbox", {
+      name: "Find a customer, facility, tower, or job",
+    }),
   ).toBeVisible();
 });
 

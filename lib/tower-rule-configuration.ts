@@ -18,9 +18,9 @@ export function towerRuleConfigurationForMode(
 export function towerRuleConfigurationLabel(
   configuration: TowerRuleConfiguration,
 ) {
-  if (configuration === "NYC_AND_NYS") return "NYC Chapter 8 + New York State";
-  if (configuration === "NYS_ONLY") return "New York State Only";
-  return "Custom / Out of State";
+  if (configuration === "NYC_AND_NYS") return "NYC Chapter 8 and NYS Part 4";
+  if (configuration === "NYS_ONLY") return "NYS Part 4 only";
+  return "Custom or out-of-state";
 }
 
 export function profileMatchesTowerConfiguration(

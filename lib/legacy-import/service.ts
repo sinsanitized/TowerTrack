@@ -295,7 +295,7 @@ export async function confirmLegacyImport(input: {
           data: {
             title: "Compliance rules must be confirmed.",
             description:
-              "This tower was created from unverified legacy data. Confirm the applicable compliance-rule configuration before relying on generated obligations.",
+              "This tower was created from unverified historical data. Confirm the applicable compliance rules before relying on generated requirements.",
             entityType: "CoolingTowerSystem",
             entityId: system.id,
             severity: "PURPLE",

@@ -17,9 +17,13 @@ export type DeadlineCategory =
   "SAMPLE" | "INSPECTION" | "MAINTENANCE" | "REPORTING_ACTION";
 
 export type DeadlineStatus =
-  "Overdue" | "Due This Week" | "Due Next Week" | "Later" | "Review Required";
+  | "Overdue"
+  | "Due this week"
+  | "Due next week"
+  | "Due later"
+  | "Review required";
 export type DeadlineExecutionState =
-  "Unscheduled" | "Scheduled—still open" | "Waiting" | "Completed";
+  "Unscheduled" | "Scheduled (not completed)" | "Waiting" | "Completed";
 
 export const deadlinePeriodValues = [
   "ALL",
@@ -121,12 +125,7 @@ export type TowerDeadlineRow = {
     | "Office reporting"
     | "Customer/vendor follow-up";
   dependency: string | null;
-  primaryActionLabel:
-    | "Complete obligation"
-    | "Enter result"
-    | "Submit report"
-    | "Review issue"
-    | "View tower";
+  primaryActionLabel: string;
   primaryActionAccessible: string;
   primaryActionHref: string;
 };
@@ -249,7 +248,7 @@ function compactRange(
 }
 
 function fullRange(start: string | null, end: string | null) {
-  if (!start && !end) return "No configured target window; review required";
+  if (!start && !end) return "No recommended service window; review required";
   if (!start || !end) return formatLongDate(start ?? end);
   if (start === end) return formatLongDate(start);
   return `${formatLongDate(start)} through ${formatLongDate(end)}`;
@@ -283,12 +282,12 @@ function statusFor(
     (obligation.latest != null && obligation.latest < today)
   )
     return { label: "Overdue", color: "RED" };
-  if (!obligation.latest) return { label: "Review Required", color: "PURPLE" };
+  if (!obligation.latest) return { label: "Review required", color: "PURPLE" };
   const period = deadlinePeriodForDate(obligation.latest, today);
   if (period === "THIS_WEEK")
-    return { label: "Due This Week", color: "YELLOW" };
-  if (period === "NEXT_WEEK") return { label: "Due Next Week", color: "BLUE" };
-  return { label: "Later", color: "GRAY" };
+    return { label: "Due this week", color: "YELLOW" };
+  if (period === "NEXT_WEEK") return { label: "Due next week", color: "BLUE" };
+  return { label: "Due later", color: "GRAY" };
 }
 
 function conciseWorkingDays(value: number | null) {
@@ -351,7 +350,7 @@ export function executionStateFor(
   if (obligation.status === "COMPLETED")
     return { label: "Completed", color: "GREEN" };
   if (obligation.status === "SCHEDULED")
-    return { label: "Scheduled—still open", color: "BLUE" };
+    return { label: "Scheduled (not completed)", color: "BLUE" };
   if (
     responsibility == null ||
     responsibility === "CUSTOMER" ||
@@ -382,7 +381,10 @@ function executionDetails(
       dependency: "Waiting on vendor",
     };
   if (obligation.type.includes("LAB_RESULT"))
-    return { executionLane: "Laboratory work", dependency: "Waiting on lab" };
+    return {
+      executionLane: "Laboratory work",
+      dependency: "Waiting on laboratory",
+    };
   if (obligation.category === "REPORTING_ACTION")
     return { executionLane: "Office reporting", dependency: null };
   return { executionLane: "Field work", dependency: null };
@@ -401,40 +403,40 @@ function primaryAction(
 > {
   if (responsibility == null)
     return {
-      primaryActionLabel: "Review issue",
-      primaryActionAccessible: `Confirm service responsibility for ${towerName}`,
-      primaryActionHref: `/systems/${towerId}?view=obligations`,
+      primaryActionLabel: "Assign responsibility",
+      primaryActionAccessible: `Assign service responsibility for ${towerName}`,
+      primaryActionHref: `/systems/${towerId}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
     };
   if (
     obligation.category === "SAMPLE" &&
     (responsibility === "CUSTOMER" || responsibility === "OTHER_VENDOR")
   )
     return {
-      primaryActionLabel: "Complete obligation",
+      primaryActionLabel: "Record external sample",
       primaryActionAccessible: `Record externally completed ${requiredAction.toLowerCase()} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?record=external-legionella#record-event`,
     };
   if (responsibility === "NOT_TRACKED")
     return {
-      primaryActionLabel: "View tower",
+      primaryActionLabel: "Open tower",
       primaryActionAccessible: `Review reference-only deadline for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
     return {
-      primaryActionLabel: "Complete obligation",
+      primaryActionLabel: "Record bacteriological sample",
       primaryActionAccessible: `Record owner-managed bacteriological sampling for ${towerName}`,
       primaryActionHref: completionHrefForObligation(towerId, obligation),
     };
   if (status === "Overdue")
     return {
-      primaryActionLabel: "Review issue",
+      primaryActionLabel: "Review missed deadline",
       primaryActionAccessible: `Open overdue ${requiredAction.toLowerCase()} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (!obligation.targetStart && !obligation.latest)
     return {
-      primaryActionLabel: "Review issue",
+      primaryActionLabel: "Review requirement",
       primaryActionAccessible: `Review ${requiredAction.toLowerCase()} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
@@ -444,8 +446,14 @@ function primaryAction(
       !obligation.type.includes("CORRECTIVE_ACTION") &&
       obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
       obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
-        ? "Submit report"
-        : "Complete obligation",
+        ? "Record submission"
+        : obligation.category === "SAMPLE"
+          ? "Record sample"
+          : obligation.category === "INSPECTION"
+            ? "Record inspection"
+            : obligation.type.includes("CLEANING")
+              ? "Record cleaning"
+              : "Record completion",
     primaryActionAccessible: `Record ${requiredAction.toLowerCase()} for ${towerName}`,
     primaryActionHref: completionHrefForObligation(towerId, obligation),
   };
@@ -512,7 +520,7 @@ export function buildTowerDeadlineRows(
           : "—",
         targetDateAccessible: obligation.targetStart
           ? formatLongDate(obligation.targetStart)
-          : "No separate operational target date",
+          : "No separate recommended service date",
         targetWindowStart,
         targetWindowEnd,
         targetWindowDisplay: compactRange(
@@ -527,7 +535,7 @@ export function buildTowerDeadlineRows(
           : "Review",
         hardDueDateAccessible: obligation.latest
           ? formatLongDate(obligation.latest)
-          : "No fixed hard due date; review required",
+          : "No fixed compliance deadline; review required",
         workingDaysLeft,
         workingDaysDisplay: days.display,
         workingDaysAccessible: days.accessible,

@@ -6,6 +6,7 @@ import { VisitCompletionForm } from "@/components/visit-completion-form";
 import { VisitRescheduleForm } from "@/components/visit-reschedule-form";
 import { ComplianceDate } from "@/components/compliance-date";
 import { cancelVisitAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { db } from "@/lib/db";
 import { dateOnly, formatDate, todayDateOnly } from "@/lib/date";
 import { requirementLabel } from "@/lib/labels";
@@ -239,6 +240,15 @@ export default async function VisitPage({
         title={visit.building.buildingName}
         description={`${isCleaningPlan ? "Two-day cleaning plan" : formatDate(visit.scheduledDate)} · ${visit.building.streetAddress} · ${visit.assignedTechnician?.name || "Unassigned"}`}
       />
+      {!["COMPLETED", "CANCELLED"].includes(visit.status) && !planned && (
+        <div className="mb-5 rounded-xl border border-blue-300 bg-blue-50 p-4 text-blue-950">
+          <b>Scheduled — requirements are still open</b>
+          <div className="mt-1 text-sm">
+            This visit coordinates the work. Compliance dates change only after
+            completed work is recorded below.
+          </div>
+        </div>
+      )}
       {planned && isCleaningPlan && (
         <div className="mb-5 rounded-xl border border-blue-300 bg-blue-50 p-4 text-blue-950">
           <b>Two-day cleaning plan created</b>
@@ -255,7 +265,7 @@ export default async function VisitPage({
             <b>Visit completed</b>
             <div className="text-sm">
               Completed activities were recorded and compliance was
-              recalculated. Every obligation still open is listed below.
+              recalculated. Every requirement still open is listed below.
             </div>
           </div>
         </div>
@@ -264,7 +274,7 @@ export default async function VisitPage({
         <div className="mb-5 rounded-xl border border-slate-300 bg-slate-50 p-4 text-slate-900">
           <b>Visit canceled</b>
           <div className="text-sm">
-            Its obligations are open again and have been returned to the work
+            Its requirements are open again and have been returned to the work
             queue.
           </div>
         </div>
@@ -335,8 +345,13 @@ export default async function VisitPage({
                 className="mt-6 border-t border-slate-200 pt-5"
               >
                 <input type="hidden" name="visitId" value={visit.id} />
+                <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
+                  Canceling returns {rescheduleObligations.length} requirement
+                  {rescheduleObligations.length === 1 ? "" : "s"} to the work
+                  queue. Their compliance deadlines do not move.
+                </div>
                 <label className="block max-w-xl">
-                  <span className="label">Cancellation reason</span>
+                  <span className="label">Cancellation reason · Required</span>
                   <input
                     className="field mt-1"
                     name="reason"
@@ -345,7 +360,26 @@ export default async function VisitPage({
                     placeholder="Why this visit will not be completed"
                   />
                 </label>
-                <button className="btn mt-3">Cancel visit</button>
+                <label className="mt-3 flex items-start gap-2 text-sm font-bold">
+                  <input
+                    className="mt-1"
+                    type="checkbox"
+                    name="confirmCancel"
+                    value="yes"
+                    required
+                  />
+                  <span>
+                    I understand the planned work will become open and
+                    unscheduled again.
+                  </span>
+                </label>
+                <SubmitButton
+                  variant="destructive"
+                  className="mt-3"
+                  pendingLabel="Canceling visit…"
+                >
+                  Cancel visit and return work to queue
+                </SubmitButton>
               </form>
             )}
         </section>

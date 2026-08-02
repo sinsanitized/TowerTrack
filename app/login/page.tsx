@@ -31,7 +31,7 @@ export default async function LoginPage({
           <div className="label text-emerald-800">Internal access</div>
           <h2 className="mt-2 text-3xl font-black">Sign in to TowerTrack</h2>
           <p className="mt-2 text-slate-600">
-            Public registration is disabled.
+            Ask an administrator to create your account.
           </p>
           {error && (
             <div

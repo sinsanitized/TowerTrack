@@ -23,7 +23,7 @@ describe("Legionella result input", () => {
   it("keeps detected results as numeric CFU/mL values", () => {
     render(<ResultInput />);
 
-    const result = screen.getByLabelText("Result (CFU/mL)");
+    const result = screen.getByLabelText(/Result \(CFU\/mL\)/);
     fireEvent.change(result, { target: { value: "25" } });
     expect(result).toHaveValue(25);
   });

@@ -301,7 +301,7 @@ export function assignStatus(args: {
   if (args.waitingOnLab)
     return {
       status: "WAITING_ON_LAB",
-      label: "Waiting on lab",
+      label: "Waiting on laboratory",
       color: "BLUE",
       nextAction: "Monitor the laboratory result",
     };

@@ -158,7 +158,7 @@ export default async function EventPage({
   return (
     <>
       <PageHeader
-        eyebrow={`${system.building.customer.name} · Event record`}
+        eyebrow={`${system.building.customer.name} · Compliance record`}
         title={plainEnumLabel(event.eventType)}
         description={`${system.building.buildingName} — ${system.systemName} · ${formatDate(event.eventDate)}`}
         actions={
@@ -172,7 +172,7 @@ export default async function EventPage({
               </Link>
             )}
             <Link className="btn" href={`/systems/${id}#regulatory-events`}>
-              Back to tower events
+              Back to compliance records
             </Link>
           </div>
         }
@@ -204,7 +204,7 @@ export default async function EventPage({
             />
             <p className="mt-3 text-sm text-slate-600">
               Recorded {formatDate(event.createdAt)} · {generatedCount}{" "}
-              generated obligation{generatedCount === 1 ? "" : "s"}
+              generated requirement{generatedCount === 1 ? "" : "s"}
             </p>
           </div>
           {replacement && (
@@ -272,16 +272,16 @@ export default async function EventPage({
           <h2 className="text-xl font-black">Audit record</h2>
           <p className="mt-2 text-sm text-slate-600">
             {event.status === "ACTIVE"
-              ? "Only an administrator or operations manager can correct this event."
+              ? "Only an administrator or operations manager can correct this record."
               : "This historical version cannot be edited. Open its active replacement when available."}
           </p>
           <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
             <div>
-              <dt className="label">Event type</dt>
+              <dt className="label">Record type</dt>
               <dd className="font-black">{plainEnumLabel(event.eventType)}</dd>
             </div>
             <div>
-              <dt className="label">Event date</dt>
+              <dt className="label">Record date</dt>
               <dd className="font-black">{formatDate(event.eventDate)}</dd>
             </div>
             <div className="sm:col-span-2">

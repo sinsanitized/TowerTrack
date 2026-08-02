@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { rescheduleVisitAction } from "@/app/actions";
-import { buttonClass } from "@/lib/button-variants";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
+import { SubmitButton } from "@/components/submit-button";
 
 export function VisitRescheduleForm({
   visitId,
@@ -25,20 +25,20 @@ export function VisitRescheduleForm({
       <input type="hidden" name="visitId" value={visitId} />
       <h3 className="font-black">Reschedule this generated visit</h3>
       <p className="mt-1 max-w-2xl text-sm text-slate-600">
-        The visit date may move only where every attached obligation remains
-        legally satisfiable. Generated deadlines do not move.
+        The visit date may move only while every attached requirement can still
+        be completed on time. Compliance deadlines do not move.
       </p>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <ComplianceWindow
           start={earliestDate}
           end={latestDate}
-          label="Dates when all selected obligations can be satisfied"
+          label="Dates when all selected requirements can be completed"
         />
         <ComplianceDate value={scheduledDate} label="Proposed visit date" />
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <label>
-          <span className="label">New visit date</span>
+          <span className="label">New visit date · Required</span>
           <input
             className="field mt-1"
             name="scheduledDate"
@@ -51,7 +51,7 @@ export function VisitRescheduleForm({
           />
         </label>
         <label>
-          <span className="label">Reschedule reason</span>
+          <span className="label">Reschedule reason · Required</span>
           <input
             className="field mt-1"
             name="reason"
@@ -61,9 +61,9 @@ export function VisitRescheduleForm({
           />
         </label>
       </div>
-      <button className={buttonClass("primary", "mt-4")}>
-        Confirm compliant reschedule
-      </button>
+      <SubmitButton className="mt-4" pendingLabel="Rescheduling visit…">
+        Reschedule visit
+      </SubmitButton>
     </form>
   );
 }

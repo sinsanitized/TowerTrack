@@ -17,10 +17,12 @@ describe("tower rule configurations", () => {
 
   it("exposes the three required plain-English choices", () => {
     expect(towerRuleConfigurationLabel("NYC_AND_NYS")).toBe(
-      "NYC Chapter 8 + New York State",
+      "NYC Chapter 8 and NYS Part 4",
     );
-    expect(towerRuleConfigurationLabel("NYS_ONLY")).toBe("New York State Only");
-    expect(towerRuleConfigurationLabel("CUSTOM")).toBe("Custom / Out of State");
+    expect(towerRuleConfigurationLabel("NYS_ONLY")).toBe("NYS Part 4 only");
+    expect(towerRuleConfigurationLabel("CUSTOM")).toBe(
+      "Custom or out-of-state",
+    );
   });
 
   it("rejects conflicting base profile selections", () => {

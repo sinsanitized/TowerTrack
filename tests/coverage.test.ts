@@ -19,7 +19,7 @@ function row(overrides: Partial<CoverageRow> = {}): CoverageRow {
     postalCode: "10017",
     authority: "REGULATORY",
     seasonal: false,
-    seasonLabel: "Year-Round Tower",
+    seasonLabel: "Year-round tower",
     seasonStatus: "Continuous operation",
     actualStartupDate: null,
     actualShutdownDate: null,
@@ -30,7 +30,7 @@ function row(overrides: Partial<CoverageRow> = {}): CoverageRow {
     hardDueDate: "2026-07-08",
     targetDate: "2026-07-08",
     daysRemaining: 0,
-    technician: "Unassigned",
+    technician: "Responsibility not assigned",
     status: {
       color: "RED",
       label: "Due today",
@@ -88,7 +88,7 @@ describe("coverageRecommendations", () => {
     expect(recommendations[0].remainingCount).toBe(0);
     expect(recommendations[0].combinesMultipleObligations).toBe(true);
     expect(recommendations[0].why).toContain(
-      "Combination: one visit can satisfy all 2 obligations.",
+      "Combined visit: one visit can satisfy all 2 requirements.",
     );
   });
 });

@@ -45,6 +45,7 @@ import {
   towerRuleConfigurationValues,
 } from "@/lib/tower-rule-configuration";
 import { serviceResponsibilityValues } from "@/lib/service-responsibility";
+import { safeReturnPath, withWorkflowNotice } from "@/lib/workflow-context";
 
 const sourceAuthorities = [
   "REGULATORY",
@@ -458,6 +459,7 @@ export async function recordServiceEventAction(formData: FormData) {
     UserRole.TECHNICIAN,
   ]);
   const systemId = z.string().min(1).parse(formData.get("systemId"));
+  const returnTo = safeReturnPath(formData.get("returnTo"));
   const command = parseServiceEventCommand(
     serviceEventInputFromFormData(formData),
   );
@@ -501,7 +503,7 @@ export async function recordServiceEventAction(formData: FormData) {
   ) {
     if (performedBy !== eventSystem.legionellaResponsibility)
       throw new Error(
-        "The event performer must match this tower's Legionella responsibility.",
+        "The person or company performing the work must match this tower's Legionella responsibility.",
       );
   } else if (performedBy !== "OUR_COMPANY") {
     throw new Error(
@@ -524,7 +526,7 @@ export async function recordServiceEventAction(formData: FormData) {
       const reportType = command.details.reportType as string;
       const reportingObligationId = command.details.reportingObligationId;
       if (!reportingObligationId)
-        throw new Error("Choose the exact reporting obligation submitted.");
+        throw new Error("Choose the exact reporting requirement submitted.");
       const matchingObligation = await tx.reportingObligation.findFirst({
         where: {
           id: reportingObligationId,
@@ -540,7 +542,7 @@ export async function recordServiceEventAction(formData: FormData) {
       });
       if (!matchingObligation)
         throw new Error(
-          "That reporting obligation is not available for this tower.",
+          "That reporting requirement is not available for this tower.",
         );
     }
     const event = await tx.serviceEvent.create({
@@ -589,6 +591,13 @@ export async function recordServiceEventAction(formData: FormData) {
   });
   revalidatePath("/");
   revalidatePath(`/systems/${systemId}`);
+  if (returnTo)
+    redirect(
+      withWorkflowNotice(
+        returnTo,
+        "Compliance record saved. Requirements and deadlines were recalculated.",
+      ),
+    );
   redirect(
     `/systems/${systemId}?event=${result.event.id}&sample=${result.projection.sampleCount}&inspection=${result.projection.inspectionCount}&maintenance=${result.projection.maintenanceCount}&reporting=${result.projection.reportingCount}&satisfied=${encodeURIComponent(result.satisfiedObligations.map((item) => item.obligationType).join(","))}`,
   );
@@ -596,6 +605,7 @@ export async function recordServiceEventAction(formData: FormData) {
 
 export async function updateServiceResponsibilityAction(formData: FormData) {
   const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
+  const returnTo = safeReturnPath(formData.get("returnTo"));
   const parsed = z
     .object({
       systemId: z.string().min(1),
@@ -676,6 +686,13 @@ export async function updateServiceResponsibilityAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/deadlines");
   revalidatePath(`/systems/${parsed.systemId}`);
+  if (returnTo)
+    redirect(
+      withWorkflowNotice(
+        returnTo,
+        "Service responsibilities saved. Work queues were updated.",
+      ),
+    );
   redirect(`/systems/${parsed.systemId}?view=settings&responsibility=1`);
 }
 
@@ -758,7 +775,9 @@ export async function correctServiceEventAction(formData: FormData) {
       data: { status: "CORRECTED" },
     });
     if (claimed.count !== 1)
-      throw new Error("This event has already been changed. Reload and retry.");
+      throw new Error(
+        "This record has already been changed. Reload and try again.",
+      );
     const next = await tx.serviceEvent.create({
       data: {
         coolingTowerSystemId: existing.coolingTowerSystemId,
@@ -851,10 +870,12 @@ export async function voidServiceEventAction(formData: FormData) {
     .object({
       eventId: z.string().min(1),
       reason: z.string().trim().min(8).max(2000),
+      confirmVoid: z.literal("yes"),
     })
     .parse({
       eventId: String(formData.get("eventId") || ""),
       reason: String(formData.get("reason") || ""),
+      confirmVoid: String(formData.get("confirmVoid") || ""),
     });
   const existing = await db.serviceEvent.findFirstOrThrow({
     where: {
@@ -890,7 +911,9 @@ export async function voidServiceEventAction(formData: FormData) {
       data: { status: "VOIDED" },
     });
     if (claimed.count !== 1)
-      throw new Error("This event has already been changed. Reload and retry.");
+      throw new Error(
+        "This record has already been changed. Reload and try again.",
+      );
     const visitActivityId = linkedVisitActivityId(existing.details);
     if (visitActivityId)
       await tx.visitActivity.updateMany({
@@ -1481,7 +1504,7 @@ export async function createVisitOpportunityAction(formData: FormData) {
   }
   if (obligations.length !== new Set(parsed.obligationIds).size)
     throw new Error(
-      "One or more obligations changed. Refresh Visit opportunities before scheduling.",
+      "One or more requirements changed. Refresh visit opportunities before scheduling.",
     );
   const outsideWindow = obligations.find(
     (item) =>
@@ -1515,7 +1538,7 @@ export async function createVisitOpportunityAction(formData: FormData) {
         status: VisitStatus.PLANNED,
         assignedTechnicianId: technician?.id,
         createdById: user.id,
-        notes: `Created from ${obligations.length} intersecting compliance obligation${obligations.length === 1 ? "" : "s"}.`,
+        notes: `Created from ${obligations.length} overlapping compliance requirement${obligations.length === 1 ? "" : "s"}.`,
       },
     });
     for (const group of activityGroups) {
@@ -1789,10 +1812,12 @@ export async function cancelVisitAction(formData: FormData) {
     .object({
       visitId: z.string().min(1),
       reason: z.string().trim().min(8).max(2000),
+      confirmCancel: z.literal("yes"),
     })
     .parse({
       visitId: String(formData.get("visitId") || ""),
       reason: String(formData.get("reason") || ""),
+      confirmCancel: String(formData.get("confirmCancel") || ""),
     });
   const visit = await db.visit.findFirstOrThrow({
     where: {
@@ -2248,7 +2273,7 @@ export async function updateRuleDefinitionAction(formData: FormData) {
     existing.ruleProfile.systems.length > 0;
   if (createCustomVersion && parsed.effectiveDate !== todayInTimeZone())
     throw new Error(
-      "Changing an assigned custom profile creates a new version. Use today's explicit effective date so future obligations can be recalculated without retroactive ambiguity.",
+      "Changing an assigned custom profile creates a new version. Use today's effective date so future requirements can be recalculated without changing the past.",
     );
   let savedRuleId = existing.id;
   await db.$transaction(async (tx) => {
@@ -2481,7 +2506,7 @@ export async function createRuleDefinitionAction(formData: FormData) {
     );
   if (profile.rules.length)
     throw new Error(
-      "This jurisdiction already has that obligation type. Edit its existing rule instead.",
+      "This jurisdiction already has that requirement type. Edit its existing rule instead.",
     );
   if (
     parsed.requirementType === "ROUTINE_LEGIONELLA_SAMPLE" &&

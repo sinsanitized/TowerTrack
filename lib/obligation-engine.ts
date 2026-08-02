@@ -907,7 +907,7 @@ export function previewEventImpact(input: {
     );
   if (missedUnchanged.length)
     messages.push(
-      `This event will not restore ${missedUnchanged.length === 1 ? "the missed obligation" : `${missedUnchanged.length} missed obligations`}.`,
+      `This record will not restore ${missedUnchanged.length === 1 ? "the missed requirement" : `${missedUnchanged.length} missed requirements`}.`,
     );
 
   const generated = [

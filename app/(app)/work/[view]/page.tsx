@@ -18,17 +18,17 @@ import { requireUser } from "@/lib/auth";
 
 const views = {
   "overdue-towers": {
-    title: "Compliance Issues",
+    title: "Overdue & problem deadlines",
     description:
-      "Missed and overdue obligations are historical compliance issues, not tasks that can still be completed on time.",
-    empty: "No active towers currently have a missed or overdue obligation.",
+      "Missed and overdue requirements are historical compliance issues, not tasks that can still be completed on time.",
+    empty: "No active towers currently have a missed or overdue requirement.",
     unit: "issues",
     Icon: AlertTriangle,
   },
   "emergency-samples": {
     title: "Emergency samples",
     description:
-      "Emergency Legionella sampling obligations that should be collected and recorded immediately.",
+      "Emergency Legionella sampling requirements that should be collected and recorded immediately.",
     empty: "No emergency Legionella samples are currently open.",
     unit: "samples",
     Icon: FlaskConical,
@@ -36,18 +36,18 @@ const views = {
   "visit-opportunities": {
     title: "Visit opportunities",
     description:
-      "Recommended dates to perform one field visit, with every compatible obligation the actual work can satisfy.",
+      "Recommended dates for one field visit, including every compatible requirement the work can satisfy.",
     empty:
-      "No on-site obligation currently has dates when the required action may still be completed.",
+      "No on-site requirement currently has dates when the required work can still be completed.",
     unit: "visit opportunities",
     Icon: Layers3,
   },
   "open-obligations": {
-    title: "Open obligations",
+    title: "Open requirements",
     description:
-      "Every pending or overdue sample, inspection, reporting, and corrective-action obligation across active towers.",
-    empty: "No obligations are currently open.",
-    unit: "obligations",
+      "Every pending or overdue sampling, inspection, reporting, and corrective-action requirement across active towers.",
+    empty: "No requirements are currently open.",
+    unit: "requirements",
     Icon: CalendarCheck,
   },
 } as const;
@@ -130,7 +130,7 @@ export default async function WorkViewPage({
         description={config.description}
         actions={
           <Link className="btn" href="/">
-            <ArrowLeft size={17} /> Back to Tower work
+            <ArrowLeft size={17} /> Back to Action Center
           </Link>
         }
       />
@@ -206,8 +206,8 @@ export default async function WorkViewPage({
                     {view === "overdue-towers"
                       ? "Review history"
                       : view === "visit-opportunities"
-                        ? "View tower"
-                        : "Complete obligation"}
+                        ? "Open tower"
+                        : "Record completion"}
                   </Link>
                 </div>
               </div>
@@ -233,8 +233,8 @@ export default async function WorkViewPage({
                   </p>
                   <p className="mt-2 text-sm font-black">
                     {row.visitOpportunity.obligations.length > 1
-                      ? `One visit can complete ${row.visitOpportunity.obligations.length} obligations.`
-                      : "Only one field obligation can be completed on these dates; no safe combined visit is available yet."}
+                      ? `One visit can complete ${row.visitOpportunity.obligations.length} requirements.`
+                      : "Only one field requirement can be completed on these dates; no combined visit is available yet."}
                   </p>
                   <div className="mt-4 border-t border-emerald-200 pt-3">
                     <p className="text-sm font-bold">
@@ -245,7 +245,7 @@ export default async function WorkViewPage({
                       className="btn btn-primary mt-3"
                       href={`/systems/${row.id}#record-event`}
                     >
-                      Complete obligation
+                      Open tower
                     </Link>
                   </div>
                 </div>

@@ -22,6 +22,7 @@ import {
   type DeadlineScheduleFilter,
 } from "@/lib/deadline-view";
 import { todayDateOnly } from "@/lib/date";
+import { withReturnPath } from "@/lib/workflow-context";
 import { complianceDashboardRows } from "@/lib/queries";
 import {
   serviceResponsibilityValues,
@@ -37,6 +38,7 @@ export default async function DeadlinesPage({
     schedule?: string;
     responsibility?: string;
     q?: string;
+    workflowNotice?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -64,6 +66,10 @@ export default async function DeadlinesPage({
       ? (requested.responsibility as ResponsibilityFilter)
       : "OUR_COMPANY";
   const search = typeof requested.q === "string" ? requested.q.trim() : "";
+  const workflowNotice =
+    typeof requested.workflowNotice === "string"
+      ? requested.workflowNotice
+      : null;
   const towers = await complianceDashboardRows({
     organizationId: user.organizationId,
     today,
@@ -88,14 +94,32 @@ export default async function DeadlinesPage({
     (row) => row.responsibility == null,
   ).length;
   const towerCount = new Set(rows.map((row) => row.towerId)).size;
+  const returnQuery = new URLSearchParams();
+  if (period !== "ALL") returnQuery.set("period", period);
+  if (action !== "ALL") returnQuery.set("action", action);
+  if (schedule !== "ALL") returnQuery.set("schedule", schedule);
+  if (responsibility !== "OUR_COMPANY")
+    returnQuery.set("responsibility", responsibility);
+  if (search) returnQuery.set("q", search);
+  const deadlineReturnTo = returnQuery.size
+    ? `/deadlines?${returnQuery}`
+    : "/deadlines";
 
   return (
     <>
       <PageHeader
         eyebrow="Portfolio deadlines"
-        title="All Cooling Tower Deadlines"
+        title="All tower deadlines"
         description="Find company work by due date and work type. Additional schedule and responsibility filters are available when needed."
       />
+      {workflowNotice && (
+        <div
+          className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950"
+          role="status"
+        >
+          {workflowNotice} Continue with the remaining deadlines below.
+        </div>
+      )}
       <DeadlineFilterControls
         filters={{ period, action, schedule, responsibility, search }}
       />
@@ -135,7 +159,7 @@ export default async function DeadlinesPage({
         >
           <SearchCheck className="mb-2" size={19} />
           <div className="text-2xl font-black">{unconfirmedCount}</div>
-          <div className="text-sm font-bold">Responsibility required</div>
+          <div className="text-sm font-bold">Responsibility not assigned</div>
         </Link>
       </section>
 
@@ -147,7 +171,7 @@ export default async function DeadlinesPage({
           Work state
         </span>
         <StatusBadge color="GRAY" label="Unscheduled" />
-        <StatusBadge color="BLUE" label="Scheduled—still open" />
+        <StatusBadge color="BLUE" label="Scheduled (not completed)" />
         <StatusBadge color="PURPLE" label="Waiting" />
         <StatusBadge color="GREEN" label="Completed" />
         <span className="font-normal text-slate-500">
@@ -159,7 +183,7 @@ export default async function DeadlinesPage({
       <div className="mb-5 flex flex-wrap gap-3 text-sm font-bold text-slate-700">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
           <CalendarRange size={18} className="text-emerald-800" />
-          {rows.length} active obligation{rows.length === 1 ? "" : "s"}
+          {rows.length} active requirement{rows.length === 1 ? "" : "s"}
         </div>
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
           {towerCount} cooling tower{towerCount === 1 ? "" : "s"}
@@ -170,15 +194,15 @@ export default async function DeadlinesPage({
         <div className="panel p-8 text-center">
           <h2 className="text-lg font-black">No active deadlines</h2>
           <p className="mt-2 text-slate-600">
-            No cooling tower obligations match the selected filters.
+            No cooling tower requirements match the selected filters.
           </p>
         </div>
       ) : (
         <div className="panel overflow-hidden">
           <div className="overflow-x-auto" data-testid="deadline-table-scroll">
             <table
-              className="w-full table-fixed text-left text-xs xl:text-sm"
-              aria-label="All cooling tower deadline obligations"
+              className="deadline-table w-full table-fixed text-left text-xs xl:text-sm"
+              aria-label="All cooling tower requirements"
             >
               <colgroup>
                 <col className="w-[22%]" />
@@ -195,12 +219,12 @@ export default async function DeadlinesPage({
                   <th className="px-2 py-3 sm:px-3">Cooling Tower</th>
                   <th className="px-2 py-3 sm:px-3">Required Action</th>
                   <th className="hidden px-2 py-3 xl:table-cell">
-                    Target Date
+                    Recommended Service Date
                   </th>
                   <th className="hidden px-2 py-3 xl:table-cell">
-                    Target Window
+                    Recommended Service Window
                   </th>
-                  <th className="px-2 py-3">Hard Due Date</th>
+                  <th className="px-2 py-3">Compliance Deadline</th>
                   <th className="px-2 py-3">Days Left</th>
                   <th className="px-2 py-3">Status</th>
                   <th className="px-2 py-3">Action</th>
@@ -213,16 +237,19 @@ export default async function DeadlinesPage({
                     className={`align-top border-l-4 ${
                       row.status === "Overdue"
                         ? "border-l-red-500 bg-red-50/60"
-                        : row.status === "Due This Week"
+                        : row.status === "Due this week"
                           ? "border-l-amber-500 bg-amber-50/50"
-                          : row.status === "Due Next Week"
+                          : row.status === "Due next week"
                             ? "border-l-blue-500 bg-blue-50/40"
-                            : row.status === "Review Required"
+                            : row.status === "Review required"
                               ? "border-l-purple-500 bg-purple-50/40"
                               : "border-l-slate-200 bg-white"
                     }`}
                   >
-                    <td className="break-words px-2 py-3 sm:px-3">
+                    <td
+                      className="break-words px-2 py-3 sm:px-3"
+                      data-label="Cooling tower"
+                    >
                       <Link
                         className="font-black text-emerald-900 underline decoration-emerald-300 underline-offset-2"
                         href={`/systems/${row.towerId}`}
@@ -234,7 +261,10 @@ export default async function DeadlinesPage({
                         {row.tonnageDisplay} · {row.operatingScheduleDisplay}
                       </div>
                     </td>
-                    <td className="break-words px-2 py-3 font-bold text-slate-900 sm:px-3">
+                    <td
+                      className="break-words px-2 py-3 font-bold text-slate-900 sm:px-3"
+                      data-label="Required action"
+                    >
                       {row.requiredAction}
                       <div className="mt-1 text-xs font-bold text-slate-500">
                         {row.executionLane}
@@ -249,7 +279,7 @@ export default async function DeadlinesPage({
                       )}
                       <details className="mt-2 xl:hidden">
                         <summary className="cursor-pointer text-xs text-emerald-800">
-                          Target details
+                          Recommended service dates
                         </summary>
                         <div className="mt-1 font-normal text-slate-600">
                           Target: {row.targetDateDisplay}
@@ -258,30 +288,38 @@ export default async function DeadlinesPage({
                         </div>
                       </details>
                     </td>
-                    <td className="hidden px-2 py-3 xl:table-cell">
+                    <td
+                      className="hidden px-2 py-3 xl:table-cell"
+                      data-mobile-secondary
+                    >
                       <span aria-label={row.targetDateAccessible}>
                         {row.targetDateDisplay}
                       </span>
                     </td>
-                    <td className="hidden px-2 py-3 xl:table-cell">
+                    <td
+                      className="hidden px-2 py-3 xl:table-cell"
+                      data-mobile-secondary
+                    >
                       <span aria-label={row.targetWindowAccessible}>
                         {row.targetWindowDisplay}
                       </span>
                     </td>
                     <td
-                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due This Week" ? "text-amber-900" : row.status === "Due Next Week" ? "text-blue-800" : row.status === "Review Required" ? "text-purple-800" : "text-slate-800"}`}
+                      data-label="Compliance deadline"
+                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due this week" ? "text-amber-900" : row.status === "Due next week" ? "text-blue-800" : row.status === "Review required" ? "text-purple-800" : "text-slate-800"}`}
                     >
                       <span aria-label={row.hardDueDateAccessible}>
                         {row.hardDueDateDisplay}
                       </span>
                     </td>
                     <td
+                      data-label="Days left"
                       aria-label={row.workingDaysAccessible}
-                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due This Week" ? "text-amber-900" : row.status === "Due Next Week" ? "text-blue-800" : row.status === "Review Required" ? "text-purple-800" : "text-slate-800"}`}
+                      className={`px-2 py-3 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due this week" ? "text-amber-900" : row.status === "Due next week" ? "text-blue-800" : row.status === "Review required" ? "text-purple-800" : "text-slate-800"}`}
                     >
                       {row.workingDaysDisplay}
                     </td>
-                    <td className="px-1 py-3">
+                    <td className="min-w-0 px-1 py-3" data-label="Status">
                       <StatusBadge color={row.statusColor} label={row.status} />
                       <div className="mt-1">
                         <StatusBadge
@@ -291,20 +329,26 @@ export default async function DeadlinesPage({
                         />
                       </div>
                     </td>
-                    <td className="px-1 py-3">
+                    <td className="px-1 py-3" data-label="Next step">
                       <Link
                         aria-label={row.primaryActionAccessible}
                         className={buttonClass(
-                          [
-                            "Complete obligation",
-                            "Enter result",
-                            "Submit report",
-                          ].includes(row.primaryActionLabel)
+                          row.primaryActionLabel.startsWith("Record")
                             ? "primary"
                             : "secondary",
-                          "min-h-9 px-1.5 py-1.5",
+                          "min-h-9 w-full min-w-0 whitespace-normal break-words px-1.5 py-1.5 text-center leading-tight",
                         )}
-                        href={row.primaryActionHref}
+                        href={
+                          row.primaryActionHref.includes("#record-event") ||
+                          row.primaryActionHref.includes(
+                            "#service-responsibilities",
+                          )
+                            ? withReturnPath(
+                                row.primaryActionHref,
+                                deadlineReturnTo,
+                              )
+                            : row.primaryActionHref
+                        }
                       >
                         {row.primaryActionLabel}
                       </Link>

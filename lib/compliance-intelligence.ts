@@ -42,7 +42,7 @@ export function getUrgency(input: {
       label: input.status === "MISSED" ? "Missed" : "Overdue",
       color: "RED",
       explanation:
-        "The controlling deadline passed. Later work cannot repair this obligation.",
+        "The controlling deadline passed. Later work cannot repair this requirement.",
       calendarDaysRemaining: input.latestDueDate
         ? calendarDaysRemaining(input.latestDueDate, today)
         : null,
@@ -55,7 +55,7 @@ export function getUrgency(input: {
       urgency: "COMPLETED",
       label: "Completed on time",
       color: "GREEN",
-      explanation: "The obligation has been completed.",
+      explanation: "The requirement has been completed.",
       calendarDaysRemaining: null,
       workingDaysRemaining: null,
     };
@@ -67,7 +67,7 @@ export function getUrgency(input: {
       urgency: "OVERDUE",
       label: "Overdue",
       color: "RED",
-      explanation: `The legal latest date passed ${Math.abs(dateInfo.calendarDays)} calendar day${dateInfo.calendarDays === -1 ? "" : "s"} ago.`,
+      explanation: `The compliance deadline passed ${Math.abs(dateInfo.calendarDays)} calendar day${dateInfo.calendarDays === -1 ? "" : "s"} ago.`,
       calendarDaysRemaining: dateInfo.calendarDays,
       workingDaysRemaining: dateInfo.workingDays,
     };
@@ -77,7 +77,7 @@ export function getUrgency(input: {
       label: "Due now",
       color: "RED",
       explanation:
-        "This obligation should not wait for a bundle opportunity unless it can be completed immediately.",
+        "This requirement should not wait for a combined visit unless it can be completed immediately.",
       calendarDaysRemaining: dateInfo?.calendarDays ?? null,
       workingDaysRemaining: dateInfo?.workingDays ?? null,
     };
@@ -86,7 +86,7 @@ export function getUrgency(input: {
       urgency: "CRITICAL",
       label: "Due today",
       color: "RED",
-      explanation: "The legal deadline is today.",
+      explanation: "The compliance deadline is today.",
       calendarDaysRemaining: 0,
       workingDaysRemaining: 0,
     };
@@ -98,7 +98,7 @@ export function getUrgency(input: {
       urgency: "CRITICAL",
       label: "Due soon",
       color: "RED",
-      explanation: "The obligation is inside its critical response period.",
+      explanation: "The requirement is inside its critical response period.",
       calendarDaysRemaining: dateInfo?.calendarDays ?? null,
       workingDaysRemaining: dateInfo?.workingDays ?? null,
     };
@@ -110,14 +110,14 @@ export function getUrgency(input: {
       urgency: "WARNING",
       label: "Due soon",
       color: "YELLOW",
-      explanation: "The legal deadline is approaching.",
+      explanation: "The compliance deadline is approaching.",
       calendarDaysRemaining: dateInfo?.calendarDays ?? null,
       workingDaysRemaining: dateInfo?.workingDays ?? null,
     };
   if (input.status === "SCHEDULED")
     return {
       urgency: "SCHEDULED",
-      label: "Scheduled — still open",
+      label: "Scheduled (not completed)",
       color: "BLUE",
       explanation:
         "Work is scheduled, but the compliance clock remains open until completion is recorded.",
@@ -138,8 +138,8 @@ export function getUrgency(input: {
     label: "Upcoming",
     color: "GREEN",
     explanation: input.latestDueDate
-      ? "The obligation is open and remains outside its warning period."
-      : "The obligation is open without a fixed legal latest date.",
+      ? "The requirement is open and remains outside its warning period."
+      : "The requirement is open without a fixed compliance deadline.",
     calendarDaysRemaining: dateInfo?.calendarDays ?? null,
     workingDaysRemaining: dateInfo?.workingDays ?? null,
   };
@@ -258,11 +258,11 @@ export function missedObligationConsequence(input: {
   priority: string;
 }): string {
   if (input.priority === "EMERGENCY")
-    return "The emergency obligation remains open and the tower stays in the highest-priority work queue until completion is recorded.";
+    return "The emergency requirement remains open and the tower stays in the highest-priority work queue until completion is recorded.";
   if (input.category === "SAMPLE")
-    return "The sampling obligation is marked missed. A later sample is stored as history but cannot repair this obligation.";
+    return "The sampling requirement is marked missed. A later sample is stored as history but cannot repair the missed deadline.";
   if (input.category === "INSPECTION")
-    return "The inspection obligation becomes overdue. Only a recorded completed inspection closes the obligation.";
+    return "The inspection requirement becomes overdue. Only a recorded completed inspection closes the requirement.";
   if (input.category === "MAINTENANCE")
     return "The required cleaning remains open. Record the completed cleaning separately; it does not reset the Legionella sampling clock.";
   if (
@@ -272,7 +272,7 @@ export function missedObligationConsequence(input: {
     })
   )
     return "The required field action is marked missed and moves to Compliance Issues; later work does not erase the missed deadline.";
-  return "The reporting or follow-up obligation becomes a compliance issue and leaves the actionable priority queue.";
+  return "The reporting or follow-up requirement becomes a compliance issue and leaves the actionable priority queue.";
 }
 
 export interface CompletionPreviewActivity {
@@ -371,8 +371,8 @@ export function previewVisitCompletion(input: {
         !activity.qualifiesForRoutineLegionella,
     ),
     explanation: satisfied.length
-      ? `Recording completion on ${input.performedDate} can satisfy ${satisfied.length} open obligation${satisfied.length === 1 ? "" : "s"}. Final results are recalculated only after the visit is saved.`
-      : `No currently open obligation is both covered by the selected activities and inside its legal window on ${input.performedDate}.`,
+      ? `Recording completion on ${input.performedDate} can satisfy ${satisfied.length} open requirement${satisfied.length === 1 ? "" : "s"}. Compliance dates are recalculated after the visit is saved.`
+      : `No open requirement is both covered by the selected work and within its valid completion dates on ${input.performedDate}.`,
   };
 }
 
@@ -532,8 +532,8 @@ export function bestVisitOpportunity(
     additionalObligationsCovered: Math.max(0, best.obligations.length - 1),
     explanation:
       best.obligations.length > 1
-        ? `One visit from ${best.start} through ${best.end} can complete ${best.obligations.length} overlapping obligations. The earliest legal deadline controls the recommendation.`
-        : `The best current service window is ${best.start} through ${best.end}. No other on-site obligation overlaps yet.`,
+        ? `One visit from ${best.start} through ${best.end} can complete ${best.obligations.length} overlapping requirements. The earliest compliance deadline controls the recommendation.`
+        : `The best current service window is ${best.start} through ${best.end}. No other on-site requirement overlaps yet.`,
   };
 }
 
@@ -614,7 +614,7 @@ export function getComplianceStatus(
       health: "GOOD" as ComplianceHealth,
       label: "Good",
       color: "GREEN" as ComplianceColor,
-      reason: "No compliance obligations are currently open.",
+      reason: "No compliance requirements are currently open.",
       controllingObligationId: null,
     };
   const health: ComplianceHealth = ["EMERGENCY", "OVERDUE"].includes(

@@ -100,8 +100,8 @@ export function ComplianceDate({
           <AlertTriangle className="mt-0.5 shrink-0" size={14} />
           <span>
             {info.weekendRisk.label}. Last normal workday:{" "}
-            {formatComplianceDate(info.weekendRisk.lastWorkingDay)}. The legal
-            deadline does not move.
+            {formatComplianceDate(info.weekendRisk.lastWorkingDay)}. The
+            compliance deadline does not move.
           </span>
         </div>
       )}

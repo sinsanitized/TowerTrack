@@ -11,7 +11,7 @@ export function LegionellaResultInput({
 
   return (
     <fieldset>
-      <legend className="label">Legionella result</legend>
+      <legend className="label">Legionella result · Required</legend>
       <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-700">
         <label className="flex items-center gap-2">
           <input
@@ -41,7 +41,7 @@ export function LegionellaResultInput({
         </>
       ) : (
         <label className="mt-3 block">
-          <span className="label">Result (CFU/mL)</span>
+          <span className="label">Result (CFU/mL) · Required</span>
           <input
             className="field mt-1"
             name="cfuPerMl"

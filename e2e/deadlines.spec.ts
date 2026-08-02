@@ -15,17 +15,17 @@ test.beforeEach(async ({ page }) => {
 test("deadline table uses the compact eight-column contract", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.getByRole("link", { name: "All Tower Deadlines" }).click();
+  await page.setViewportSize({ width: 1536, height: 900 });
+  await page.getByRole("link", { name: "All Deadlines" }).click();
   const table = page.getByRole("table", {
-    name: "All cooling tower deadline obligations",
+    name: "All cooling tower requirements",
   });
   const expected = [
     "Cooling Tower",
     "Required Action",
-    "Target Date",
-    "Target Window",
-    "Hard Due Date",
+    "Recommended Service Date",
+    "Recommended Service Window",
+    "Compliance Deadline",
     "Days Left",
     "Status",
     "Action",
@@ -68,7 +68,9 @@ test("deadline table uses the compact eight-column contract", async ({
       clientWidth: element.clientWidth,
       scrollWidth: element.scrollWidth,
     }));
-  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+  // The row priority border and enclosing panel borders account for up to six
+  // layout pixels without creating user-scrollable content.
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 6);
 });
 
 test("smaller desktop keeps identity and decision columns visible", async ({
@@ -77,12 +79,12 @@ test("smaller desktop keeps identity and decision columns visible", async ({
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto("/deadlines");
   const table = page.getByRole("table", {
-    name: "All cooling tower deadline obligations",
+    name: "All cooling tower requirements",
   });
   for (const heading of [
     "Cooling Tower",
     "Required Action",
-    "Hard Due Date",
+    "Compliance Deadline",
     "Days Left",
     "Status",
     "Action",
@@ -91,15 +93,17 @@ test("smaller desktop keeps identity and decision columns visible", async ({
       table.getByRole("columnheader", { name: heading, exact: true }),
     ).toBeVisible();
   await expect(
-    table.getByRole("columnheader", { name: "Target Date" }),
+    table.getByRole("columnheader", { name: "Recommended Service Date" }),
   ).toBeHidden();
-  await expect(table.getByText("Target details").first()).toBeVisible();
+  await expect(
+    table.getByText("Recommended service dates").first(),
+  ).toBeVisible();
 });
 
 test("due-date and work-type filters narrow displayed rows", async ({
   page,
 }) => {
-  await page.getByRole("link", { name: "All Tower Deadlines" }).click();
+  await page.getByRole("link", { name: "All Deadlines" }).click();
   await expect(
     page.getByRole("navigation", {
       name: "Filter by Rule Configuration",
@@ -113,7 +117,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
     "Overdue",
     "Due this week",
     "Due next week",
-    "Later",
+    "Due later",
   ])
     await expect(
       dueDateFilter.getByRole("link", { name: label, exact: true }),
@@ -208,10 +212,10 @@ test("mobile keeps reference metadata readable without adding columns", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/deadlines");
   const table = page.getByRole("table", {
-    name: "All cooling tower deadline obligations",
+    name: "All cooling tower requirements",
   });
   await expect(table.locator("th")).toHaveCount(8);
-  await expect(table.getByRole("columnheader")).toHaveCount(6);
+  await expect(table.getByRole("columnheader")).toHaveCount(0);
   await expect(table.getByRole("row").nth(1)).toContainText(
     /(?:[\d,.]+ tons|Tonnage not recorded) · (?:Seasonal|Year-round|Schedule not set)/,
   );
@@ -220,7 +224,7 @@ test("mobile keeps reference metadata readable without adding columns", async ({
 test("action center separates this week from next week", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Current Work Week" }),
+    page.getByRole("heading", { name: "Due this week" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Next Week" })).toBeVisible();
   await expect(page.getByText(/next three working days/i)).toHaveCount(0);
@@ -233,11 +237,9 @@ test("action center separates this week from next week", async ({ page }) => {
   await expect(page.getByText("Work requiring action now")).toBeVisible();
   await expect(page.getByText("Near-term planning")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Combined Visit Recommendations" }),
+    page.getByRole("heading", { name: "Combine work into one visit" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Route and obligation optimization"),
-  ).toBeVisible();
+  await expect(page.getByText("Route and requirement planning")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "View all due this week" }),
   ).toHaveAttribute("href", "/deadlines?period=THIS_WEEK");

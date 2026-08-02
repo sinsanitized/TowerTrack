@@ -52,7 +52,7 @@ function ActionRow({
   const responsibility = operationalResponsibility(row, obligation);
   const executionLabel =
     obligation.status === "SCHEDULED"
-      ? "Scheduled—still open"
+      ? "Scheduled (not completed)"
       : responsibility == null
         ? "Waiting on review"
         : responsibility === "CUSTOMER"
@@ -96,23 +96,29 @@ function ActionRow({
               {row.profileSourceLabel}
             </p>
           </details>
-          {row.visitOpportunity?.obligations[0]?.id === obligation.id &&
+          {row.visitOpportunity?.obligations.some(
+            (item) => item.id === obligation.id,
+          ) &&
             row.visitOpportunity.obligations.length > 1 && (
               <details className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
                 <summary className="cursor-pointer font-black">
-                  Combine with {row.visitOpportunity.obligations.length - 1}{" "}
-                  other obligation
+                  Optional: complete{" "}
+                  {row.visitOpportunity.obligations.length - 1} other
+                  requirement
                   {row.visitOpportunity.obligations.length === 2 ? "" : "s"}
                 </summary>
                 <p className="mt-2 font-bold">
+                  This is a route-saving suggestion, not another required task.
                   One visit can complete all listed field work from{" "}
                   {row.visitOpportunity.start} through{" "}
                   {row.visitOpportunity.end}.
                 </p>
                 <ul className="mt-2 list-disc pl-5">
-                  {row.visitOpportunity.obligations.map((item) => (
-                    <li key={item.id}>{requiredActionLabel(item.type)}</li>
-                  ))}
+                  {row.visitOpportunity.obligations
+                    .filter((item) => item.id !== obligation.id)
+                    .map((item) => (
+                      <li key={item.id}>{requiredActionLabel(item.type)}</li>
+                    ))}
                 </ul>
               </details>
             )}
@@ -145,7 +151,7 @@ function ActionRow({
         <Link
           className={buttonClass(
             obligation.category === "SAMPLE" ? "primary" : "secondary",
-            "min-h-11 justify-center whitespace-nowrap",
+            "min-h-11 w-full justify-center whitespace-normal text-center lg:w-auto",
           )}
           href={
             responsibility == null
@@ -154,13 +160,19 @@ function ActionRow({
           }
         >
           {responsibility == null || obligation.status === "OVERDUE"
-            ? "Review issue"
+            ? "Assign responsibility"
             : obligation.category === "REPORTING_ACTION" &&
                 !obligation.type.includes("CORRECTIVE_ACTION") &&
                 obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
                 obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
-              ? "Submit report"
-              : "Complete obligation"}
+              ? "Record submission"
+              : obligation.category === "SAMPLE"
+                ? "Record sample"
+                : obligation.category === "INSPECTION"
+                  ? "Record inspection"
+                  : obligation.type.includes("CLEANING")
+                    ? "Record cleaning"
+                    : "Record completion"}
         </Link>
       </div>
     </article>
@@ -262,7 +274,7 @@ export default async function ActionCenterPage() {
       <PageHeader
         eyebrow="Daily operations"
         title="Action Center"
-        description="Work that can still prevent a compliance failure, ordered by deadline."
+        description="Start with the first item under Act now. If there are none, work down this page from top to bottom."
       />
 
       <section
@@ -303,10 +315,10 @@ export default async function ActionCenterPage() {
         <section className="panel mb-7 overflow-hidden border-red-200">
           <div className="border-b border-red-200 bg-red-50 p-5">
             <h2 className="mt-1 text-xl font-black text-red-950">
-              Immediate Attention
+              Immediate attention
             </h2>
             <p className="mt-1 text-sm font-bold text-red-800">
-              Only visible when needed
+              Urgent work and unresolved failures
             </p>
           </div>
           {immediateItems.length > 0 && (
@@ -360,7 +372,7 @@ export default async function ActionCenterPage() {
           <div className="flex items-start gap-3">
             <CalendarCheck className="mt-1 text-amber-800" size={20} />
             <div>
-              <h2 className="mt-1 text-xl font-black">Current Work Week</h2>
+              <h2 className="mt-1 text-xl font-black">Due this week</h2>
               <p className="mt-1 text-sm font-bold text-amber-900">
                 Work requiring action now
               </p>
@@ -400,7 +412,7 @@ export default async function ActionCenterPage() {
           <div className="flex items-start gap-3">
             <CalendarCheck className="mt-1 text-blue-700" size={20} />
             <div>
-              <h2 className="mt-1 text-xl font-black">Next Week</h2>
+              <h2 className="mt-1 text-xl font-black">Next week</h2>
               <p className="mt-1 text-sm font-bold text-blue-800">
                 Near-term planning
               </p>
@@ -440,10 +452,10 @@ export default async function ActionCenterPage() {
             <Layers3 className="mt-1" size={20} />
             <div>
               <h2 className="mt-1 text-xl font-black">
-                Combined Visit Recommendations
+                Combine work into one visit
               </h2>
               <p className="mt-1 text-sm font-bold text-emerald-800">
-                Route and obligation optimization
+                Route and requirement planning
               </p>
             </div>
           </div>
@@ -467,7 +479,7 @@ export default async function ActionCenterPage() {
                   <div className="text-sm text-emerald-950">{row.building}</div>
                   <h3 className="mt-3 text-lg font-black">
                     One visit can satisfy {opportunity.obligations.length}{" "}
-                    obligations
+                    requirements
                   </h3>
                   <ul className="mt-2 list-disc pl-5 text-sm">
                     {opportunity.obligations.map((item) => (
@@ -492,14 +504,14 @@ export default async function ActionCenterPage() {
                     className="btn btn-primary mt-4 min-h-11"
                     href={`/systems/${row.id}#record-event`}
                   >
-                    Open tower and record work
+                    Open tower
                   </Link>
                 </article>
               );
             })
           ) : (
             <p className="text-sm font-bold text-slate-600">
-              No later obligations currently share valid completion dates.
+              No later requirements currently share valid completion dates.
             </p>
           )}
         </div>

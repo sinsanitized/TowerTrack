@@ -65,6 +65,14 @@ export default async function NewCoolingTowerPage({
         description={`Customer and address saved for ${customer.name}. Now identify the cooling tower equipment at ${building.streetAddress}, ${building.city}, ${building.state}.`}
       />
       <div className="panel mx-auto max-w-3xl p-6">
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
+          <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-900">
+            ✓ Step 1 · Customer and address
+          </span>
+          <span className="rounded-full bg-emerald-800 px-2 py-1 text-white">
+            Step 2 · Cooling tower
+          </span>
+        </div>
         <form
           action={createCoolingTowerSystemAction}
           className="grid gap-5 sm:grid-cols-2"
@@ -102,7 +110,7 @@ export default async function NewCoolingTowerPage({
             />
           </label>
           <label>
-            <span className="label">Cooling Tower Tonnage</span>
+            <span className="label">Cooling tower tonnage</span>
             <input
               className="field mt-1"
               name="tonnage"
@@ -165,7 +173,7 @@ export default async function NewCoolingTowerPage({
           </div>
           <div>
             <label className="label" htmlFor="new-tower-rule-configuration">
-              Compliance Rules
+              Compliance rules
             </label>
             <select
               id="new-tower-rule-configuration"
@@ -177,11 +185,9 @@ export default async function NewCoolingTowerPage({
               <option value="" disabled>
                 Choose configuration
               </option>
-              <option value="NYC_AND_NYS">
-                NYC Chapter 8 + New York State
-              </option>
-              <option value="NYS_ONLY">New York State Only</option>
-              <option value="CUSTOM">Custom / Out of State</option>
+              <option value="NYC_AND_NYS">NYC Chapter 8 and NYS Part 4</option>
+              <option value="NYS_ONLY">NYS Part 4 only</option>
+              <option value="CUSTOM">Custom or out-of-state</option>
             </select>
           </div>
           <div>

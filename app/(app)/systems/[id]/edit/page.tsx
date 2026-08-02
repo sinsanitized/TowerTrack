@@ -39,11 +39,23 @@ function jurisdictionLabel(jurisdiction: {
 
 export default async function EditCustomerTowerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ focus?: string; returnTo?: string }>;
 }) {
   const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const { id } = await params;
+  const { focus, returnTo: requestedReturnTo } = await searchParams;
+  const returnTo =
+    requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
+      ? requestedReturnTo
+      : null;
+  const focusedResponsibility = serviceResponsibilityFamilies.some(
+    ([key]) => key === focus,
+  )
+    ? focus
+    : null;
   const [system, profiles, jurisdictions] = await Promise.all([
     db.coolingTowerSystem.findFirst({
       where: {
@@ -79,7 +91,7 @@ export default async function EditCustomerTowerPage({
         title={`Edit ${system.building.customer.name} — ${system.systemName}`}
         description="Update verified customer, address, and equipment information. Compliance-rule changes use a separate effective-dated workflow below."
         actions={
-          <Link className="btn" href={`/systems/${system.id}`}>
+          <Link className="btn" href={returnTo ?? `/systems/${system.id}`}>
             Cancel
           </Link>
         }
@@ -193,7 +205,7 @@ export default async function EditCustomerTowerPage({
               />
             </label>
             <label>
-              <span className="label">Cooling Tower Tonnage</span>
+              <span className="label">Cooling tower tonnage</span>
               <input
                 className="field mt-1"
                 name="tonnage"
@@ -221,15 +233,24 @@ export default async function EditCustomerTowerPage({
           </button>
         </section>
       </form>
-      <section className="panel mx-auto mt-6 max-w-4xl p-6">
-        <div className="label">Service Responsibility</div>
+      <section
+        id="service-responsibilities"
+        className="panel mx-auto mt-6 max-w-4xl scroll-mt-6 p-6"
+      >
+        <div className="label">Service responsibilities</div>
         <h2 className="mt-1 text-xl font-black">
-          Contracted service ownership
+          Who is responsible for each service
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           This controls operational ownership only. It does not change the legal
           requirements assigned to this tower.
         </p>
+        {focusedResponsibility && (
+          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-900">
+            Assign the highlighted service responsibility, then save this
+            section.
+          </div>
+        )}
         {serviceResponsibilityFamilies.some(([key]) => system[key] == null) && (
           <div className="mt-4 rounded-lg border border-purple-300 bg-purple-50 p-3 text-sm font-bold text-purple-900">
             One or more service responsibilities must be confirmed. Unknown work
@@ -241,17 +262,26 @@ export default async function EditCustomerTowerPage({
           className="mt-4 grid gap-4 sm:grid-cols-2"
         >
           <input type="hidden" name="systemId" value={system.id} />
+          {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
           {serviceResponsibilityFamilies.map(([key, label]) => (
-            <label key={key}>
+            <label
+              key={key}
+              className={
+                focusedResponsibility === key
+                  ? "rounded-lg border-2 border-blue-400 bg-blue-50 p-3"
+                  : undefined
+              }
+            >
               <span className="label">{label}</span>
               <select
                 className="field mt-1"
                 name={key}
                 defaultValue={system[key] ?? ""}
+                autoFocus={focusedResponsibility === key}
                 required
               >
                 <option value="" disabled>
-                  Choose responsibility
+                  Select responsible party
                 </option>
                 <option value="OUR_COMPANY">Our company</option>
                 <option value="CUSTOMER">Customer</option>
@@ -287,12 +317,12 @@ export default async function EditCustomerTowerPage({
             ))}
           </div>
           <button className="btn btn-primary sm:col-span-2">
-            Save Service Responsibility
+            Save service responsibilities
           </button>
         </form>
       </section>
       <section className="panel mx-auto mt-6 max-w-4xl p-6">
-        <div className="label">Operating Schedule</div>
+        <div className="label">Operating schedule</div>
         <p className="mt-2 text-sm text-slate-600">
           This planning setting is separate from audited startup and shutdown
           events. Seasonal details appear only for a seasonal tower.
@@ -317,7 +347,7 @@ export default async function EditCustomerTowerPage({
         />
       </section>
       <section className="panel mx-auto mt-6 max-w-4xl p-6">
-        <div className="label">Compliance Rules</div>
+        <div className="label">Compliance rules</div>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-black">
@@ -336,7 +366,7 @@ export default async function EditCustomerTowerPage({
         </div>
         <details className="mt-5 rounded-xl border border-slate-200 p-4">
           <summary className="cursor-pointer font-black text-emerald-900">
-            Change Compliance Rules
+            Change compliance rules
           </summary>
           <form
             action={changeTowerRuleConfigurationAction}
@@ -352,10 +382,10 @@ export default async function EditCustomerTowerPage({
                 required
               >
                 <option value="NYC_AND_NYS">
-                  NYC Chapter 8 + New York State
+                  NYC Chapter 8 and NYS Part 4
                 </option>
-                <option value="NYS_ONLY">New York State Only</option>
-                <option value="CUSTOM">Custom / Out of State</option>
+                <option value="NYS_ONLY">NYS Part 4 only</option>
+                <option value="CUSTOM">Custom or out-of-state</option>
               </select>
             </label>
             <label>
@@ -421,7 +451,7 @@ export default async function EditCustomerTowerPage({
                   date.
                 </li>
                 <li>
-                  Open obligations will be recalculated under the selected
+                  Open requirements will be recalculated under the selected
                   jurisdiction and profile.
                 </li>
                 <li>
@@ -441,7 +471,7 @@ export default async function EditCustomerTowerPage({
               </label>
             </div>
             <button className="btn btn-primary sm:col-span-2">
-              Change Compliance Rules
+              Change compliance rules
             </button>
           </form>
         </details>
@@ -463,8 +493,9 @@ export default async function EditCustomerTowerPage({
                     : " onward"}
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
-                  {assignment.changedBy?.name ?? "Migration backfill"} ·{" "}
-                  {assignment.reason}
+                  {assignment.changedBy?.name ??
+                    "Imported historical assignment"}{" "}
+                  · {assignment.reason}
                 </div>
               </div>
             ))}

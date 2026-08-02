@@ -156,7 +156,7 @@ function statusFromOpen(
     return {
       risk: "INACTIVE" as const,
       plainEnglishStatus: "Inactive",
-      explanation: "Routine operating obligations are paused while shut down.",
+      explanation: "Routine operating requirements are paused while shut down.",
     };
   const status = getComplianceStatus(
     open.map((item, index) => ({
@@ -928,7 +928,7 @@ export async function rebuildSystemComplianceProjections(
     ? {
         risk: "OVERDUE" as const,
         plainEnglishStatus: "Compliance issue",
-        explanation: `${missedCount} obligation${missedCount === 1 ? " was" : "s were"} missed. Later work cannot repair a passed controlling deadline.`,
+        explanation: `${missedCount} requirement${missedCount === 1 ? " was" : "s were"} missed. Later work cannot repair a passed compliance deadline.`,
       }
     : statusFromOpen(today, open, operating);
   await tx.complianceStatus.upsert({

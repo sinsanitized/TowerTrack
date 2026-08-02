@@ -15,7 +15,9 @@ test("home leads directly into tower event entry", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Action Center" }),
   ).toBeVisible();
-  await expect(page.getByText("Combined Visit Recommendations")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Combine work into one visit" }),
+  ).toBeVisible();
   await expect(page.getByText("Tower directory")).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Planning", exact: true }),
@@ -34,31 +36,29 @@ test("home leads directly into tower event entry", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sample" })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Record Legionella sample" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Record cleaning" }),
+    page.getByRole("button", { name: "Cleaning" }),
   ).not.toBeVisible();
   await expect(
     page.getByRole("button", { name: "Record startup" }),
   ).not.toBeVisible();
   await expect(
-    page.getByText("More event types", { exact: true }),
+    page.getByText("Other work and special conditions", { exact: true }),
   ).toBeVisible();
-  await page.getByText("More event types", { exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Record cleaning" }),
-  ).toBeVisible();
+  await page
+    .getByText("Other work and special conditions", { exact: true })
+    .click();
+  await expect(page.getByRole("button", { name: "Cleaning" })).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: "Record routine legionella sample collected",
     }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save Event" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save record" })).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "Open Legionella sampling obligations",
+      name: "Open Legionella sampling requirements",
     }),
   ).toBeVisible();
   await expect(
@@ -71,7 +71,7 @@ test("home leads directly into tower event entry", async ({ page }) => {
 test("system view shows authority and separate target and hard due", async ({
   page,
 }) => {
-  const search = page.getByRole("combobox", { name: "Search towers" });
+  const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("JOB-1002");
   await expect(
     page
@@ -84,12 +84,14 @@ test("system view shows authority and separate target and hard due", async ({
   await expect(
     page.getByRole("heading", { name: "Next required actions" }),
   ).toBeVisible();
-  await expect(page.getByText("Target date").first()).toBeVisible();
-  await expect(page.getByText("Hard due date").first()).toBeVisible();
+  await expect(
+    page.getByText("Recommended service date").first(),
+  ).toBeVisible();
+  await expect(page.getByText("Compliance deadline").first()).toBeVisible();
   await expect(page.getByText("Next hard due")).toHaveCount(0);
-  await page.getByRole("link", { name: "Obligations", exact: true }).click();
+  await page.getByRole("link", { name: "Requirements", exact: true }).click();
   await page
-    .getByText("Rule details and obligation completion tools", { exact: true })
+    .getByText("Rule details and completion tools", { exact: true })
     .click();
   await expect(
     page.getByText(/Regulatory|Company policy|Guidance only/).first(),
@@ -147,7 +149,7 @@ test("unused corrective action and review destinations are removed", async ({
   await expect(page.getByRole("link", { name: "Customers" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Compliance Issues" }),
+    page.getByRole("link", { name: "Overdue & Problems" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Towers", exact: true }),
@@ -166,7 +168,7 @@ test("home presents mutually exclusive Action Center sections", async ({
   await expect(page.getByText("Booked field visits")).toHaveCount(0);
   await expect(
     page.getByRole("heading", {
-      name: "Due within the next three working days",
+      name: "Due this week",
     }),
   ).toBeVisible();
   await expect(
@@ -207,11 +209,8 @@ test("priority queue remains scannable on a phone-sized screen", async ({
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "Due within the next three working days",
+      name: "Due this week",
     }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: /Record sample|Open tower/ }).first(),
   ).toBeVisible();
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
@@ -220,8 +219,29 @@ test("priority queue remains scannable on a phone-sized screen", async ({
   expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport + 1);
 });
 
+test("mobile navigation stays compact and exposes the active destinations", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(
+    page.getByRole("navigation", { name: "Primary navigation" }),
+  ).toBeHidden();
+  await page.locator("aside details summary").click();
+  const navigation = page.getByRole("navigation", {
+    name: "Mobile navigation",
+  });
+  await expect(navigation).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Action Center", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    navigation.getByRole("link", { name: "All Deadlines" }),
+  ).toBeVisible();
+});
+
 test("top search finds towers by building and job number", async ({ page }) => {
-  const search = page.getByRole("combobox", { name: "Search towers" });
+  const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("100 Park Avenue");
   const result = page
     .getByRole("listbox", { name: "Tower search results" })
@@ -376,7 +396,7 @@ test("customer onboarding continues from address to cooling tower details", asyn
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
   await page
-    .getByLabel("Compliance Rules", { exact: true })
+    .getByLabel("Compliance rules", { exact: true })
     .selectOption("NYC_AND_NYS");
   await page.getByLabel("Profile version", { exact: true }).selectOption({
     label: "NYC Chapter 8 + New York State — NYC Chapter 8 2026 + NYS Part 4",
@@ -418,7 +438,7 @@ test("customer onboarding continues from address to cooling tower details", asyn
 test("legacy sample correction route opens the audited event editor", async ({
   page,
 }) => {
-  const search = page.getByRole("combobox", { name: "Search towers" });
+  const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("JOB-1001");
   const result = page
     .getByRole("listbox", { name: "Tower search results" })
@@ -429,7 +449,7 @@ test("legacy sample correction route opens the audited event editor", async ({
   await page.goto(`${systemUrl}/correct`);
   await expect(page).toHaveURL(/\/events\//);
   await expect(
-    page.getByRole("heading", { name: "Correct event details" }),
+    page.getByRole("heading", { name: "Correct record details" }),
   ).toBeVisible();
   await expect(page.getByText("Correction reason (required)")).toBeVisible();
 });
@@ -437,7 +457,7 @@ test("legacy sample correction route opens the audited event editor", async ({
 test("operations manager can open and correct an individual event", async ({
   page,
 }) => {
-  const search = page.getByRole("combobox", { name: "Search towers" });
+  const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("JOB-1002");
   await search.press("Enter");
   const eventHistory = page.locator("#regulatory-events");
@@ -446,22 +466,22 @@ test("operations manager can open and correct an individual event", async ({
     .first()
     .click();
   await expect(
-    page.getByRole("heading", { name: "Correct event details" }),
+    page.getByRole("heading", { name: "Correct record details" }),
   ).toBeVisible();
   await expect(page.getByLabel("Event type")).toBeVisible();
-  await expect(page.getByLabel("Event date")).toBeVisible();
+  await expect(page.getByLabel(/date.*Required/)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Correction impact preview" }),
   ).toBeVisible();
-  await page.getByLabel("Event date").fill("2026-07-17");
+  await page.getByLabel(/date.*Required/).fill("2026-07-17");
   await page
     .getByLabel("Notes")
     .fill("Corrected through event detail workflow");
   await page
     .getByLabel("Correction reason (required)")
     .fill("Verified against the signed field record");
-  await page.getByRole("button", { name: "Save corrected event" }).click();
-  await expect(page.getByText("Event correction saved")).toBeVisible();
+  await page.getByRole("button", { name: "Save corrected record" }).click();
+  await expect(page.getByText(/Compliance record corrected/)).toBeVisible();
   await expect(
     page
       .locator("#regulatory-events")
@@ -474,7 +494,7 @@ test("operations manager records cleaning in the tower event workflow", async ({
   page,
 }) => {
   await page.goto("/");
-  const search = page.getByRole("combobox", { name: "Search towers" });
+  const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("Pennsylvania Distribution Hub");
   await page
     .getByRole("listbox", { name: "Tower search results" })
@@ -482,20 +502,22 @@ test("operations manager records cleaning in the tower event workflow", async ({
     .first()
     .click();
   await expect(page).toHaveURL(/\/systems\//);
-  await page.getByRole("button", { name: "Record an event" }).click();
+  await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible();
-  await page.getByText("More event types", { exact: true }).click();
-  const addCleaning = page.getByRole("button", { name: "Record cleaning" });
+  await page
+    .getByText("Other work and special conditions", { exact: true })
+    .click();
+  const addCleaning = page.getByRole("button", { name: "Cleaning" });
   await expect(addCleaning).toBeVisible();
   await addCleaning.click();
   await expect(page.getByLabel("Cleaning type")).toBeVisible();
   const eventForm = page.locator("#record-event form");
-  await eventForm.getByLabel("Event date").fill("2026-07-14");
+  await eventForm.getByLabel(/date.*Required/).fill("2026-07-14");
   await eventForm.getByText("Add notes (optional)", { exact: true }).click();
   await eventForm.getByLabel("Notes").fill("Verified field cleaning record");
-  await eventForm.getByRole("button", { name: "Save Event" }).click();
+  await eventForm.getByRole("button", { name: "Save record" }).click();
   await expect(page).toHaveURL(/event=/);
   await expect(page.getByText(/Event recorded/)).toBeVisible();
   await page.getByRole("link", { name: "Overview", exact: true }).click();

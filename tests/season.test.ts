@@ -27,11 +27,11 @@ describe("seasonal operation helpers", () => {
         ...seasonalTower,
         seasonal: false,
       }),
-    ).toBe("Year-Round Tower");
+    ).toBe("Year-round tower");
   });
 
   it("labels editable seasonal windows", () => {
-    expect(seasonLabel(seasonalTower)).toBe("Seasonal Tower · May 1–Oct 31");
+    expect(seasonLabel(seasonalTower)).toBe("Seasonal tower · May 1–Oct 31");
   });
 
   it("shows pre-season before the configured start", () => {
@@ -57,6 +57,6 @@ describe("seasonal operation helpers", () => {
         },
         "2026-09-20",
       ),
-    ).toBe("Season shut down");
+    ).toBe("Shut down for the season");
   });
 });

@@ -78,7 +78,7 @@ export default async function TowersPage() {
                 <div className="font-bold">
                   {next
                     ? requiredActionLabel(next.type)
-                    : "No actionable obligation"}
+                    : "No actionable requirement"}
                 </div>
               </div>
               <ComplianceDate
@@ -109,7 +109,7 @@ export default async function TowersPage() {
                 className="btn min-h-11 justify-center"
                 href={`/systems/${row.id}`}
               >
-                Open workspace
+                Open tower
               </Link>
             </article>
           );

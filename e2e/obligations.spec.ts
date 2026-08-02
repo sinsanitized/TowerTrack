@@ -3,12 +3,14 @@ import { test, expect, type Locator } from "@playwright/test";
 test.describe.configure({ timeout: 180_000 });
 
 async function confirmRecorder(recorder: Locator) {
-  await recorder.getByRole("button", { name: "Save Event" }).click();
+  await recorder.getByRole("button", { name: "Save record" }).click();
 }
 
 async function openCompliancePreview(recorder: Locator) {
   const preview = recorder.locator("section").filter({
-    has: recorder.getByRole("heading", { name: "Expected Compliance Impact" }),
+    has: recorder.getByRole("heading", {
+      name: "What saving this record will do",
+    }),
   });
   await expect(preview).toBeVisible();
   return preview;
@@ -24,7 +26,7 @@ test.beforeEach(async ({ page }) => {
     .fill(process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
-  const towerSearch = page.getByRole("combobox", { name: "Search towers" });
+  const towerSearch = page.getByRole("combobox", { name: "Find a tower" });
   await towerSearch.fill("JOB-1001");
   const systemResult = page
     .getByRole("listbox", { name: "Tower search results" })
@@ -35,11 +37,11 @@ test.beforeEach(async ({ page }) => {
   expect(systemUrl).toMatch(/^\/systems\//);
   await page.goto(systemUrl!, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/systems\//);
-  await page.getByRole("link", { name: "Obligations", exact: true }).click();
+  await page.getByRole("link", { name: "Requirements", exact: true }).click();
   await page
-    .getByText("Rule details and obligation completion tools", { exact: true })
+    .getByText("Rule details and completion tools", { exact: true })
     .click();
-  await page.getByRole("button", { name: "Record an event" }).click();
+  await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible();
@@ -48,7 +50,7 @@ test.beforeEach(async ({ page }) => {
 test("disinfection choices explain corrective treatment and full remediation", async ({
   page,
 }) => {
-  await page.getByRole("button", { name: "Record disinfection" }).click();
+  await page.getByRole("button", { name: "Disinfection" }).click();
   const recorder = page.locator("#record-event");
   await expect(
     recorder.getByRole("heading", {
@@ -56,7 +58,7 @@ test("disinfection choices explain corrective treatment and full remediation", a
     }),
   ).toBeVisible();
   await expect(recorder.getByText(/Do not select this if/)).toBeVisible();
-  await recorder.getByLabel("Event date").fill("2026-07-17");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-17");
   const preview = await openCompliancePreview(recorder);
   await expect(
     preview.getByText("Generates Post disinfection retest"),
@@ -64,18 +66,22 @@ test("disinfection choices explain corrective treatment and full remediation", a
   await expect(preview.getByText(/Jul 20, 2026/).first()).toBeVisible();
   await expect(preview.getByText(/Jul 24, 2026/).first()).toBeVisible();
 
-  await recorder.getByLabel("Event date").fill("2026-07-15");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-15");
   await expect(preview.getByText(/Jul 18, 2026/).first()).toBeVisible();
   await expect(
     preview.getByText(/weekend dates inside this window/),
   ).toBeVisible();
 
-  await recorder.getByLabel("Event date").fill("2026-07-11");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-11");
   await expect(
     preview.getByText(/Legal deadline falls on a weekend/),
   ).toBeVisible();
   await expect(preview.getByText(/Fri, Jul 17, 2026/)).toBeVisible();
-  await recorder.getByLabel("Response type").selectOption("FULL_REMEDIATION");
+  await recorder
+    .getByRole("button", {
+      name: /Tower was drained, physically cleaned, and flushed/,
+    })
+    .click();
   await expect(
     recorder.getByRole("heading", {
       name: "Full remediation — complete physical tower treatment",
@@ -111,14 +117,17 @@ test("correction and reversion replay a post-disinfection sample window", async 
     while ((await priorReplayEvent.count()) > 0) {
       await priorReplayEvent.first().click();
       await page
-        .getByLabel("Reason to void (required)")
+        .getByLabel("Reason this record is invalid · Required")
         .fill("Remove an incomplete automated workflow-test record");
-      await page.getByRole("button", { name: "Void event (audited)" }).click();
+      await page.getByLabel(/I understand this voids the record/).check();
+      await page.getByRole("button", { name: "Mark record invalid" }).click();
       await expect(page).toHaveURL(/voidedEvent=1/, { timeout: 30_000 });
       await expect(
         page.getByRole("heading", { name: "Record what happened" }),
       ).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByText(/Event voided/)).toBeVisible();
+      await expect(
+        page.getByText(/Compliance record marked invalid/),
+      ).toBeVisible();
       priorReplayEvent = page
         .locator("#regulatory-events a")
         .filter({ hasText: "Active" })
@@ -126,9 +135,9 @@ test("correction and reversion replay a post-disinfection sample window", async 
         .filter({ hasText: eventDate });
     }
   }
-  await page.getByRole("button", { name: "Record disinfection" }).click();
+  await page.getByRole("button", { name: "Disinfection" }).click();
   let recorder = page.locator("#record-event");
-  await recorder.getByLabel("Event date").fill(triggerDate);
+  await recorder.getByLabel(/date.*Required/).fill(triggerDate);
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder
     .getByLabel("Notes")
@@ -143,7 +152,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
     .locator("section:visible")
     .filter({
       has: page.getByRole("heading", {
-        name: "Open Legionella sampling obligations",
+        name: "Open Legionella sampling requirements",
       }),
     })
     .first();
@@ -161,26 +170,26 @@ test("correction and reversion replay a post-disinfection sample window", async 
     .first()
     .click();
   await expect(
-    page.getByRole("heading", { name: "Correct event details" }),
+    page.getByRole("heading", { name: "Correct record details" }),
   ).toBeVisible();
-  await page.getByLabel("Event date").fill(correctedDate);
-  await expect(page.getByLabel("Event date")).toHaveValue(correctedDate);
+  await page.getByLabel(/date.*Required/).fill(correctedDate);
+  await expect(page.getByLabel(/date.*Required/)).toHaveValue(correctedDate);
   await page
     .getByLabel("Correction reason (required)")
     .fill("Corrected against signed field service record");
-  await page.getByRole("button", { name: "Save corrected event" }).click();
+  await page.getByRole("button", { name: "Save corrected record" }).click();
   await expect(page).toHaveURL(/correctedEvent=/, { timeout: 30_000 });
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Event correction saved")).toBeVisible();
+  await expect(page.getByText(/Compliance record corrected/)).toBeVisible();
   await expect(
     sampling.getByText(new RegExp(`Jan 15, ${year}`)).first(),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Record Legionella sample" }).click();
+  await page.getByRole("button", { name: "Sample" }).click();
   recorder = page.locator("#record-event");
-  await recorder.getByLabel("Event date").fill(collectionDate);
+  await recorder.getByLabel(/date.*Required/).fill(collectionDate);
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder
     .getByLabel("Notes")
@@ -204,14 +213,17 @@ test("correction and reversion replay a post-disinfection sample window", async 
     .first()
     .click();
   await page
-    .getByLabel("Reason to void (required)")
+    .getByLabel("Reason this record is invalid · Required")
     .fill("Completion record reverted for workflow verification");
-  await page.getByRole("button", { name: "Void event (audited)" }).click();
+  await page.getByLabel(/I understand this voids the record/).check();
+  await page.getByRole("button", { name: "Mark record invalid" }).click();
   await expect(page).toHaveURL(/voidedEvent=1/, { timeout: 30_000 });
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/Event voided/)).toBeVisible();
+  await expect(
+    page.getByText(/Compliance record marked invalid/),
+  ).toBeVisible();
   await expect(
     sampling.getByText("Post disinfection retest").first(),
   ).toBeVisible();
@@ -226,14 +238,17 @@ test("correction and reversion replay a post-disinfection sample window", async 
     .first()
     .click();
   await page
-    .getByLabel("Reason to void (required)")
+    .getByLabel("Reason this record is invalid · Required")
     .fill("Triggering treatment record was entered for the wrong tower");
-  await page.getByRole("button", { name: "Void event (audited)" }).click();
+  await page.getByLabel(/I understand this voids the record/).check();
+  await page.getByRole("button", { name: "Mark record invalid" }).click();
   await expect(page).toHaveURL(/voidedEvent=1/, { timeout: 30_000 });
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),
   ).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/Event voided/)).toBeVisible();
+  await expect(
+    page.getByText(/Compliance record marked invalid/),
+  ).toBeVisible();
   await expect(sampling.getByText(new RegExp(`Jan 15, ${year}`))).toHaveCount(
     0,
   );
@@ -242,10 +257,12 @@ test("correction and reversion replay a post-disinfection sample window", async 
 test("startup immediately generates sampling and DOH reporting windows", async ({
   page,
 }) => {
-  await page.getByText("More event types", { exact: true }).click();
+  await page
+    .getByText("Other work and special conditions", { exact: true })
+    .click();
   await page.getByRole("button", { name: "Record startup" }).click();
   const recorder = page.locator("#record-event");
-  await recorder.getByLabel("Event date").fill("2026-07-14");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder.getByLabel("Notes").fill("Seasonal startup field record");
   const startupPreview = await openCompliancePreview(recorder);
@@ -290,13 +307,15 @@ test("startup immediately generates sampling and DOH reporting windows", async (
 test("emergency event creates an immediate sample without a made-up latest date", async ({
   page,
 }) => {
-  await page.getByText("More event types", { exact: true }).click();
+  await page
+    .getByText("Other work and special conditions", { exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Record emergency condition" })
     .click();
   const recorder = page.locator("#record-event");
   await recorder.getByLabel("Emergency trigger").selectOption("BIOCIDE_LOSS");
-  await recorder.getByLabel("Event date").fill("2026-07-14");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder
     .getByLabel("Notes")
@@ -322,18 +341,18 @@ test("emergency event creates an immediate sample without a made-up latest date"
 test("Level 4 date-only result creates review reminders and a retest chain", async ({
   page,
 }) => {
-  await page.getByRole("button", { name: "Record Legionella sample" }).click();
+  await page.getByRole("button", { name: "Sample" }).click();
   let recorder = page.locator("#record-event");
-  await recorder.getByLabel("Event date").fill("2026-07-14");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder
     .getByLabel("Notes")
     .fill("Sample associated with the verified laboratory report");
   await confirmRecorder(recorder);
 
-  await page.getByRole("button", { name: "Record Legionella result" }).click();
+  await page.getByRole("button", { name: "Laboratory result" }).click();
   recorder = page.locator("#record-event");
-  await recorder.getByLabel("Event date").fill("2026-07-14");
+  await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
   await recorder.getByLabel("Result (CFU/mL)").fill("1250");
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder

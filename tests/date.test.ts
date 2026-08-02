@@ -144,7 +144,7 @@ describe("working-day intelligence", () => {
     expect(info.date).toBe("2026-07-19");
     expect(info.weekendRisk).toEqual({
       kind: "DEADLINE_ON_WEEKEND",
-      label: "Legal deadline falls on a weekend",
+      label: "Compliance deadline falls on a weekend",
       lastWorkingDay: "2026-07-17",
     });
   });

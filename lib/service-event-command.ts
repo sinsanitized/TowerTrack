@@ -106,7 +106,7 @@ export function parseServiceEventCommand(
     );
 
   if (parsed.eventType === "REPORT_SUBMITTED" && !parsed.reportType)
-    throw new Error("Choose the reporting obligation that was submitted.");
+    throw new Error("Choose the reporting requirement that was submitted.");
 
   return {
     eventType: parsed.eventType,

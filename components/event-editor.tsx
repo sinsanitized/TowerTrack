@@ -21,6 +21,7 @@ import {
 import { plainEnumLabel, requirementLabel } from "@/lib/labels";
 import { formatOperationalDate } from "@/lib/date";
 import { buttonClass } from "@/lib/button-variants";
+import { SubmitButton } from "@/components/submit-button";
 
 interface EditableEvent {
   id: string;
@@ -106,15 +107,17 @@ export function EventEditor({
     <div className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
       <form action={correctServiceEventAction} className="panel p-6">
         <input type="hidden" name="eventId" value={event.id} />
-        <div className="label">Editable event record</div>
-        <h2 className="mt-1 text-xl font-black">Correct event details</h2>
+        <div className="label">Editable compliance record</div>
+        <h2 className="mt-1 text-xl font-black">
+          The information is wrong—replace it with corrected information
+        </h2>
         <p className="mt-2 text-sm text-slate-600">
           Saving creates an audited replacement and recalculates every open
           obligation. The original record remains visible.
         </p>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="md:col-span-2">
-            <span className="label">Event type</span>
+            <span className="label">Record type · Required</span>
             <select
               className="field mt-1"
               name="eventType"
@@ -131,7 +134,14 @@ export function EventEditor({
             </select>
           </label>
           <label>
-            <span className="label">Event date</span>
+            <span className="label">
+              {eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
+                ? "Sample collection date"
+                : eventType === "LEGIONELLA_RESULT_RECEIVED"
+                  ? "Laboratory result received date"
+                  : "Work completion date"}{" "}
+              · Required
+            </span>
             <input
               className="field mt-1"
               name="eventDate"
@@ -202,7 +212,7 @@ export function EventEditor({
                 value={event.reportingObligationId}
               />
               <label className="md:col-span-2">
-                <span className="label">Reporting obligation submitted</span>
+                <span className="label">Reporting requirement submitted</span>
                 <input
                   className="field mt-1"
                   name="reportType"
@@ -241,9 +251,9 @@ export function EventEditor({
           </label>
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <button className={buttonClass("primary")}>
-            <Save size={17} /> Save corrected event
-          </button>
+          <SubmitButton pendingLabel="Saving corrected record…">
+            <Save size={17} /> Save corrected record
+          </SubmitButton>
           <Link
             className={buttonClass("secondary")}
             href={`/systems/${systemId}`}
@@ -259,17 +269,17 @@ export function EventEditor({
           <h2 className="mt-1 text-xl font-black">Correction impact preview</h2>
           <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-1">
             <div>
-              <dt className="label">Event type</dt>
+              <dt className="label">Record type</dt>
               <dd className="font-black">
                 {plainEnumLabel(event.eventType)} → {plainEnumLabel(eventType)}
               </dd>
             </div>
-            <ComplianceDate value={eventDate} label="Corrected event date" />
+            <ComplianceDate value={eventDate} label="Corrected record date" />
           </dl>
           <div className="mt-4 rounded-lg bg-purple-50 p-3 text-sm font-bold text-purple-950">
             All open sample, inspection, reporting, and corrective projections
-            will be rebuilt from the active event history. Completed work is
-            preserved.
+            will be rebuilt from the active compliance-record history. Completed
+            work is preserved.
           </div>
           <div className="mt-4 space-y-3">
             {preview.error ? (
@@ -300,7 +310,7 @@ export function EventEditor({
                     />
                     <ComplianceDate
                       value={item.latestDueDate}
-                      label="Legal deadline"
+                      label="Compliance deadline"
                       deadline
                       empty={
                         item.priority === "EMERGENCY"
@@ -313,7 +323,8 @@ export function EventEditor({
               ))
             ) : (
               <p className="text-sm font-bold text-slate-600">
-                No new dated obligation is predicted from this corrected event.
+                No new dated requirement is predicted from this corrected
+                record.
               </p>
             )}
           </div>
@@ -322,17 +333,21 @@ export function EventEditor({
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 shrink-0" size={19} />
             <div>
-              <h2 className="font-black">Remove an invalid event</h2>
+              <h2 className="font-black">
+                This record should not exist—mark it invalid
+              </h2>
               <p className="mt-1 text-sm">
-                Removal voids the record without deleting its audit history and
-                recalculates compliance.
+                Marking it invalid keeps it visible in audit history and
+                recalculates compliance from the remaining valid records.
               </p>
             </div>
           </div>
           <form action={voidServiceEventAction} className="mt-4 space-y-3">
             <input type="hidden" name="eventId" value={event.id} />
             <label className="block">
-              <span className="label">Reason to void (required)</span>
+              <span className="label">
+                Reason this record is invalid · Required
+              </span>
               <textarea
                 className="field mt-1 min-h-20"
                 name="reason"
@@ -340,9 +355,25 @@ export function EventEditor({
                 required
               />
             </label>
-            <button className={buttonClass("destructive")}>
-              Void event (audited)
-            </button>
+            <label className="flex items-start gap-2 rounded-lg border border-red-300 bg-white p-3 text-sm font-bold">
+              <input
+                className="mt-1"
+                type="checkbox"
+                name="confirmVoid"
+                value="yes"
+                required
+              />
+              <span>
+                I understand this marks the record invalid, keeps it in audit
+                history, and recalculates dependent requirements and deadlines.
+              </span>
+            </label>
+            <SubmitButton
+              variant="destructive"
+              pendingLabel="Marking record invalid…"
+            >
+              Mark record invalid
+            </SubmitButton>
           </form>
         </section>
       </div>

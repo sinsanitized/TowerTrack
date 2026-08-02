@@ -21,7 +21,7 @@ export function complianceJurisdictionLabel(
 ) {
   if (jurisdiction === "NYC") return "New York City";
   if (jurisdiction === "NYS") return "New York State outside NYC";
-  return "Custom / Out of State";
+  return "Custom or out-of-state";
 }
 
 export function profileSourceLabel(jurisdiction: ComplianceJurisdiction) {

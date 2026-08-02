@@ -30,8 +30,8 @@ const config: TowerRuleConfig = {
   ruleSetVersion: "combined-test",
 };
 
-describe("Record an Event workflow hierarchy", () => {
-  it("keeps frequent work primary and moves cleaning to More Event Types", () => {
+describe("compliance record workflow hierarchy", () => {
+  it("keeps the five familiar work categories primary", () => {
     expect(
       eventDefinitionsForLocation("PRIMARY").map(({ type }) => type),
     ).toEqual([
@@ -39,12 +39,10 @@ describe("Record an Event workflow hierarchy", () => {
       "LEGIONELLA_RESULT_RECEIVED",
       "QUARTERLY_INSPECTION_COMPLETED",
       "HIGH_LEGIONELLA_DISINFECTION",
+      "CLEANING_COMPLETED",
     ]);
     expect(
       eventDefinitionsForLocation("MORE").map(({ type }) => type),
-    ).toContain("CLEANING_COMPLETED");
-    expect(
-      eventDefinitionsForLocation("PRIMARY").map(({ type }) => type),
     ).not.toContain("CLEANING_COMPLETED");
   });
 
@@ -124,7 +122,7 @@ describe("event impact preview", () => {
     });
     expect(preview.satisfied).toEqual([]);
     expect(preview.messages).toContain(
-      "This event will not restore the missed obligation.",
+      "This record will not restore the missed requirement.",
     );
   });
 

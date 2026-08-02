@@ -50,7 +50,7 @@ export function OperationPatternForm({
     <form action={updateSeasonalSettingsAction} className="mt-4 space-y-4">
       <input type="hidden" name="systemId" value={systemId} />
       <fieldset>
-        <legend className="label">Operating Schedule</legend>
+        <legend className="label">Operating schedule</legend>
         <div className="mt-2 grid gap-3 md:grid-cols-2">
           <label
             className={`cursor-pointer rounded-xl border-2 p-4 ${
@@ -181,7 +181,7 @@ export function OperationPatternForm({
             </fieldset>
           </div>
           <p className="mt-3 text-sm font-bold text-slate-700">
-            Seasonal Tower · {months[startMonth - 1]} {startDay} through{" "}
+            Seasonal tower · {months[startMonth - 1]} {startDay} through{" "}
             {months[endMonth - 1]} {endDay}
           </p>
         </div>
@@ -193,9 +193,9 @@ export function OperationPatternForm({
         </div>
         <p className="mt-1">
           Changing this configuration does not prove the tower started or shut
-          down. Record the actual change with <b>Add startup</b> or{" "}
-          <b>Add shutdown</b>; those audited events generate or pause compliance
-          obligations.
+          down. Record the actual change with <b>Record startup</b> or{" "}
+          <b>Record shutdown</b>; those compliance records create or pause
+          requirements.
         </p>
       </div>
 

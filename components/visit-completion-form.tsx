@@ -11,6 +11,7 @@ import {
   type CompletionPreviewObligation,
 } from "@/lib/compliance-intelligence";
 import { activityLabel, plainEnumLabel } from "@/lib/labels";
+import { SubmitButton } from "@/components/submit-button";
 
 type Activity = CompletionPreviewActivity & {
   sourceAuthority: string;
@@ -156,7 +157,7 @@ export function VisitCompletionForm({
       {!readOnly && (
         <div className="mt-6 border-t pt-5">
           <label className="block">
-            <span className="label">Performed date</span>
+            <span className="label">Work completion date · Required</span>
             <input
               className="field mt-1 max-w-xs"
               name="performedDate"
@@ -203,9 +204,13 @@ export function VisitCompletionForm({
               )}
             </ul>
           </section>
-          <button className="btn btn-primary mt-4" disabled={!selected.size}>
+          <SubmitButton
+            className="mt-4"
+            pendingLabel="Saving completed work…"
+            disabled={!selected.size}
+          >
             {completionLabel}
-          </button>
+          </SubmitButton>
         </div>
       )}
     </form>

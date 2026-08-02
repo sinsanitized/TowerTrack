@@ -114,7 +114,7 @@ export default async function CustomersPage() {
     <>
       <PageHeader
         eyebrow="Customers & sites"
-        title="Customer Information"
+        title="Customers"
         description="Create the customer and address first, then add the cooling tower equipment details."
       />
       <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
@@ -218,6 +218,12 @@ export default async function CustomersPage() {
           )}
         </div>
         <aside className="panel p-5">
+          <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
+            <span className="rounded-full bg-emerald-800 px-2 py-1 text-white">
+              Step 1 of 2
+            </span>
+            Customer and address
+          </div>
           <div className="flex items-center gap-2">
             <Plus size={18} />
             <h2 className="font-black">Add customer</h2>
@@ -270,8 +276,10 @@ export default async function CustomersPage() {
             </button>
           </form>
           <p className="mt-4 text-xs text-slate-500">
-            The internal account number is generated automatically. Jurisdiction
-            and rules are selected in the next step.
+            This step saves the customer and address. If you leave before adding
+            equipment, the customer remains marked “Cooling tower details not
+            added” so setup can be resumed. The internal account number is
+            generated automatically.
           </p>
         </aside>
       </div>

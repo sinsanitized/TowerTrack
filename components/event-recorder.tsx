@@ -26,6 +26,7 @@ import { plainEnumLabel, requirementLabel } from "@/lib/labels";
 import { formatOperationalDate } from "@/lib/date";
 import { eventDefinitionsForLocation } from "@/lib/event-workflow";
 import { buttonClass } from "@/lib/button-variants";
+import { SubmitButton } from "@/components/submit-button";
 import {
   canRecordExternalLegionella,
   serviceResponsibilityLabel,
@@ -71,6 +72,7 @@ export function EventRecorder({
   legionellaResponsibility,
   legionellaVendorName,
   onCancel,
+  returnTo,
 }: {
   systemId: string;
   defaultDate: string;
@@ -83,6 +85,7 @@ export function EventRecorder({
   legionellaResponsibility: ServiceResponsibility | null;
   legionellaVendorName?: string | null;
   onCancel?: () => void;
+  returnTo?: string;
 }) {
   const responseTimings = ruleConfig.responseTimings;
   const [ready, setReady] = useState(false);
@@ -114,6 +117,21 @@ export function EventRecorder({
     "HIGH_LEGIONELLA_DISINFECTION",
     "FULL_REMEDIATION",
   ].includes(eventType);
+  const recordDateLabel =
+    eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" ||
+    eventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED"
+      ? "Sample collection date"
+      : eventType === "LEGIONELLA_RESULT_RECEIVED"
+        ? "Laboratory result received date"
+        : eventType === "QUARTERLY_INSPECTION_COMPLETED"
+          ? "Inspection completion date"
+          : isCleaning
+            ? "Cleaning completion date"
+            : isRemediation
+              ? "Disinfection completion date"
+              : isHyper
+                ? "Date performed"
+                : "Completion date";
   const externalLegionella = canRecordExternalLegionella(
     legionellaResponsibility,
   );
@@ -184,11 +202,11 @@ export function EventRecorder({
     <div id="record-event" className="scroll-mt-6">
       <section className="panel p-5">
         <div>
-          <div className="label">Quick event entry</div>
-          <h2 className="mt-1 text-xl font-black">Record what happened</h2>
+          <div className="label">Step 1 of 2 · Choose completed work</div>
+          <h2 className="mt-1 text-xl font-black">What happened?</h2>
           <p className="mt-1 text-sm text-slate-600">
-            TowerTrack will show the sample, inspection, and reporting
-            obligations created by the event. Date-only values stay date-only.
+            Choose the familiar field or office task below. TowerTrack will
+            select the correct compliance record and calculate what comes next.
           </p>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -226,7 +244,7 @@ export function EventRecorder({
               "w-full cursor-pointer text-sm",
             )}
           >
-            More event types
+            Other work and special conditions
           </summary>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {moreEvents.map(({ label, type: value }) => {
@@ -319,16 +337,17 @@ export function EventRecorder({
           className="panel mt-4 grid gap-4 p-5 lg:grid-cols-4"
         >
           <div className="border-b border-slate-200 pb-4 lg:col-span-4">
-            <div className="label">Event details</div>
+            <div className="label">Step 2 of 2 · Enter verified details</div>
             <h3 className="mt-1 text-xl font-black">
               Record {plainEnumLabel(eventType)}
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Enter the verified field information and save. TowerTrack will
-              validate and recalculate compliance automatically.
+              Fields marked Required must be completed. TowerTrack will validate
+              the information and recalculate compliance automatically.
             </p>
           </div>
           <input type="hidden" name="systemId" value={systemId} />
+          {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
           <input type="hidden" name="eventType" value={eventType} />
           <input
             type="hidden"
@@ -378,9 +397,7 @@ export function EventRecorder({
               </div>
             )}
           <label className={isHyper ? "lg:col-span-4 lg:max-w-sm" : ""}>
-            <span className="label">
-              {isHyper ? "Date Performed" : "Event date"}
-            </span>
+            <span className="label">{recordDateLabel} · Required</span>
             <input
               className="field mt-1"
               name="eventDate"
@@ -390,6 +407,10 @@ export function EventRecorder({
               value={eventDate}
               onChange={(event) => setEventDate(event.target.value)}
             />
+            <span className="mt-1 block text-sm text-slate-600">
+              Use the date shown on the field record, laboratory report, or
+              signed service document—not today&apos;s entry date.
+            </span>
           </label>
           {isHyper && (
             <p className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 lg:col-span-4">
@@ -480,21 +501,39 @@ export function EventRecorder({
             </label>
           )}
           {isRemediation && (
-            <label>
-              <span className="label">Response type</span>
-              <select
-                className="field mt-1"
-                value={eventType}
-                onChange={(event) => setEventType(event.target.value)}
-              >
-                <option value="HIGH_LEGIONELLA_DISINFECTION">
-                  Corrective disinfection — adjust or change biocide
-                </option>
-                <option value="FULL_REMEDIATION">
-                  Full remediation — drain, clean and flush
-                </option>
-              </select>
-            </label>
+            <fieldset className="lg:col-span-4">
+              <legend className="label">
+                What work was completed? · Required
+              </legend>
+              <p className="mt-1 text-sm text-slate-700">
+                Choose the statement that matches the signed service record.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <button
+                  className={buttonClass(
+                    eventType === "HIGH_LEGIONELLA_DISINFECTION"
+                      ? "primary"
+                      : "secondary",
+                    "min-h-16 justify-start whitespace-normal text-left",
+                  )}
+                  type="button"
+                  onClick={() => setEventType("HIGH_LEGIONELLA_DISINFECTION")}
+                >
+                  Biocide was adjusted or changed; tower was not fully drained,
+                  cleaned, and flushed
+                </button>
+                <button
+                  className={buttonClass(
+                    eventType === "FULL_REMEDIATION" ? "primary" : "secondary",
+                    "min-h-16 justify-start whitespace-normal text-left",
+                  )}
+                  type="button"
+                  onClick={() => setEventType("FULL_REMEDIATION")}
+                >
+                  Tower was drained, physically cleaned, and flushed
+                </button>
+              </div>
+            </fieldset>
           )}
           {isRemediation && (
             <div
@@ -612,7 +651,7 @@ export function EventRecorder({
             aria-live="polite"
           >
             <div className="label">Before saving</div>
-            <h3 className="mt-1 font-black">Expected Compliance Impact</h3>
+            <h3 className="mt-1 font-black">What saving this record will do</h3>
             <div className="mt-3">
               {preview.error ? (
                 <p className="text-sm font-bold">
@@ -663,7 +702,7 @@ export function EventRecorder({
                             />
                             <ComplianceDate
                               value={obligation.latestDueDate}
-                              label="Legal deadline"
+                              label="Compliance deadline"
                               deadline
                               empty={
                                 obligation.priority === "EMERGENCY"
@@ -684,10 +723,16 @@ export function EventRecorder({
                   compliance.
                 </p>
               )}
-              <p className="mt-3 text-xs font-bold text-blue-800">
-                This is a preview from the tower&apos;s current rule profile.
-                Final obligations are generated only after the event is saved.
-              </p>
+              <details className="mt-3 text-sm">
+                <summary className="cursor-pointer font-bold text-blue-900">
+                  How TowerTrack calculated this
+                </summary>
+                <p className="mt-2 text-blue-800">
+                  This preview uses the tower&apos;s current compliance rules.
+                  Final requirements are generated only after the record is
+                  saved.
+                </p>
+              </details>
             </div>
           </section>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end lg:col-span-4">
@@ -703,13 +748,13 @@ export function EventRecorder({
                 Cancel
               </button>
             )}
-            <button
-              className={buttonClass("primary", "min-h-11 w-full lg:w-auto")}
-              type="submit"
+            <SubmitButton
+              className="min-h-11 w-full lg:w-auto"
+              pendingLabel="Saving compliance record…"
               disabled={Boolean(preview.error)}
             >
-              Save Event
-            </button>
+              Save record
+            </SubmitButton>
           </div>
         </form>
       )}

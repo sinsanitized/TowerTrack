@@ -19,7 +19,9 @@ test("administrator adds a supported jurisdiction rule", async ({ page }) => {
   await profile.locator("summary").first().click();
   await addSummary.click();
   const form = addRule.locator("form");
-  const requirementType = await form.getByLabel("Obligation type").inputValue();
+  const requirementType = await form
+    .getByLabel("Requirement type")
+    .inputValue();
   await form
     .getByLabel("Rule name")
     .fill(`Verified ${requirementType.toLowerCase()} rule`);

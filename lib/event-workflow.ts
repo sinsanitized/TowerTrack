@@ -18,33 +18,33 @@ export type EventWorkflowDefinition = {
 export const eventWorkflowDefinitions: readonly EventWorkflowDefinition[] = [
   {
     type: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
-    label: "Record Legionella sample",
+    label: "Sample",
     classification: "FREQUENT_FIELD",
     location: "PRIMARY",
   },
   {
     type: "LEGIONELLA_RESULT_RECEIVED",
-    label: "Record Legionella result",
+    label: "Laboratory result",
     classification: "OFFICE_ADMINISTRATIVE",
     location: "PRIMARY",
   },
   {
     type: "QUARTERLY_INSPECTION_COMPLETED",
-    label: "Record inspection",
+    label: "Inspection",
     classification: "FREQUENT_FIELD",
     location: "PRIMARY",
   },
   {
     type: "HIGH_LEGIONELLA_DISINFECTION",
-    label: "Record disinfection",
+    label: "Disinfection",
     classification: "FREQUENT_FIELD",
     location: "PRIMARY",
   },
   {
     type: "CLEANING_COMPLETED",
-    label: "Record cleaning",
+    label: "Cleaning",
     classification: "INFREQUENT_FIELD",
-    location: "MORE",
+    location: "PRIMARY",
   },
   {
     type: "SUMMERTIME_HYPERHALOGENATION",

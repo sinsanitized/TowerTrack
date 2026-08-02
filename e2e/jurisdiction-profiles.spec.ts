@@ -17,10 +17,10 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
 }) => {
   await page.goto("/deadlines?configuration=NYC_AND_NYS");
   const table = page.getByRole("table", {
-    name: "All cooling tower deadline obligations",
+    name: "All cooling tower requirements",
   });
   await table.getByRole("row").nth(1).getByRole("link").first().click();
-  await expect(page.getByText("Compliance Rules").first()).toBeVisible();
+  await expect(page.getByText("Compliance rules").first()).toBeVisible();
   await expect(
     page.getByText("NYC Chapter 8 + New York State").first(),
   ).toBeVisible();
@@ -30,11 +30,11 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
     .click();
   await page.getByRole("link", { name: "Edit customer & tower" }).click();
   await expect(
-    page.getByText("Compliance Rules", { exact: true }).first(),
+    page.getByText("Compliance rules", { exact: true }).first(),
   ).toBeVisible();
   await page
     .locator("summary")
-    .filter({ hasText: "Change Compliance Rules" })
+    .filter({ hasText: "Change compliance rules" })
     .click();
   await expect(page.getByLabel("Rule configuration")).toBeVisible();
   await expect(page.getByLabel("Assigned profile version")).toBeVisible();

@@ -1,14 +1,88 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate } from "@/components/compliance-date";
+import { StatusBadge } from "@/components/status-badge";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { dateOnly, diffDays, formatDate, todayDateOnly } from "@/lib/date";
 import { formatLegionellaResult, plainEnumLabel } from "@/lib/labels";
 import { buttonClass } from "@/lib/button-variants";
+import {
+  matchesSampleQueueFilter,
+  sampleQueueFilters,
+  sampleQueueState,
+  sortSampleQueue,
+  type SampleQueueFilter,
+  type SampleQueueState,
+} from "@/lib/sample-queue";
 import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
+import { withReturnPath } from "@/lib/workflow-context";
 
-export default async function SamplesPage() {
+const filterLabels: Record<SampleQueueFilter, string> = {
+  ACTION_NEEDED: "Action needed",
+  WAITING: "Waiting on another party",
+  COMPLETED: "Completed",
+  ALL: "All samples",
+};
+
+const statePresentation: Record<
+  SampleQueueState,
+  {
+    color: "GREEN" | "YELLOW" | "PURPLE" | "GRAY";
+    label: string;
+    article: string;
+  }
+> = {
+  RESPONSIBILITY_UNKNOWN: {
+    color: "PURPLE",
+    label: "Responsibility unknown",
+    article: "border-l-purple-500 bg-purple-50/40",
+  },
+  ACTION_NEEDED: {
+    color: "YELLOW",
+    label: "Enter result",
+    article: "border-l-amber-500 bg-amber-50/40",
+  },
+  WAITING_EXTERNAL: {
+    color: "PURPLE",
+    label: "Waiting on another party",
+    article: "border-l-purple-400 bg-purple-50/30",
+  },
+  REFERENCE_ONLY: {
+    color: "GRAY",
+    label: "Reference only",
+    article: "border-l-slate-300 bg-slate-50/60",
+  },
+  COMPLETED: {
+    color: "GREEN",
+    label: "Result entered",
+    article: "border-l-emerald-500 bg-emerald-50/30",
+  },
+};
+
+function requestedFilter(
+  value: string | string[] | undefined,
+): SampleQueueFilter {
+  return typeof value === "string" &&
+    sampleQueueFilters.includes(value as SampleQueueFilter)
+    ? (value as SampleQueueFilter)
+    : "ACTION_NEEDED";
+}
+
+export default async function SamplesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
+  const query = await searchParams;
+  const filter = requestedFilter(query.status);
+  const search =
+    typeof query.q === "string" ? query.q.trim().toLowerCase() : "";
+  const today = todayDateOnly();
+  const workflowNotice =
+    typeof query.workflowNotice === "string" ? query.workflowNotice : null;
+  const sampleReturnTo = `/samples?status=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
   const samples = await db.serviceEvent.findMany({
     where: {
       eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
@@ -18,40 +92,172 @@ export default async function SamplesPage() {
       },
     },
     orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-    take: 100,
+    take: 250,
     include: {
-      coolingTowerSystem: { include: { building: true } },
+      coolingTowerSystem: {
+        include: { building: { include: { customer: true } } },
+      },
       labResultsForSample: { orderBy: { receivedDate: "desc" }, take: 1 },
     },
   });
+  const queue = sortSampleQueue(
+    samples.map((sample) => ({
+      ...sample,
+      eventDateValue: sample.eventDate,
+      eventDate: dateOnly(sample.eventDate),
+      responsibility: sample.coolingTowerSystem.laboratoryResultResponsibility,
+      resultEntered: sample.labResultsForSample.length > 0,
+    })),
+  );
+  const counts = {
+    ACTION_NEEDED: queue.filter((item) =>
+      matchesSampleQueueFilter(item, "ACTION_NEEDED"),
+    ).length,
+    WAITING: queue.filter((item) => matchesSampleQueueFilter(item, "WAITING"))
+      .length,
+    COMPLETED: queue.filter((item) =>
+      matchesSampleQueueFilter(item, "COMPLETED"),
+    ).length,
+    ALL: queue.length,
+  };
+  const visibleSamples = queue.filter((item) => {
+    if (!matchesSampleQueueFilter(item, filter)) return false;
+    if (!search) return true;
+    const tower = item.coolingTowerSystem;
+    return [
+      tower.systemName,
+      tower.internalJobNumber,
+      tower.building.buildingName,
+      tower.building.customer.name,
+    ].some((value) => value.toLowerCase().includes(search));
+  });
+
   return (
     <>
       <PageHeader
-        eyebrow="Field and laboratory records"
+        eyebrow="Sample follow-up"
         title="Samples"
-        description="Legionella collections and their most recent linked result."
+        description="Resolve missing Legionella results first, then review completed sample records."
       />
-      <div className="panel divide-y divide-slate-200">
-        {samples.map((sample) => {
+      {workflowNotice && (
+        <div
+          className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950"
+          role="status"
+        >
+          {workflowNotice} Continue with the next sample below.
+        </div>
+      )}
+      <section
+        className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="Sample status summary"
+      >
+        {sampleQueueFilters.map((item) => {
+          const selected = filter === item;
+          const color =
+            item === "ACTION_NEEDED"
+              ? "border-amber-400 bg-amber-50 text-amber-950"
+              : item === "WAITING"
+                ? "border-purple-300 bg-purple-50 text-purple-950"
+                : item === "COMPLETED"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                  : "border-slate-300 bg-white text-slate-800";
+          return (
+            <Link
+              key={item}
+              href={`/samples?status=${item}${search ? `&q=${encodeURIComponent(search)}` : ""}`}
+              aria-current={selected ? "page" : undefined}
+              className={`rounded-xl border p-4 transition-colors ${color} ${selected ? "ring-2 ring-emerald-800 ring-offset-2" : "hover:border-emerald-500"}`}
+            >
+              <div className="text-sm font-black">{filterLabels[item]}</div>
+              <div className="mt-1 text-2xl font-black">{counts[item]}</div>
+            </Link>
+          );
+        })}
+      </section>
+      <form
+        className="panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-end"
+        method="get"
+      >
+        <input type="hidden" name="status" value={filter} />
+        <label className="grow">
+          <span className="label">
+            Find a customer, facility, tower, or job
+          </span>
+          <input
+            className="field mt-1"
+            type="search"
+            name="q"
+            defaultValue={typeof query.q === "string" ? query.q : ""}
+            placeholder="Search samples"
+          />
+        </label>
+        <button className={buttonClass("secondary", "min-h-11 justify-center")}>
+          Search
+        </button>
+        {(search || filter !== "ACTION_NEEDED") && (
+          <Link
+            className={buttonClass("secondary", "min-h-11 justify-center")}
+            href="/samples"
+          >
+            Reset
+          </Link>
+        )}
+      </form>
+      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
+        <div className="font-black">
+          {filter === "ACTION_NEEDED"
+            ? "Start with the oldest sample below. Enter its laboratory result or assign who is responsible."
+            : filter === "WAITING"
+              ? "No entry is required yet. Follow up with the customer or vendor named on each sample."
+              : filter === "COMPLETED"
+                ? "These samples already have results. Open a record only to review its details."
+                : "All samples are shown. Use the status on each row to decide what happens next."}
+        </div>
+      </div>
+      <div className="panel divide-y divide-slate-200 overflow-hidden">
+        {visibleSamples.map((sample) => {
           const result = sample.labResultsForSample[0];
+          const state = sampleQueueState(sample);
+          const presentation = statePresentation[state];
+          const age = diffDays(sample.eventDate, today);
+          const responsibility =
+            sample.coolingTowerSystem.laboratoryResultResponsibility;
+          const statusLabel =
+            state === "WAITING_EXTERNAL"
+              ? responsibility === "CUSTOMER"
+                ? "Waiting on customer"
+                : "Waiting on vendor"
+              : presentation.label;
           return (
             <article
               key={sample.id}
-              className="grid gap-3 p-5 md:grid-cols-[1fr_180px_180px_auto] md:items-center"
+              className={`grid gap-4 border-l-4 p-5 xl:grid-cols-[minmax(240px,1.2fr)_180px_minmax(220px,1fr)_auto] xl:items-center ${presentation.article}`}
             >
               <div>
-                <div className="font-black">
+                <StatusBadge color={presentation.color} label={statusLabel} />
+                <div className="mt-3 font-black">
                   {sample.coolingTowerSystem.systemName}
                 </div>
-                <div className="text-sm text-slate-600">
+                <div className="text-sm font-bold text-slate-700">
                   {sample.coolingTowerSystem.building.buildingName}
                 </div>
+                <div className="text-xs text-slate-600">
+                  {sample.coolingTowerSystem.building.customer.name} ·{" "}
+                  {sample.coolingTowerSystem.internalJobNumber}
+                </div>
               </div>
-              <ComplianceDate
-                value={sample.eventDate}
-                label="Sample collected"
-                compact
-              />
+              <div>
+                <ComplianceDate
+                  value={sample.eventDateValue}
+                  label="Sample collected"
+                  compact
+                />
+                <div className="mt-2 text-xs font-bold text-slate-600">
+                  {age === 0
+                    ? "Collected today"
+                    : `${age} calendar day${age === 1 ? "" : "s"} ago`}
+                </div>
+              </div>
               <div>
                 <div className="label">Laboratory result</div>
                 <div className="mt-1 font-black">
@@ -59,47 +265,57 @@ export default async function SamplesPage() {
                     ? formatLegionellaResult(result.cfuPerMl)
                     : "No result entered"}
                 </div>
-                {result && (
-                  <div className="text-xs text-slate-600">
-                    {plainEnumLabel(result.level)}
+                {result ? (
+                  <div className="mt-1 text-xs text-slate-600">
+                    {plainEnumLabel(result.level)} · Received{" "}
+                    {formatDate(result.receivedDate)}
                   </div>
-                )}
-                {!result && (
-                  <div className="mt-1 text-xs font-bold text-purple-800">
-                    {sample.coolingTowerSystem.laboratoryResultResponsibility ==
-                    null
-                      ? "Waiting on responsibility review"
-                      : sample.coolingTowerSystem
-                            .laboratoryResultResponsibility === "CUSTOMER"
-                        ? "Waiting on customer"
-                        : sample.coolingTowerSystem
-                              .laboratoryResultResponsibility === "OTHER_VENDOR"
-                          ? "Waiting on vendor"
-                          : sample.coolingTowerSystem
-                                .laboratoryResultResponsibility ===
-                              "NOT_TRACKED"
-                            ? "Reference only"
-                            : "Waiting on laboratory result"}
+                ) : (
+                  <div className="mt-1 text-xs font-bold text-slate-700">
+                    {serviceResponsibilityLabel(responsibility)}
                   </div>
                 )}
               </div>
               <Link
                 className={buttonClass(
-                  result ? "secondary" : "primary",
-                  "min-h-11 justify-center",
+                  state === "ACTION_NEEDED" ? "primary" : "secondary",
+                  "min-h-11 w-full justify-center text-center xl:w-auto",
                 )}
-                href={`/systems/${sample.coolingTowerSystemId}?sampleEventId=${sample.id}`}
+                href={
+                  state === "ACTION_NEEDED"
+                    ? withReturnPath(
+                        `/systems/${sample.coolingTowerSystemId}?labSample=${sample.id}#record-event`,
+                        sampleReturnTo,
+                      )
+                    : state === "RESPONSIBILITY_UNKNOWN"
+                      ? withReturnPath(
+                          `/systems/${sample.coolingTowerSystemId}/edit?focus=laboratoryResultResponsibility#service-responsibilities`,
+                          sampleReturnTo,
+                        )
+                      : `/systems/${sample.coolingTowerSystemId}?view=history`
+                }
               >
-                {result
-                  ? "View tower"
-                  : sample.coolingTowerSystem.laboratoryResultResponsibility ===
-                      "OUR_COMPANY"
-                    ? "Enter result"
-                    : `Review · ${serviceResponsibilityLabel(sample.coolingTowerSystem.laboratoryResultResponsibility)}`}
+                {state === "ACTION_NEEDED"
+                  ? "Enter laboratory result"
+                  : state === "RESPONSIBILITY_UNKNOWN"
+                    ? "Assign responsibility"
+                    : state === "WAITING_EXTERNAL"
+                      ? "View waiting details"
+                      : state === "COMPLETED"
+                        ? "View sample record"
+                        : "Open tower"}
               </Link>
             </article>
           );
         })}
+        {!visibleSamples.length && (
+          <div className="p-8 text-center">
+            <h2 className="font-black">No samples match this view</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Choose another status or clear the search.
+            </p>
+          </div>
+        )}
       </div>
     </>
   );

@@ -130,7 +130,7 @@ function sampleTiming(rule: RuleSummary, internalTargetDays: number | null) {
   if (rule.requirementType === "ROUTINE_LEGIONELLA_SAMPLE")
     return rule.frequencyDays == null
       ? "No verified Legionella sampling interval is configured."
-      : `The legal deadline is day ${rule.frequencyDays} after the last qualifying sample.${internalTargetDays ? ` The internal service target is day ${internalTargetDays}.` : " No earlier internal target is set."}`;
+      : `The compliance deadline is day ${rule.frequencyDays} after the last qualifying sample.${internalTargetDays ? ` The recommended service date is day ${internalTargetDays}.` : " No earlier recommended service date is set."}`;
   if (rule.requirementType === "SUMMERTIME_HYPERHALOGENATION") {
     const minimum =
       rule.minimumDaysAfterTrigger ?? nycRuleDisplay.hyperSampleMinimumDays;
@@ -143,7 +143,7 @@ function sampleTiming(rule: RuleSummary, internalTargetDays: number | null) {
   if (rule.requirementType === "PORTAL_SAMPLE_DATE")
     return "This reports a completed sample; it does not create another Legionella sample.";
   if (rule.requirementType === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
-    return "This is a separate bacteriological monitoring obligation and does not replace the Legionella culture schedule.";
+    return "This is a separate bacteriological monitoring requirement and does not replace the Legionella culture schedule.";
   if (rule.requirementType === "ANNUAL_CLEANING")
     return "Cleaning is separate from sampling. Startup sampling is valid only 3–14 days after startup; another cleaning may share a visit with routine sampling only on mutually valid dates.";
   if (
@@ -217,11 +217,25 @@ export default async function AdminPage({
       <PageHeader
         eyebrow="Configuration"
         title="Admin"
-        description="Set the legal hard interval and the earlier internal service target, then review each obligation in plain English. Every save is audited and recalculates affected towers."
+        description="Set the compliance interval and the earlier recommended service date, then review each requirement in plain English. Every save is audited and recalculates affected towers."
       />
+      <nav
+        className="panel mb-6 flex flex-wrap gap-2 p-3"
+        aria-label="Admin sections"
+      >
+        <a className="btn" href="#users">
+          Users
+        </a>
+        <a className="btn" href="#compliance-rules">
+          Compliance rules
+        </a>
+        <a className="btn" href="#data-exchange">
+          Imports and exports
+        </a>
+      </nav>
       <details className="panel mb-6 overflow-hidden">
         <summary className="cursor-pointer list-none p-5 font-black text-emerald-900">
-          Create Custom / Out of State profile
+          Create custom or out-of-state profile
         </summary>
         <form
           action={createCustomRuleProfileAction}
@@ -259,8 +273,8 @@ export default async function AdminPage({
             />
           </label>
           <p className="text-sm font-bold text-amber-900 sm:col-span-2">
-            Safe default: the new profile starts with no enabled obligations and
-            never inherits NYC rules.
+            Safe default: the new profile starts with no enabled requirements
+            and never inherits NYC rules.
           </p>
           <button className="btn btn-primary sm:col-span-2">
             Create empty custom profile
@@ -283,6 +297,7 @@ export default async function AdminPage({
         </div>
       )}
       <section
+        id="users"
         className="panel mb-6 p-5"
         aria-labelledby="user-management-title"
       >
@@ -436,7 +451,10 @@ export default async function AdminPage({
           </table>
         </div>
       </section>
-      <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
+      <div
+        id="compliance-rules"
+        className="scroll-mt-6 grid gap-6 xl:grid-cols-[1fr_300px]"
+      >
         <div className="space-y-5">
           {profiles.map((profile) => {
             const routineRule = profile.rules.find(
@@ -494,7 +512,7 @@ export default async function AdminPage({
                       </div>
                       <div className="mt-1 text-xs text-slate-500">
                         {profile._count.systems} towers · {profile._count.rules}{" "}
-                        obligation rules
+                        requirement rules
                       </div>
                     </div>
                   </div>
@@ -504,7 +522,7 @@ export default async function AdminPage({
                   <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="label">Routine Legionella timing</div>
                     <h3 className="mt-1 text-lg font-black">
-                      Legal deadline and service target
+                      Compliance deadline and recommended service date
                     </h3>
                     <p className="mt-2 max-w-3xl text-sm text-slate-600">
                       The hard interval is the maximum permitted gap between
@@ -579,7 +597,7 @@ export default async function AdminPage({
                     <section className="rounded-xl border border-sky-200 bg-sky-50 p-4">
                       <div className="label">Legionella sample date ranges</div>
                       <h3 className="mt-1 text-lg font-black">
-                        Events that create a sample obligation
+                        Records that create a sampling requirement
                       </h3>
                       <div className="mt-4 overflow-x-auto">
                         <table className="w-full min-w-[620px] text-left text-sm">
@@ -603,7 +621,7 @@ export default async function AdminPage({
                               </td>
                             </tr>
                             <tr>
-                              <th className="py-3 pr-4">System startup</th>
+                              <th className="py-3 pr-4">Tower startup</th>
                               <td className="py-3 pr-4 font-bold">
                                 Day {nycRuleDisplay.startupSampleMinimumDays}–
                                 {nycRuleDisplay.startupSampleMaximumDays}
@@ -669,7 +687,7 @@ export default async function AdminPage({
                   )}
 
                   <section>
-                    <div className="label">Obligation rules</div>
+                    <div className="label">Requirement rules</div>
                     <h3 className="mt-1 text-lg font-black">
                       What is required and when
                     </h3>
@@ -693,7 +711,7 @@ export default async function AdminPage({
                             value={profile.id}
                           />
                           <label>
-                            <span className="label">Obligation type</span>
+                            <span className="label">Requirement type</span>
                             <select
                               className="field mt-1"
                               name="requirementType"
@@ -731,7 +749,9 @@ export default async function AdminPage({
                                 name="triggerActivityType"
                                 defaultValue=""
                               >
-                                <option value="">Not event-triggered</option>
+                                <option value="">
+                                  Not created by a record
+                                </option>
                                 {customTriggerActivities.map((activity) => (
                                   <option key={activity} value={activity}>
                                     {plainEnumLabel(activity)}
@@ -1033,8 +1053,8 @@ export default async function AdminPage({
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">
                                   Scope is displayed for audit clarity; only
-                                  rule timing supported by the obligation engine
-                                  is editable here.
+                                  rule timing supported by TowerTrack is
+                                  editable here.
                                 </p>
                               </div>
                               <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm font-bold">
@@ -1082,11 +1102,11 @@ export default async function AdminPage({
           })}
         </div>
         <aside className="space-y-5">
-          <div className="panel p-5">
+          <div id="data-exchange" className="panel scroll-mt-6 p-5">
             <h2 className="font-black">Before changing a rule</h2>
             <p className="mt-2 text-sm text-slate-600">
               Verify the legal or policy source. Saving changes recalculates
-              current obligations for every tower using that jurisdiction.
+              current requirements for every tower using that jurisdiction.
             </p>
             <p className="mt-3 text-sm font-bold text-amber-900">
               The internal target is operational guidance. It never extends the

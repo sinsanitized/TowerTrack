@@ -338,7 +338,7 @@ export function weekendDeadlineRisk(value: string | Date): WeekendDeadlineRisk {
   if (isWeekend(deadline))
     return {
       kind: "DEADLINE_ON_WEEKEND",
-      label: "Legal deadline falls on a weekend",
+      label: "Compliance deadline falls on a weekend",
       lastWorkingDay: lastWorkingDayBefore(deadline),
     };
   if (isWeekend(addDays(deadline, -1)))

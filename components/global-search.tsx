@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
+import { buttonClass } from "@/lib/button-variants";
 
 export interface GlobalSearchItem {
   id: string;
@@ -63,6 +64,7 @@ export function GlobalSearch() {
       }}
     >
       <form
+        className="flex items-center gap-2"
         role="search"
         onSubmit={async (event) => {
           event.preventDefault();
@@ -83,28 +85,41 @@ export function GlobalSearch() {
           window.location.assign(first.href);
         }}
       >
-        <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-        <input
-          aria-label="Search towers"
-          aria-autocomplete="list"
-          aria-controls="global-search-results"
-          aria-expanded={open && Boolean(normalizedQuery)}
-          role="combobox"
-          autoComplete="off"
-          className="field pl-10"
-          placeholder="Search building, system, job number…"
-          type="search"
-          disabled={!hydrated}
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") setOpen(false);
-          }}
-        />
+        <div className="relative min-w-0 flex-1">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+            size={18}
+          />
+          <input
+            aria-label="Find a tower"
+            aria-autocomplete="list"
+            aria-controls="global-search-results"
+            aria-expanded={open && Boolean(normalizedQuery)}
+            role="combobox"
+            autoComplete="off"
+            className="field pl-10"
+            placeholder="Customer, building, address, tower, or job number"
+            type="search"
+            disabled={!hydrated}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setOpen(false);
+            }}
+          />
+        </div>
+        <button
+          className={buttonClass("secondary", "min-h-11 shrink-0 px-3")}
+          type="submit"
+        >
+          <Search size={17} aria-hidden />
+          <span className="hidden sm:inline">Find tower</span>
+          <span className="sr-only sm:hidden">Find tower</span>
+        </button>
       </form>
       {open && normalizedQuery && (
         <div

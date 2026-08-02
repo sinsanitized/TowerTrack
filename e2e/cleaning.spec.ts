@@ -15,16 +15,16 @@ test.beforeEach(async ({ page }) => {
 test("operations manager can record cleaning without creating or resetting a sample window", async ({
   page,
 }) => {
-  const search = page.getByRole("combobox", { name: "Search towers" });
+  const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("100 Park Avenue");
   await search.press("Enter");
-  await page.getByRole("link", { name: "Obligations", exact: true }).click();
+  await page.getByRole("link", { name: "Requirements", exact: true }).click();
   await page
-    .getByText("Rule details and obligation completion tools", { exact: true })
+    .getByText("Rule details and completion tools", { exact: true })
     .click();
 
   const samplingHeading = page.getByRole("heading", {
-    name: "Open Legionella sampling obligations",
+    name: "Open Legionella sampling requirements",
   });
   await expect(samplingHeading).toBeVisible();
   const samplingSection = samplingHeading.locator("..");
@@ -37,17 +37,16 @@ test("operations manager can record cleaning without creating or resetting a sam
       })),
     );
 
-  await page.getByRole("button", { name: "Record an event" }).click();
-  await page.getByText("More event types", { exact: true }).click();
-  await page.getByRole("button", { name: "Record cleaning" }).click();
+  await page.getByRole("button", { name: "Add compliance record" }).click();
+  await page.getByRole("button", { name: "Cleaning" }).click();
   await expect(page.getByLabel("Cleaning type")).toBeVisible();
   const cleaningForm = page.locator("#record-event form");
-  await cleaningForm.getByLabel("Event date").fill("2026-07-14");
+  await cleaningForm.getByLabel(/Cleaning completion date/).fill("2026-07-14");
   await cleaningForm.getByText("Add notes (optional)", { exact: true }).click();
   await cleaningForm
     .getByLabel("Notes")
     .fill("Record cleaning separately from regulatory sampling");
-  await cleaningForm.getByRole("button", { name: "Save Event" }).click();
+  await cleaningForm.getByRole("button", { name: "Save record" }).click();
 
   await expect(page).toHaveURL(/event=/);
   await expect(page.getByText("Cleaning completed").last()).toBeVisible();

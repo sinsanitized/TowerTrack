@@ -33,8 +33,8 @@ function monthDay(month: number, day: number) {
 export function seasonLabel(system: SeasonalFields) {
   if ("operationPeriodType" in system && system.operationPeriodType == null)
     return "Schedule not set";
-  if (!system.seasonal) return "Year-Round Tower";
-  return `Seasonal Tower · ${monthDay(
+  if (!system.seasonal) return "Year-round tower";
+  return `Seasonal tower · ${monthDay(
     system.seasonStartMonth,
     system.seasonStartDay,
   )}–${monthDay(system.seasonEndMonth, system.seasonEndDay)}`;
@@ -61,9 +61,9 @@ export function seasonalStatus(
     ? dateOnly(system.actualShutdownDate)
     : null;
   if (shutdown && shutdown >= start && today > shutdown)
-    return "Season shut down";
+    return "Shut down for the season";
   if (startup && startup <= today && today <= end) return "Operating season";
   if (today < start) return "Pre-season";
-  if (today > end) return "Off season";
-  return "Expected operating season";
+  if (today > end) return "Off-season";
+  return "Within expected operating season — startup not recorded";
 }
