@@ -22,6 +22,7 @@ import {
 import {
   activitiesCanShareVisit,
   completedEventsConflictOnSameDate,
+  annualCleaningCompletionDates,
   isAnnualCleaningActivity,
 } from "@/lib/activity-compatibility";
 import { rebuildSystemComplianceProjections } from "@/lib/obligation-projections";
@@ -1434,7 +1435,7 @@ export async function createVisitOpportunityAction(formData: FormData) {
               ],
             },
           },
-          select: { eventDate: true },
+          select: { eventType: true, eventDate: true },
         },
       },
     }),
@@ -1476,7 +1477,7 @@ export async function createVisitOpportunityAction(formData: FormData) {
   ];
   const visitYear = Number(parsed.visitDate.slice(0, 4));
   const cleaningProgress = annualCleaningProgress(
-    system.serviceEvents.map((event) => dateOnly(event.eventDate)),
+    annualCleaningCompletionDates(system.serviceEvents).map(dateOnly),
     visitYear,
   );
   const projectedCleaning =
@@ -1939,7 +1940,7 @@ export async function rescheduleVisitAction(formData: FormData) {
             ],
           },
         },
-        select: { eventDate: true },
+        select: { eventType: true, eventDate: true },
       },
     },
   });
@@ -1970,7 +1971,9 @@ export async function rescheduleVisitAction(formData: FormData) {
           ? (() => {
               const year = Number(requestedYear);
               const progress = annualCleaningProgress(
-                system.serviceEvents.map((event) => dateOnly(event.eventDate)),
+                annualCleaningCompletionDates(system.serviceEvents).map(
+                  dateOnly,
+                ),
                 year,
               );
               const cleaning = nextAnnualCleaningObligation({

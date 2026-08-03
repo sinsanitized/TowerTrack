@@ -10,6 +10,11 @@ const CLEANING_EVENT_TYPES = new Set([
   "STARTUP_CLEANING_DISINFECTION",
 ]);
 
+const ANNUAL_CLEANING_COMPLETION_EVENT_TYPES = new Set([
+  ...CLEANING_EVENT_TYPES,
+  "FULL_REMEDIATION",
+]);
+
 export function activitiesCanShareVisit(left: string, right: string) {
   const cleaningAndHyper =
     (ANNUAL_CLEANING_ACTIVITY_TYPES.has(left) &&
@@ -33,4 +38,14 @@ export function isAnnualCleaningActivity(activityType: string) {
 
 export function isCleaningCompletionEvent(eventType: string) {
   return CLEANING_EVENT_TYPES.has(eventType);
+}
+
+export function annualCleaningCompletionDates(
+  events: Array<{ eventType: string; eventDate: string | Date }>,
+) {
+  return events
+    .filter((event) =>
+      ANNUAL_CLEANING_COMPLETION_EVENT_TYPES.has(event.eventType),
+    )
+    .map((event) => event.eventDate);
 }
