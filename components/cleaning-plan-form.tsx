@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createAnnualCleaningPlanAction } from "@/app/actions";
 import { formatOperationalDate, nextWorkingDate } from "@/lib/date";
+import { SubmitButton } from "@/components/submit-button";
 
 export function CleaningPlanForm({
   systemId,
@@ -89,17 +90,22 @@ export function CleaningPlanForm({
         </label>
       </div>
       <label className="block">
-        <span className="label">Reason for planning</span>
+        <span className="label">
+          Why is this plan being created? · Required
+        </span>
         <input
           className="field mt-1"
           name="reason"
+          aria-label="Reason for planning"
           required
           minLength={8}
           maxLength={2000}
-          defaultValue="Plan the next required annual cleaning"
+          placeholder="Example: Scheduled the next required annual cleaning"
         />
       </label>
-      <button className="btn btn-primary">Create two-day cleaning plan</button>
+      <SubmitButton pendingLabel="Creating cleaning plan…">
+        Create two-day cleaning plan
+      </SubmitButton>
     </form>
   );
 }

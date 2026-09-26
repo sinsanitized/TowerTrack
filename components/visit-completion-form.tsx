@@ -72,6 +72,12 @@ export function VisitCompletionForm({
   return (
     <form action={completeVisitAction} className="mt-5">
       <input type="hidden" name="visitId" value={visitId} />
+      {!readOnly && (
+        <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950">
+          Select only the work actually completed. All planned activities are
+          selected by default.
+        </p>
+      )}
       <div className="space-y-3">
         {activities.map((activity) => (
           <div

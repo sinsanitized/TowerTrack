@@ -47,6 +47,7 @@ import {
 import { towerRuleConfigurationLabel } from "@/lib/tower-rule-configuration";
 import { buttonClass } from "@/lib/button-variants";
 import { completionHrefForObligation } from "@/lib/deadline-view";
+import { SubmitButton } from "@/components/submit-button";
 import {
   responsibilityFamilyForObligation,
   responsibilityForServiceObligation,
@@ -431,6 +432,10 @@ export default async function SystemPage({
     : [];
   const newlyCreated = query.created === "1";
   const detailsUpdated = query.updated === "1";
+  const responsibilitiesUpdated = query.responsibility === "1";
+  const operationPatternUpdated = query.operationPattern === "1";
+  const targetWindowUpdated = query.targetWindow === "1";
+  const rulesUpdated = query.rulesChanged === "1";
   const today = todayDateOnly();
   const trackedOpenObligations = dashboardRow.openObligations.filter(
     (item) =>
@@ -865,8 +870,32 @@ export default async function SystemPage({
       )}
       {detailsUpdated && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Customer, tower, jurisdiction, and rule settings updated. Compliance
-          requirements were recalculated from the compliance record history.
+          Customer, address, and tower equipment saved. Compliance requirements
+          were recalculated from the compliance record history.
+        </div>
+      )}
+      {responsibilitiesUpdated && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+          Service responsibilities saved. Action queues now reflect who handles
+          each service.
+        </div>
+      )}
+      {operationPatternUpdated && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+          Operating schedule saved. This planning change did not record a
+          startup or shutdown event.
+        </div>
+      )}
+      {targetWindowUpdated && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+          Recommended monthly sample dates saved. The compliance deadline was
+          not changed.
+        </div>
+      )}
+      {rulesUpdated && (
+        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+          Compliance rules saved. Open requirements and deadlines were
+          recalculated from the tower&apos;s valid record history.
         </div>
       )}
       {typeof query.correctedEvent === "string" && (
@@ -1422,11 +1451,14 @@ export default async function SystemPage({
                             name="notes"
                             value={`Completed ${plainEnumLabel(item.obligationType)}`}
                           />
-                          <button className={buttonClass("primary", "mt-2")}>
+                          <SubmitButton
+                            className="mt-2"
+                            pendingLabel="Saving submission…"
+                          >
                             {item.obligationType === "PORTAL_SAMPLE_DATE"
                               ? "Record NYC portal submission"
                               : "Record submission"}
-                          </button>
+                          </SubmitButton>
                         </form>
                       )
                     )}
@@ -1683,18 +1715,24 @@ export default async function SystemPage({
               />
             </label>
             <label>
-              <span className="label">Reason</span>
+              <span className="label">
+                Why are you changing these dates? · Required
+              </span>
               <input
                 className="field mt-1"
                 name="reason"
+                aria-label="Reason"
                 minLength={8}
                 required
-                defaultValue="Update recommended monthly sample dates"
+                placeholder="Example: Align collection dates with the service route"
               />
             </label>
-            <button className="btn btn-primary self-end">
+            <SubmitButton
+              className="self-end"
+              pendingLabel="Saving recommended dates…"
+            >
               Save recommended dates
-            </button>
+            </SubmitButton>
           </form>
         </div>
       </div>

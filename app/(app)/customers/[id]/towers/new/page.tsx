@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 import { todayDateOnly } from "@/lib/date";
 import { OperatingScheduleFields } from "@/components/operating-schedule-fields";
+import { SubmitButton } from "@/components/submit-button";
 import {
   towerRuleConfigurationForMode,
   towerRuleConfigurationLabel,
@@ -79,8 +80,14 @@ export default async function NewCoolingTowerPage({
         >
           <input type="hidden" name="customerId" value={customer.id} />
           <input type="hidden" name="buildingId" value={building.id} />
+          <div className="sm:col-span-2">
+            <h2 className="text-lg font-black">1. Tower equipment</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Fields marked Required must be completed.
+            </p>
+          </div>
           <label>
-            <span className="label">Tower name</span>
+            <span className="label">Tower name · Required</span>
             <input
               className="field mt-1"
               name="systemName"
@@ -93,15 +100,15 @@ export default async function NewCoolingTowerPage({
             <input className="field mt-1" name="manufacturer" />
           </label>
           <label>
-            <span className="label">Model number</span>
+            <span className="label">Model number · Required</span>
             <input className="field mt-1" name="modelNumber" required />
           </label>
           <label>
-            <span className="label">Serial number</span>
+            <span className="label">Serial number · Required</span>
             <input className="field mt-1" name="serialNumber" required />
           </label>
           <label>
-            <span className="label">Tower location</span>
+            <span className="label">Tower location · Required</span>
             <input
               className="field mt-1"
               name="towerLocation"
@@ -110,7 +117,7 @@ export default async function NewCoolingTowerPage({
             />
           </label>
           <label>
-            <span className="label">Cooling tower tonnage</span>
+            <span className="label">Cooling tower tonnage · Required</span>
             <input
               className="field mt-1"
               name="tonnage"
@@ -121,8 +128,14 @@ export default async function NewCoolingTowerPage({
             />
           </label>
           <OperatingScheduleFields />
+          <div className="border-t border-slate-200 pt-5 sm:col-span-2">
+            <h2 className="text-lg font-black">2. Service responsibility</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Choose who manages Legionella sampling and laboratory follow-up.
+            </p>
+          </div>
           <label>
-            <span className="label">Legionella Responsibility</span>
+            <span className="label">Legionella responsibility · Required</span>
             <select
               className="field mt-1"
               name="legionellaResponsibility"
@@ -149,13 +162,26 @@ export default async function NewCoolingTowerPage({
               Legionella vendor name (when applicable)
             </span>
             <input className="field mt-1" name="legionellaVendorName" />
+            <span className="mt-1 block text-xs text-slate-600">
+              Required when another vendor manages Legionella.
+            </span>
           </label>
+          <div className="border-t border-slate-200 pt-5 sm:col-span-2">
+            <h2 className="text-lg font-black">
+              3. Compliance rules · Administrator review
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              These selections determine which requirements and deadlines the
+              tower will receive. Verify them for this address before saving.
+            </p>
+          </div>
           <div>
             <label className="label" htmlFor="new-tower-jurisdiction">
-              Jurisdiction
+              Jurisdiction · Required
             </label>
             <select
               id="new-tower-jurisdiction"
+              aria-label="Jurisdiction"
               className="field mt-1"
               name="jurisdictionId"
               defaultValue=""
@@ -173,10 +199,11 @@ export default async function NewCoolingTowerPage({
           </div>
           <div>
             <label className="label" htmlFor="new-tower-rule-configuration">
-              Compliance rules
+              Compliance rules · Required
             </label>
             <select
               id="new-tower-rule-configuration"
+              aria-label="Compliance rules"
               className="field mt-1"
               name="ruleConfiguration"
               defaultValue=""
@@ -192,10 +219,11 @@ export default async function NewCoolingTowerPage({
           </div>
           <div>
             <label className="label" htmlFor="new-tower-rule-profile">
-              Profile version
+              Assigned rule profile · Required
             </label>
             <select
               id="new-tower-rule-profile"
+              aria-label="Profile version"
               className="field mt-1"
               name="ruleProfileId"
               defaultValue=""
@@ -215,7 +243,7 @@ export default async function NewCoolingTowerPage({
             </select>
           </div>
           <label>
-            <span className="label">Effective date</span>
+            <span className="label">Rules effective date · Required</span>
             <input
               className="field mt-1"
               name="ruleEffectiveDate"
@@ -232,9 +260,12 @@ export default async function NewCoolingTowerPage({
             </p>
           </div>
           <div className="sm:col-span-2">
-            <button className="btn btn-primary w-full">
+            <SubmitButton
+              className="w-full"
+              pendingLabel="Creating cooling tower…"
+            >
               Create cooling tower
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

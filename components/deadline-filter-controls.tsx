@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { buttonClass } from "@/lib/button-variants";
@@ -38,6 +39,7 @@ function chip(selected: boolean) {
 }
 
 export function DeadlineFilterControls({ filters }: { filters: Filters }) {
+  const router = useRouter();
   const moreFilters = useRef<HTMLDetailsElement>(null);
   const activeSecondary = [
     filters.schedule === "SEASONAL"
@@ -59,13 +61,33 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
               ? "All responsibilities"
               : null,
   ].filter(Boolean) as string[];
+  const dueDateLabels: Record<DeadlinePeriod, string> = {
+    ALL: "All due dates",
+    OVERDUE: "Overdue",
+    THIS_WEEK: "Due this week",
+    NEXT_WEEK: "Due next week",
+    LATER: "Due later",
+  };
+  const workTypeLabels: Record<DeadlineActionFilter, string> = {
+    ALL: "All work types",
+    SAMPLE: "Samples",
+    INSPECTION: "Inspections",
+    MAINTENANCE: "Cleaning & treatment",
+    REPORTING_ACTION: "Reporting & certification",
+  };
+  const hasActiveFilters =
+    filters.period !== "ALL" ||
+    filters.action !== "ALL" ||
+    filters.schedule !== "ALL" ||
+    filters.responsibility !== "OUR_COMPANY" ||
+    Boolean(filters.search);
 
   return (
     <section className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_190px_220px_auto] xl:items-end">
         <form
           action="/deadlines"
-          className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row"
+          className="flex min-w-0 flex-col gap-2 sm:flex-row"
         >
           {filters.period !== "ALL" && (
             <input type="hidden" name="period" value={filters.period} />
@@ -84,9 +106,9 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
             />
           )}
           <label className="min-w-0 flex-1">
-            <span className="sr-only">Search deadlines</span>
+            <span className="label">Search deadlines</span>
             <input
-              className="field"
+              className="field mt-1"
               type="search"
               name="q"
               defaultValue={filters.search}
@@ -100,6 +122,48 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
             Search
           </button>
         </form>
+        <label>
+          <span className="label">Due date</span>
+          <select
+            className="field mt-1 bg-white"
+            value={filters.period}
+            onChange={(event) =>
+              router.push(
+                href({
+                  ...filters,
+                  period: event.target.value as DeadlinePeriod,
+                }),
+              )
+            }
+          >
+            {Object.entries(dueDateLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="label">Work type</span>
+          <select
+            className="field mt-1 bg-white"
+            value={filters.action}
+            onChange={(event) =>
+              router.push(
+                href({
+                  ...filters,
+                  action: event.target.value as DeadlineActionFilter,
+                }),
+              )
+            }
+          >
+            {Object.entries(workTypeLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
         <details
           ref={moreFilters}
           className="relative"
@@ -113,12 +177,12 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
           <summary
             className={buttonClass(
               "secondary",
-              "w-full cursor-pointer justify-center whitespace-nowrap sm:w-auto",
+              "w-full cursor-pointer justify-center whitespace-nowrap",
             )}
             aria-label="More deadline filters"
             role="button"
           >
-            <SlidersHorizontal size={17} /> More Filters
+            <SlidersHorizontal size={17} /> More filters
             {activeSecondary.length > 0 && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-950">
                 {activeSecondary.length}
@@ -201,69 +265,24 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
                   responsibility: "OUR_COMPANY",
                 })}
               >
-                Reset More Filters
+                Reset more filters
               </Link>
             </div>
           </div>
         </details>
-        {activeSecondary.length > 0 && (
-          <div className="self-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-950">
-            {activeSecondary.join(" · ")}
-          </div>
-        )}
       </div>
-      <div className="mt-4 grid gap-3">
-        <div>
-          <div className="label mb-2">Due Date</div>
-          <nav
-            className="flex flex-wrap gap-2"
-            aria-label="Filter deadlines by due date"
-          >
-            {[
-              ["ALL", "All"],
-              ["OVERDUE", "Overdue"],
-              ["THIS_WEEK", "Due this week"],
-              ["NEXT_WEEK", "Due next week"],
-              ["LATER", "Due later"],
-            ].map(([value, label]) => (
-              <Link
-                key={value}
-                aria-current={filters.period === value ? "page" : undefined}
-                className={chip(filters.period === value)}
-                href={href({ ...filters, period: value as DeadlinePeriod })}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div>
-          <div className="label mb-2">Work Type</div>
-          <nav
-            className="flex flex-wrap gap-2"
-            aria-label="Filter deadlines by work type"
-          >
-            {[
-              ["ALL", "All work"],
-              ["SAMPLE", "Samples"],
-              ["INSPECTION", "Inspections"],
-              ["MAINTENANCE", "Cleaning & treatment"],
-              ["REPORTING_ACTION", "Reporting & certification"],
-            ].map(([value, label]) => (
-              <Link
-                key={value}
-                aria-current={filters.action === value ? "page" : undefined}
-                className={chip(filters.action === value)}
-                href={href({
-                  ...filters,
-                  action: value as DeadlineActionFilter,
-                })}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-        </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 text-sm">
+        <p className="font-bold text-slate-700" aria-live="polite">
+          Showing: {dueDateLabels[filters.period]} ·{" "}
+          {workTypeLabels[filters.action]}
+          {activeSecondary.length ? ` · ${activeSecondary.join(" · ")}` : ""}
+          {filters.search ? ` · Search: “${filters.search}”` : ""}
+        </p>
+        {hasActiveFilters && (
+          <Link className={buttonClass("ghost")} href="/deadlines">
+            Clear filters
+          </Link>
+        )}
       </div>
     </section>
   );

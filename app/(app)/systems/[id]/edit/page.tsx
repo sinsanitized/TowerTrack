@@ -20,6 +20,7 @@ import {
   serviceResponsibilityFamilies,
   serviceResponsibilityLabel,
 } from "@/lib/service-responsibility";
+import { SubmitButton } from "@/components/submit-button";
 
 function jurisdictionLabel(jurisdiction: {
   city: string | null;
@@ -101,6 +102,10 @@ export default async function EditCustomerTowerPage({
         className="mx-auto max-w-4xl space-y-6"
       >
         <input type="hidden" name="systemId" value={system.id} />
+        <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950">
+          This form saves only customer, address, and tower equipment. The
+          sections below are saved separately.
+        </p>
         <section className="panel p-6">
           <div className="label">Customer and address</div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -219,18 +224,24 @@ export default async function EditCustomerTowerPage({
         </section>
         <section className="panel p-6">
           <label>
-            <span className="label">Reason for changes</span>
+            <span className="label">
+              Why are you making this change? · Required
+            </span>
             <input
               className="field mt-1"
               name="reason"
+              aria-label="Reason for changes"
               minLength={8}
-              defaultValue="Update verified customer and tower information"
+              placeholder="Example: Corrected the serial number from the equipment plate"
               required
             />
           </label>
-          <button className="btn btn-primary mt-4 w-full">
+          <SubmitButton
+            className="mt-4 w-full"
+            pendingLabel="Saving customer and tower changes…"
+          >
             Save customer and tower changes
-          </button>
+          </SubmitButton>
         </section>
       </form>
       <section
@@ -243,7 +254,7 @@ export default async function EditCustomerTowerPage({
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           This controls operational ownership only. It does not change the legal
-          requirements assigned to this tower.
+          requirements assigned to this tower. This section is saved separately.
         </p>
         {focusedResponsibility && (
           <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-900">
@@ -291,7 +302,9 @@ export default async function EditCustomerTowerPage({
             </label>
           ))}
           <label>
-            <span className="label">Vendor name (when applicable)</span>
+            <span className="label">
+              Legionella vendor name (required for Another vendor)
+            </span>
             <input
               className="field mt-1"
               name="legionellaVendorName"
@@ -299,11 +312,14 @@ export default async function EditCustomerTowerPage({
             />
           </label>
           <label className="sm:col-span-2">
-            <span className="label">Reason</span>
+            <span className="label">
+              Why are you changing responsibility? · Required
+            </span>
             <input
               className="field mt-1"
               name="reason"
-              defaultValue="Confirm contracted service responsibility"
+              aria-label="Reason"
+              placeholder="Example: Confirmed the service contract with the customer"
               minLength={8}
               required
             />
@@ -316,9 +332,12 @@ export default async function EditCustomerTowerPage({
               </div>
             ))}
           </div>
-          <button className="btn btn-primary sm:col-span-2">
+          <SubmitButton
+            className="sm:col-span-2"
+            pendingLabel="Saving service responsibilities…"
+          >
             Save service responsibilities
-          </button>
+          </SubmitButton>
         </form>
       </section>
       <section className="panel mx-auto mt-6 max-w-4xl p-6">
@@ -434,12 +453,15 @@ export default async function EditCustomerTowerPage({
               />
             </label>
             <label>
-              <span className="label">Reason</span>
+              <span className="label">
+                Why are you changing these rules? · Required
+              </span>
               <input
                 className="field mt-1"
                 name="reason"
+                aria-label="Reason"
                 minLength={8}
-                defaultValue="Change verified tower compliance rules"
+                placeholder="Example: Verified the applicable jurisdiction with the owner"
                 required
               />
             </label>
@@ -470,9 +492,12 @@ export default async function EditCustomerTowerPage({
                 impact.
               </label>
             </div>
-            <button className="btn btn-primary sm:col-span-2">
+            <SubmitButton
+              className="sm:col-span-2"
+              pendingLabel="Changing compliance rules…"
+            >
               Change compliance rules
-            </button>
+            </SubmitButton>
           </form>
         </details>
         <details className="mt-4 text-sm">

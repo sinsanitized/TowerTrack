@@ -5,6 +5,7 @@ import { ClickableTableRow } from "@/components/clickable-row";
 import { createCustomerAction } from "@/app/actions";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function CustomersPage() {
   const user = await requireUser();
@@ -97,7 +98,7 @@ export default async function CustomersPage() {
                         <div>
                           <div className="font-black">{customer.name}</div>
                           <div className="text-xs text-slate-500">
-                            Account {customer.accountNumber}
+                            Customer account number: {customer.accountNumber}
                           </div>
                         </div>
                       </div>
@@ -152,7 +153,8 @@ export default async function CustomersPage() {
             <div className="p-10 text-center">
               <b>No customer systems yet.</b>
               <p className="mt-2 text-slate-600">
-                Import buildings and towers from Settings.
+                Add your first customer here, or import existing buildings and
+                towers from Settings.
               </p>
             </div>
           )}
@@ -169,12 +171,15 @@ export default async function CustomersPage() {
             <h2 className="font-black">Add customer</h2>
           </div>
           <form action={createCustomerAction} className="mt-5 space-y-4">
+            <p className="text-sm font-bold text-slate-700">
+              Fields marked Required must be completed.
+            </p>
             <label className="block">
-              <span className="label">Customer name</span>
+              <span className="label">Customer name · Required</span>
               <input className="field mt-1" name="name" required />
             </label>
             <label className="block">
-              <span className="label">Street address</span>
+              <span className="label">Street address · Required</span>
               <input
                 className="field mt-1"
                 name="streetAddress"
@@ -188,11 +193,11 @@ export default async function CustomersPage() {
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="label">City</span>
+                <span className="label">City · Required</span>
                 <input className="field mt-1" name="city" required />
               </label>
               <label className="block">
-                <span className="label">State</span>
+                <span className="label">State · Required</span>
                 <input
                   className="field mt-1 uppercase"
                   name="state"
@@ -203,7 +208,7 @@ export default async function CustomersPage() {
               </label>
             </div>
             <label className="block">
-              <span className="label">ZIP code</span>
+              <span className="label">ZIP code · Required</span>
               <input
                 className="field mt-1"
                 name="postalCode"
@@ -211,15 +216,19 @@ export default async function CustomersPage() {
                 required
               />
             </label>
-            <button className="btn btn-primary w-full">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+              This saves the customer and address now. You will enter cooling
+              tower equipment on the next screen, and you can resume later.
+            </div>
+            <SubmitButton
+              className="w-full"
+              pendingLabel="Saving customer and address…"
+            >
               Continue to cooling tower details
-            </button>
+            </SubmitButton>
           </form>
           <p className="mt-4 text-xs text-slate-500">
-            This step saves the customer and address. If you leave before adding
-            equipment, the customer remains marked “Cooling tower details not
-            added” so setup can be resumed. The internal account number is
-            generated automatically.
+            The internal account number is generated automatically.
           </p>
         </aside>
       </div>

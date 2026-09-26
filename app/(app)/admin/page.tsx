@@ -17,6 +17,7 @@ import { plainEnumLabel } from "@/lib/labels";
 import { nycRuleDisplayValues } from "@/lib/rule-profile";
 import { UserRole } from "@prisma/client";
 import { todayDateOnly } from "@/lib/date";
+import { SubmitButton } from "@/components/submit-button";
 
 const authorities = [
   "REGULATORY",
@@ -276,9 +277,12 @@ export default async function AdminPage({
             Safe default: the new profile starts with no enabled requirements
             and never inherits NYC rules.
           </p>
-          <button className="btn btn-primary sm:col-span-2">
+          <SubmitButton
+            className="sm:col-span-2"
+            pendingLabel="Creating custom profile…"
+          >
             Create empty custom profile
-          </button>
+          </SubmitButton>
         </form>
       </details>
       {(saved.savedProfile || saved.savedRule) && (
@@ -353,9 +357,9 @@ export default async function AdminPage({
             </select>
           </label>
           <div className="lg:col-span-4">
-            <button className="btn btn-primary" type="submit">
+            <SubmitButton pendingLabel="Creating user…">
               Create user
-            </button>
+            </SubmitButton>
           </div>
         </form>
 
@@ -586,9 +590,9 @@ export default async function AdminPage({
                         />
                       </label>
                       <div className="sm:col-span-2">
-                        <button className="btn btn-primary">
+                        <SubmitButton pendingLabel="Saving routine timing…">
                           Save routine timing
-                        </button>
+                        </SubmitButton>
                       </div>
                     </form>
                   </section>
@@ -859,9 +863,9 @@ export default async function AdminPage({
                             />
                           </label>
                           <div className="sm:col-span-2 xl:col-span-3">
-                            <button className="btn btn-primary">
+                            <SubmitButton pendingLabel="Adding rule…">
                               Add rule and recalculate towers
-                            </button>
+                            </SubmitButton>
                           </div>
                         </form>
                       </details>
@@ -1086,9 +1090,9 @@ export default async function AdminPage({
                                 />
                               </label>
                               <div className="sm:col-span-2 xl:col-span-3">
-                                <button className="btn btn-primary">
+                                <SubmitButton pendingLabel="Saving rule revision…">
                                   Save as revision {rule.revision + 1}
-                                </button>
+                                </SubmitButton>
                               </div>
                             </form>
                           </details>

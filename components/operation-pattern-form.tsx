@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateSeasonalSettingsAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 const months = [
   "January",
@@ -201,16 +202,21 @@ export function OperationPatternForm({
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <label>
-          <span className="label">Reason for change</span>
+          <span className="label">
+            Why are you changing the schedule? · Required
+          </span>
           <input
             className="field mt-1"
             name="reason"
+            aria-label="Reason for change"
             required
             minLength={8}
-            defaultValue="Update tower operation pattern"
+            placeholder="Example: Confirmed seasonal dates with the building manager"
           />
         </label>
-        <button className="btn btn-primary">Save operating schedule</button>
+        <SubmitButton pendingLabel="Saving operating schedule…">
+          Save operating schedule
+        </SubmitButton>
       </div>
     </form>
   );

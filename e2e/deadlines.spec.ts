@@ -113,36 +113,32 @@ test("due-date and work-type filters narrow displayed rows", async ({
       name: "Filter by Rule Configuration",
     }),
   ).toHaveCount(0);
-  const dueDateFilter = page.getByRole("navigation", {
-    name: "Filter deadlines by due date",
-  });
+  const dueDateFilter = page.getByRole("combobox", { name: "Due date" });
   for (const label of [
-    "All",
+    "All due dates",
     "Overdue",
     "Due this week",
     "Due next week",
     "Due later",
   ])
     await expect(
-      dueDateFilter.getByRole("link", { name: label, exact: true }),
-    ).toBeVisible();
-  await dueDateFilter.getByRole("link", { name: "Due next week" }).click();
+      dueDateFilter.getByRole("option", { name: label }),
+    ).toHaveCount(1);
+  await dueDateFilter.selectOption("NEXT_WEEK");
   await expect(page).toHaveURL("/deadlines?period=NEXT_WEEK");
 
-  const workTypeFilter = page.getByRole("navigation", {
-    name: "Filter deadlines by work type",
-  });
+  const workTypeFilter = page.getByRole("combobox", { name: "Work type" });
   for (const label of [
-    "All work",
+    "All work types",
     "Samples",
     "Inspections",
     "Cleaning & treatment",
     "Reporting & certification",
   ])
     await expect(
-      workTypeFilter.getByRole("link", { name: label }),
-    ).toBeVisible();
-  await workTypeFilter.getByRole("link", { name: "Samples" }).click();
+      workTypeFilter.getByRole("option", { name: label }),
+    ).toHaveCount(1);
+  await workTypeFilter.selectOption("SAMPLE");
   await expect(page).toHaveURL("/deadlines?period=NEXT_WEEK&action=SAMPLE");
 
   await expect(page.getByText("Later this month", { exact: true })).toHaveCount(
@@ -206,7 +202,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
   await expect(
     page.getByText("Seasonal · Customer managed").last(),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Reset More Filters" }).click();
+  await page.getByRole("link", { name: "Reset more filters" }).click();
   await expect(page).toHaveURL("/deadlines?period=NEXT_WEEK&action=SAMPLE");
 });
 
@@ -268,10 +264,10 @@ test("simplified deadline controls wrap at laptop and mobile widths", async ({
       page.getByRole("button", { name: "More deadline filters" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("navigation", { name: "Filter deadlines by due date" }),
+      page.getByRole("combobox", { name: "Due date" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("navigation", { name: "Filter deadlines by work type" }),
+      page.getByRole("combobox", { name: "Work type" }),
     ).toBeVisible();
     const pageWidth = await page.evaluate(() => ({
       client: document.documentElement.clientWidth,
