@@ -431,13 +431,13 @@ function primaryAction(
 > {
   if (responsibility == null)
     return {
-      primaryActionLabel: "Assign",
+      primaryActionLabel: "Assign owner",
       primaryActionAccessible: `Assign service responsibility for ${towerName}`,
       primaryActionHref: `/systems/${towerId}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
     };
   if (obligation.category === "SAMPLE" && responsibility === "OTHER_VENDOR")
     return {
-      primaryActionLabel: "Record",
+      primaryActionLabel: "Record sample",
       primaryActionAccessible: `Record externally completed ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
       primaryActionHref: eventEntryHref({
         type: "external-legionella",
@@ -447,36 +447,47 @@ function primaryAction(
     };
   if (obligation.category === "SAMPLE" && responsibility === "CUSTOMER")
     return {
-      primaryActionLabel: "View",
+      primaryActionLabel: "View details",
       primaryActionAccessible: `View customer-managed responsibility for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=information`,
     };
   if (responsibility === "NOT_TRACKED")
     return {
-      primaryActionLabel: "View",
+      primaryActionLabel: "View details",
       primaryActionAccessible: `Review reference-only deadline for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
     return {
-      primaryActionLabel: "Record",
+      primaryActionLabel: "Record sample",
       primaryActionAccessible: `Record owner-managed bacteriological sampling for ${towerName}`,
       primaryActionHref: completionHrefForObligation(towerId, obligation),
     };
   if (status === "Overdue")
     return {
-      primaryActionLabel: "Review",
+      primaryActionLabel: "Review issue",
       primaryActionAccessible: `Open overdue ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (!obligation.targetStart && !obligation.latest)
     return {
-      primaryActionLabel: "Review",
+      primaryActionLabel: "Review details",
       primaryActionAccessible: `Review ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   return {
-    primaryActionLabel: "Record",
+    primaryActionLabel:
+      obligation.category === "SAMPLE"
+        ? isResampleObligation(obligation.type)
+          ? "Record resample"
+          : "Record sample"
+        : obligation.category === "INSPECTION"
+          ? "Record inspection"
+          : obligation.category === "REPORTING_ACTION"
+            ? "Record submission"
+            : obligation.type.includes("CLEANING")
+              ? "Record cleaning"
+              : "Record completion",
     primaryActionAccessible: `Record ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
     primaryActionHref: completionHrefForObligation(towerId, obligation),
   };

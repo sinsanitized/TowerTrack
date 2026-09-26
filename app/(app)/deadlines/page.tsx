@@ -77,6 +77,11 @@ export default async function DeadlinesPage({
     search,
   });
   const towerCount = new Set(rows.map((row) => row.towerId)).size;
+  const statusCounts = {
+    overdue: rows.filter((row) => row.status === "Overdue").length,
+    thisWeek: rows.filter((row) => row.status === "Due this week").length,
+    nextWeek: rows.filter((row) => row.status === "Due next week").length,
+  };
   const returnQuery = new URLSearchParams();
   if (period !== "ALL") returnQuery.set("period", period);
   if (action !== "ALL") returnQuery.set("action", action);
@@ -114,6 +119,21 @@ export default async function DeadlinesPage({
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
           {towerCount} cooling tower{towerCount === 1 ? "" : "s"}
         </div>
+        {statusCounts.overdue > 0 && (
+          <div className="rounded-xl border border-red-300 bg-white px-4 py-3 text-red-800">
+            {statusCounts.overdue} overdue
+          </div>
+        )}
+        {statusCounts.thisWeek > 0 && (
+          <div className="rounded-xl border border-amber-300 bg-white px-4 py-3 text-amber-900">
+            {statusCounts.thisWeek} due this week
+          </div>
+        )}
+        {statusCounts.nextWeek > 0 && (
+          <div className="rounded-xl border border-blue-300 bg-white px-4 py-3 text-blue-800">
+            {statusCounts.nextWeek} due next week
+          </div>
+        )}
       </div>
 
       {rows.length === 0 ? (

@@ -167,7 +167,7 @@ function ActionRow({
         </div>
         <Link
           className={buttonClass(
-            obligation.category === "SAMPLE" ? "primary" : "secondary",
+            "primary",
             "min-h-11 w-full justify-center whitespace-normal text-center lg:w-auto",
           )}
           href={

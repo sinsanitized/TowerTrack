@@ -87,7 +87,7 @@ describe("all tower deadline rows", () => {
     expect(unknown[0]).toMatchObject({
       responsibility: null,
       executionState: "Waiting",
-      primaryActionLabel: "Assign",
+      primaryActionLabel: "Assign owner",
     });
   });
 
@@ -283,7 +283,7 @@ describe("all tower deadline rows", () => {
     expect(row.workingDaysDisplay).toBe("2 working days left");
     expect(row.workingDaysAccessible).toBe("2 working days left");
     expect(row.status).toBe("Due next week");
-    expect(row.primaryActionLabel).toBe("Record");
+    expect(row.primaryActionLabel).toBe("Record sample");
   });
 
   it.each([
@@ -387,12 +387,12 @@ describe("all tower deadline rows", () => {
     expect(rows.find(({ id }) => id === "overdue")).toMatchObject({
       workingDaysDisplay: "Overdue by 3 working days",
       status: "Overdue",
-      primaryActionLabel: "Review",
+      primaryActionLabel: "Review issue",
     });
     expect(rows.find(({ id }) => id === "review")).toMatchObject({
       workingDaysDisplay: "Needs review",
       status: "Review required",
-      primaryActionLabel: "Review",
+      primaryActionLabel: "Review details",
     });
   });
 
