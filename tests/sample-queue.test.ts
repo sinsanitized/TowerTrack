@@ -44,6 +44,6 @@ describe("sample action queue", () => {
     expect(matchesSampleQueueFilter(ours, "ACTION_NEEDED")).toBe(true);
     expect(matchesSampleQueueFilter(customer, "WAITING")).toBe(true);
     expect(matchesSampleQueueFilter(complete, "COMPLETED")).toBe(true);
-    expect(matchesSampleQueueFilter(reference, "ALL")).toBe(true);
+    expect(matchesSampleQueueFilter(reference, "WAITING")).toBe(true);
   });
 });

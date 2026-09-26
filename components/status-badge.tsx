@@ -35,14 +35,16 @@ export function StatusBadge({
   return (
     <span
       data-color={color}
-      className={`inline-flex max-w-full items-center rounded-full border font-extrabold ${
+      className={`inline-flex max-w-full min-w-0 items-start border font-extrabold ${
         compact
-          ? "max-w-full gap-1 px-1.5 py-1 text-[10px] leading-tight whitespace-normal"
-          : "gap-1.5 px-2.5 py-1 text-xs leading-tight whitespace-normal"
+          ? "gap-1 rounded-lg px-1.5 py-1 text-[10px] leading-tight whitespace-normal"
+          : "gap-1.5 rounded-xl px-2.5 py-1 text-xs leading-tight whitespace-normal"
       } ${styles[color]}`}
     >
-      <Icon className="shrink-0" size={14} aria-hidden />
-      {label}
+      <Icon className="mt-px shrink-0" size={14} aria-hidden />
+      <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+        {label}
+      </span>
     </span>
   );
 }

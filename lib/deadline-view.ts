@@ -2,9 +2,14 @@ import {
   addDays,
   asUtc,
   formatLongDate,
+  formatWorkingDaysLeft,
   workingDaysRemaining,
 } from "@/lib/date";
-import { plainEnumLabel, requiredActionLabel } from "@/lib/labels";
+import {
+  lowercaseWithJurisdictionAcronyms,
+  plainEnumLabel,
+  requiredActionLabel,
+} from "@/lib/labels";
 import {
   responsibilityForObligation,
   responsibilityFamilyForObligation,
@@ -12,6 +17,15 @@ import {
   type ResponsibilityFilter,
   type ServiceResponsibility,
 } from "@/lib/service-responsibility";
+import type {
+  LegionellaSampleReportingStatus,
+  PreviousLegionellaSummary,
+} from "@/lib/legionella-summary";
+import {
+  eventEntryHref,
+  isResampleObligation,
+  type EventEntryIntentName,
+} from "@/lib/event-entry-intent";
 
 export type DeadlineCategory =
   "SAMPLE" | "INSPECTION" | "MAINTENANCE" | "REPORTING_ACTION";
@@ -83,6 +97,7 @@ export type DeadlineTowerInput = {
   waterTreatmentResponsibility?: ServiceResponsibility | null;
   regulatoryReportingResponsibility?: ServiceResponsibility | null;
   certificationResponsibility?: ServiceResponsibility | null;
+  previousLegionella: PreviousLegionellaSummary;
   openObligations: DeadlineObligationInput[];
 };
 
@@ -102,11 +117,15 @@ export type TowerDeadlineRow = {
   responsibilityLabel: string;
   category: DeadlineCategory;
   requiredAction: string;
-  targetDate: string | null;
-  targetDateDisplay: string;
-  targetDateAccessible: string;
-  targetWindowStart: string | null;
-  targetWindowEnd: string | null;
+  previousLegionellaSampleDate: string | null;
+  previousLegionellaSampleDisplay: string;
+  previousLegionellaSampleAccessible: string;
+  portalReportingStatus: LegionellaSampleReportingStatus;
+  portalSubmittedDate: string | null;
+  portalDisplay: string;
+  portalAccessible: string;
+  targetStartDate: string | null;
+  targetEndDate: string | null;
   targetWindowDisplay: string;
   targetWindowAccessible: string;
   hardDueDate: string | null;
@@ -219,39 +238,39 @@ function compactDate(value: string, currentYear: string) {
   }).format(asUtc(value));
 }
 
-function compactRange(
-  start: string | null,
-  end: string | null,
-  currentYear: string,
-) {
-  if (!start && !end) return "Review";
-  if (!start || !end) return compactDate(start ?? end!, currentYear);
-  if (start === end) return compactDate(start, currentYear);
-  const startParts = start.split("-");
-  const endParts = end.split("-");
-  const sameMonth =
-    startParts[0] === endParts[0] && startParts[1] === endParts[1];
-  const startText = new Intl.DateTimeFormat("en-US", {
+function previousSampleDateDisplay(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    ...(startParts[0] === currentYear ? {} : { year: "numeric" as const }),
+    year: "numeric",
     timeZone: "UTC",
-  }).format(asUtc(start));
-  if (sameMonth) return `${startText}–${Number(endParts[2])}`;
-  const endText = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    ...(endParts[0] === currentYear ? {} : { year: "numeric" as const }),
-    timeZone: "UTC",
-  }).format(asUtc(end));
-  return `${startText}–${endText}`;
+  }).format(asUtc(value));
 }
 
-function fullRange(start: string | null, end: string | null) {
-  if (!start && !end) return "No recommended service window; review required";
-  if (!start || !end) return formatLongDate(start ?? end);
-  if (start === end) return formatLongDate(start);
-  return `${formatLongDate(start)} through ${formatLongDate(end)}`;
+function portalPresentation(summary: PreviousLegionellaSummary) {
+  if (summary.portalReportingStatus === "NOT_APPLICABLE")
+    return {
+      display: "Not applicable",
+      accessible: "NYC portal reporting does not apply to this cooling tower.",
+    };
+  if (summary.portalReportingStatus === "SUBMITTED")
+    return {
+      display: previousSampleDateDisplay(summary.portalSubmittedDate!),
+      accessible: `Previous Legionella sample was submitted to the NYC portal on ${formatLongDate(summary.portalSubmittedDate)}.`,
+    };
+  if (summary.portalReportingStatus === "NOT_SUBMITTED")
+    return {
+      display: "Not submitted",
+      accessible:
+        "Previous Legionella sample has not been submitted to the NYC portal.",
+    };
+  if (summary.portalReportingStatus === "SUBMISSION_DATE_MISSING")
+    return {
+      display: "Submission date missing",
+      accessible:
+        "Previous Legionella sample is marked submitted, but its NYC portal submission date is missing.",
+    };
+  return { display: "Review", accessible: summary.explanation };
 }
 
 function actionLabel(obligation: DeadlineObligationInput): string {
@@ -262,7 +281,7 @@ function actionLabel(obligation: DeadlineObligationInput): string {
   if (obligation.type.includes("CORRECTIVE_ACTION"))
     return "Complete required Legionella corrective action";
   if (obligation.type.includes("NOTIFICATION"))
-    return `Submit ${plainEnumLabel(obligation.type).toLowerCase()}`;
+    return `Submit ${lowercaseWithJurisdictionAcronyms(plainEnumLabel(obligation.type))}`;
   if (obligation.type === "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING")
     return "Monitor disinfectant residual three times daily";
   if (obligation.type === "LEVEL_4_FULL_REMEDIATION")
@@ -290,23 +309,26 @@ function statusFor(
   return { label: "Due later", color: "GRAY" };
 }
 
-function conciseWorkingDays(value: number | null) {
-  if (value == null)
-    return { display: "Review", accessible: "Working days require review" };
-  if (value === 0)
+function targetWindowPresentation(
+  start: string | null,
+  end: string | null,
+  currentYear: string,
+) {
+  if (start && end && start !== end)
     return {
-      display: "Today",
-      accessible: "Due today; zero working days left",
+      display: `${compactDate(start, currentYear)} – ${compactDate(end, currentYear)}`,
+      accessible: `Recommended service window from ${formatLongDate(start)} through ${formatLongDate(end)}`,
     };
-  if (value > 0)
+  if (start || end) {
+    const date = start ?? end!;
     return {
-      display: `${value} day${value === 1 ? "" : "s"}`,
-      accessible: `${value} working day${value === 1 ? "" : "s"} left`,
+      display: compactDate(date, currentYear),
+      accessible: `Recommended service date ${formatLongDate(date)}`,
     };
-  const overdue = Math.abs(value);
+  }
   return {
-    display: `${overdue} overdue`,
-    accessible: `${overdue} working day${overdue === 1 ? "" : "s"} overdue`,
+    display: "Not set",
+    accessible: "No separate recommended service window",
   };
 }
 
@@ -315,10 +337,16 @@ export function completionHrefForObligation(
   obligation: Pick<DeadlineObligationInput, "id" | "type" | "category">,
 ) {
   if (obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
-    return `/systems/${towerId}?record=bacteriological#record-event`;
-  const recordType =
+    return eventEntryHref({
+      type: "bacteriological",
+      towerId,
+      obligationId: obligation.id,
+    });
+  const recordType: EventEntryIntentName | null =
     obligation.category === "SAMPLE"
-      ? "sample"
+      ? isResampleObligation(obligation.type)
+        ? "resample"
+        : "sample"
       : obligation.category === "INSPECTION"
         ? "inspection"
         : obligation.type === "SUMMERTIME_HYPERHALOGENATION_DUE"
@@ -336,7 +364,7 @@ export function completionHrefForObligation(
                     ? "biological"
                     : null;
   return recordType
-    ? `/systems/${towerId}?record=${recordType}#record-event`
+    ? eventEntryHref({ type: recordType, towerId, obligationId: obligation.id })
     : `/systems/${towerId}?view=obligations#reporting-${obligation.id}`;
 }
 
@@ -403,58 +431,53 @@ function primaryAction(
 > {
   if (responsibility == null)
     return {
-      primaryActionLabel: "Assign responsibility",
+      primaryActionLabel: "Assign",
       primaryActionAccessible: `Assign service responsibility for ${towerName}`,
       primaryActionHref: `/systems/${towerId}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
     };
-  if (
-    obligation.category === "SAMPLE" &&
-    (responsibility === "CUSTOMER" || responsibility === "OTHER_VENDOR")
-  )
+  if (obligation.category === "SAMPLE" && responsibility === "OTHER_VENDOR")
     return {
-      primaryActionLabel: "Record external sample",
-      primaryActionAccessible: `Record externally completed ${requiredAction.toLowerCase()} for ${towerName}`,
-      primaryActionHref: `/systems/${towerId}?record=external-legionella#record-event`,
+      primaryActionLabel: "Record",
+      primaryActionAccessible: `Record externally completed ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
+      primaryActionHref: eventEntryHref({
+        type: "external-legionella",
+        towerId,
+        obligationId: obligation.id,
+      }),
+    };
+  if (obligation.category === "SAMPLE" && responsibility === "CUSTOMER")
+    return {
+      primaryActionLabel: "View",
+      primaryActionAccessible: `View customer-managed responsibility for ${towerName}`,
+      primaryActionHref: `/systems/${towerId}?view=information`,
     };
   if (responsibility === "NOT_TRACKED")
     return {
-      primaryActionLabel: "Open tower",
+      primaryActionLabel: "View",
       primaryActionAccessible: `Review reference-only deadline for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (obligation.type === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
     return {
-      primaryActionLabel: "Record bacteriological sample",
+      primaryActionLabel: "Record",
       primaryActionAccessible: `Record owner-managed bacteriological sampling for ${towerName}`,
       primaryActionHref: completionHrefForObligation(towerId, obligation),
     };
   if (status === "Overdue")
     return {
-      primaryActionLabel: "Review missed deadline",
-      primaryActionAccessible: `Open overdue ${requiredAction.toLowerCase()} for ${towerName}`,
+      primaryActionLabel: "Review",
+      primaryActionAccessible: `Open overdue ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (!obligation.targetStart && !obligation.latest)
     return {
-      primaryActionLabel: "Review requirement",
-      primaryActionAccessible: `Review ${requiredAction.toLowerCase()} for ${towerName}`,
+      primaryActionLabel: "Review",
+      primaryActionAccessible: `Review ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
       primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   return {
-    primaryActionLabel:
-      obligation.category === "REPORTING_ACTION" &&
-      !obligation.type.includes("CORRECTIVE_ACTION") &&
-      obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
-      obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
-        ? "Record submission"
-        : obligation.category === "SAMPLE"
-          ? "Record sample"
-          : obligation.category === "INSPECTION"
-            ? "Record inspection"
-            : obligation.type.includes("CLEANING")
-              ? "Record cleaning"
-              : "Record completion",
-    primaryActionAccessible: `Record ${requiredAction.toLowerCase()} for ${towerName}`,
+    primaryActionLabel: "Record",
+    primaryActionAccessible: `Record ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
     primaryActionHref: completionHrefForObligation(towerId, obligation),
   };
 }
@@ -465,15 +488,21 @@ export function buildTowerDeadlineRows(
 ): TowerDeadlineRow[] {
   const currentYear = today.slice(0, 4);
   const rows = towers.flatMap((tower) =>
-    tower.openObligations.map((obligation) => {
+    tower.openObligations.flatMap<TowerDeadlineRow>((obligation) => {
       const status = statusFor(obligation, today);
       const workingDaysLeft = obligation.latest
         ? workingDaysRemaining(obligation.latest, today)
         : null;
-      const days = conciseWorkingDays(workingDaysLeft);
-      const targetWindowStart = obligation.targetStart ?? obligation.earliest;
-      const targetWindowEnd = obligation.targetEnd ?? obligation.latest;
+      const workingDaysText = obligation.latest
+        ? formatWorkingDaysLeft(obligation.latest, today)
+        : "Needs review";
+      const targetWindow = targetWindowPresentation(
+        obligation.targetStart,
+        obligation.targetEnd,
+        currentYear,
+      );
       const requiredAction = actionLabel(obligation);
+      const portal = portalPresentation(tower.previousLegionella);
       const responsibilityFamily = responsibilityFamilyForObligation(
         obligation.type,
         obligation.category,
@@ -486,6 +515,8 @@ export function buildTowerDeadlineRows(
               tower.legionellaResponsibility,
             )
           : configuredResponsibility;
+      if (obligation.category === "SAMPLE" && responsibility === "CUSTOMER")
+        return [];
       const action = primaryAction(
         tower.id,
         tower.systemName,
@@ -514,21 +545,28 @@ export function buildTowerDeadlineRows(
         responsibilityLabel: serviceResponsibilityLabel(responsibility),
         category: obligation.category,
         requiredAction,
-        targetDate: obligation.targetStart,
-        targetDateDisplay: obligation.targetStart
-          ? compactDate(obligation.targetStart, currentYear)
-          : "—",
-        targetDateAccessible: obligation.targetStart
-          ? formatLongDate(obligation.targetStart)
-          : "No separate recommended service date",
-        targetWindowStart,
-        targetWindowEnd,
-        targetWindowDisplay: compactRange(
-          targetWindowStart,
-          targetWindowEnd,
-          currentYear,
-        ),
-        targetWindowAccessible: fullRange(targetWindowStart, targetWindowEnd),
+        previousLegionellaSampleDate:
+          tower.previousLegionella.sampleCollectedDate,
+        previousLegionellaSampleDisplay: tower.previousLegionella
+          .sampleCollectedDate
+          ? previousSampleDateDisplay(
+              tower.previousLegionella.sampleCollectedDate,
+            )
+          : tower.previousLegionella.explanation.startsWith("Multiple")
+            ? "Review required"
+            : "None recorded",
+        previousLegionellaSampleAccessible: tower.previousLegionella
+          .sampleCollectedDate
+          ? `Previous qualifying Legionella sample was collected on ${formatLongDate(tower.previousLegionella.sampleCollectedDate)}.`
+          : tower.previousLegionella.explanation,
+        portalReportingStatus: tower.previousLegionella.portalReportingStatus,
+        portalSubmittedDate: tower.previousLegionella.portalSubmittedDate,
+        portalDisplay: portal.display,
+        portalAccessible: portal.accessible,
+        targetStartDate: obligation.targetStart,
+        targetEndDate: obligation.targetEnd,
+        targetWindowDisplay: targetWindow.display,
+        targetWindowAccessible: targetWindow.accessible,
         hardDueDate: obligation.latest,
         hardDueDateDisplay: obligation.latest
           ? compactDate(obligation.latest, currentYear)
@@ -537,8 +575,11 @@ export function buildTowerDeadlineRows(
           ? formatLongDate(obligation.latest)
           : "No fixed compliance deadline; review required",
         workingDaysLeft,
-        workingDaysDisplay: days.display,
-        workingDaysAccessible: days.accessible,
+        workingDaysDisplay: workingDaysText,
+        workingDaysAccessible:
+          workingDaysText === "Needs review"
+            ? "Working days require review"
+            : workingDaysText,
         status: status.label,
         statusColor: status.color,
         executionState: executionState.label,
@@ -549,16 +590,7 @@ export function buildTowerDeadlineRows(
     }),
   );
   return rows.sort((a, b) => {
-    const overdueOrder =
-      Number(a.status !== "Overdue") - Number(b.status !== "Overdue");
-    if (overdueOrder) return overdueOrder;
-    const aMissingTarget = a.targetDate == null;
-    const bMissingTarget = b.targetDate == null;
-    if (aMissingTarget !== bMissingTarget) return aMissingTarget ? 1 : -1;
     return (
-      (a.targetDate ?? a.hardDueDate ?? "9999-12-31").localeCompare(
-        b.targetDate ?? b.hardDueDate ?? "9999-12-31",
-      ) ||
       (a.hardDueDate ?? "9999-12-31").localeCompare(
         b.hardDueDate ?? "9999-12-31",
       ) ||

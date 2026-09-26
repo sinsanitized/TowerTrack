@@ -16,7 +16,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "admin:create": "tsx scripts/create-admin.ts",
-    "admin:reset-password": "tsx scripts/reset-password.ts"
+    "admin:reset-password": "tsx scripts/reset-password.ts",
+    "import:lindiana:stage": "tsx scripts/stage-lindiana-import.ts",
+    "import:lindiana:apply": "tsx scripts/apply-lindiana-staging.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

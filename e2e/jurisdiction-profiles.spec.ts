@@ -17,7 +17,7 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
 }) => {
   await page.goto("/deadlines?configuration=NYC_AND_NYS");
   const table = page.getByRole("table", {
-    name: "All cooling tower requirements",
+    name: "All cooling tower required work",
   });
   await table.getByRole("row").nth(1).getByRole("link").first().click();
   await expect(page.getByText("Compliance rules").first()).toBeVisible();

@@ -18,7 +18,8 @@ test("operations manager can record cleaning without creating or resetting a sam
   const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("100 Park Avenue");
   await search.press("Enter");
-  await page.getByRole("link", { name: "Requirements", exact: true }).click();
+  await page.getByRole("option").first().click();
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
   await page
     .getByText("Rule details and completion tools", { exact: true })
     .click();

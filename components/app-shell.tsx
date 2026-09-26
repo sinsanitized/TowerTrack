@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AlertTriangle,
   Building2,
   CalendarRange,
   History,
@@ -22,7 +21,6 @@ import { ComplianceTodayProvider } from "@/components/compliance-date";
 
 const nav = [
   ["Action Center", "/", LayoutDashboard],
-  ["Overdue & Problems", "/work/overdue-towers", AlertTriangle],
   ["All Deadlines", "/deadlines", CalendarRange],
   ["Towers", "/towers", Building2],
   ["Samples", "/samples", FlaskConical],
@@ -68,9 +66,9 @@ export function AppShell({
             Fictional demo
           </span>
           <details className="group relative lg:hidden">
-            <summary className="grid size-11 cursor-pointer list-none place-items-center rounded-lg border border-white/20 bg-white/10 hover:bg-white/15">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 font-bold hover:bg-white/15">
               <Menu size={21} aria-hidden />
-              <span className="sr-only">Open navigation</span>
+              <span>Menu</span>
             </summary>
             <div className="absolute right-0 top-[calc(100%+.5rem)] z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-white/15 bg-[#173f31] p-2 shadow-2xl">
               <nav aria-label="Mobile navigation" className="space-y-1">
@@ -93,7 +91,7 @@ export function AppShell({
               </nav>
               <div className="mt-2 border-t border-white/10 p-3">
                 <div className="text-sm font-bold">{user.name}</div>
-                <div className="text-xs text-white/60">
+                <div className="text-xs text-white/80">
                   {user.role.replaceAll("_", " ")}
                 </div>
                 <form action={logoutAction}>
@@ -128,11 +126,11 @@ export function AppShell({
         </nav>
         <div className="hidden border-t border-white/10 p-5 lg:block">
           <div className="text-sm font-bold">{user.name}</div>
-          <div className="text-xs text-white/60">
+          <div className="text-xs text-white/80">
             {user.role.replaceAll("_", " ")}
           </div>
           <form action={logoutAction}>
-            <button className="mt-3 flex items-center gap-2 text-xs font-bold text-white/70">
+            <button className="mt-3 flex items-center gap-2 text-xs font-bold text-white/90">
               <LogOut size={15} />
               Sign out
             </button>

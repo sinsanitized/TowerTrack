@@ -1,21 +1,37 @@
+import { companyHolidayName } from "@/lib/rule-definitions/company-work-calendar";
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDateOnly(value: string): boolean {
+  if (!ISO_DATE.test(value)) return false;
+  const parsed = new Date(`${value}T12:00:00.000Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
 
 export function dateOnly(value: string | Date): string {
   if (typeof value === "string") {
-    if (!ISO_DATE.test(value))
+    if (!isValidDateOnly(value))
       throw new Error(`Invalid date-only value: ${value}`);
     return value;
   }
+  if (Number.isNaN(value.getTime()))
+    throw new Error("Invalid date-only value: Invalid Date");
   return value.toISOString().slice(0, 10);
 }
 
 export function asUtc(value: string): Date {
-  if (!ISO_DATE.test(value))
+  if (!isValidDateOnly(value))
     throw new Error(`Invalid date-only value: ${value}`);
   return new Date(`${value}T12:00:00.000Z`);
 }
 
 export function todayDateOnly(now = new Date()): string {
+  const fixedTestDate = process.env.TOWERTRACK_TEST_DATE;
+  if (process.env.TOWERTRACK_TEST_CLOCK === "enabled" && fixedTestDate)
+    return dateOnly(fixedTestDate);
   return todayInTimeZone("America/New_York", now);
 }
 
@@ -237,9 +253,17 @@ export function isWeekend(value: string | Date): boolean {
   return day === 0 || day === 6;
 }
 
+export function isCompanyHoliday(value: string | Date): boolean {
+  return companyHolidayName(dateOnly(value)) != null;
+}
+
+export function isWorkingDay(value: string | Date): boolean {
+  return !isWeekend(value) && !isCompanyHoliday(value);
+}
+
 export function nextWorkingDate(value: string): string {
   let next = addDays(value, 1);
-  while (isWeekend(next)) next = addDays(next, 1);
+  while (!isWorkingDay(next)) next = addDays(next, 1);
   return next;
 }
 
@@ -248,7 +272,7 @@ function workingDaysForward(from: string, to: string): number {
   let count = 0;
   while (cursor < to) {
     cursor = addDays(cursor, 1);
-    if (!isWeekend(cursor)) count += 1;
+    if (isWorkingDay(cursor)) count += 1;
   }
   return count;
 }
@@ -323,7 +347,7 @@ export function actionableWorkingDaysRemaining(
 
 export function lastWorkingDayBefore(value: string | Date): string {
   let cursor = addDays(dateOnly(value), -1);
-  while (isWeekend(cursor)) cursor = addDays(cursor, -1);
+  while (!isWorkingDay(cursor)) cursor = addDays(cursor, -1);
   return cursor;
 }
 

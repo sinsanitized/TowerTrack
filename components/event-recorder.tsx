@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Beaker,
@@ -32,6 +32,8 @@ import {
   serviceResponsibilityLabel,
   type ServiceResponsibility,
 } from "@/lib/service-responsibility";
+import type { EventEntryContext } from "@/components/event-recorder-drawer";
+import { isResampleObligation } from "@/lib/event-entry-intent";
 
 const eventIcons = {
   ROUTINE_LEGIONELLA_SAMPLE_COLLECTED: FlaskConical,
@@ -70,9 +72,11 @@ export function EventRecorder({
   canConfirmOwnerManaged = false,
   openSampleObligations = [],
   legionellaResponsibility,
+  bacteriologicalResponsibility,
   legionellaVendorName,
   onCancel,
   returnTo,
+  intentContext,
 }: {
   systemId: string;
   defaultDate: string;
@@ -83,9 +87,11 @@ export function EventRecorder({
   canConfirmOwnerManaged?: boolean;
   openSampleObligations?: OpenSampleObligationForImpact[];
   legionellaResponsibility: ServiceResponsibility | null;
+  bacteriologicalResponsibility: ServiceResponsibility | null;
   legionellaVendorName?: string | null;
   onCancel?: () => void;
   returnTo?: string;
+  intentContext?: EventEntryContext;
 }) {
   const responseTimings = ruleConfig.responseTimings;
   const [ready, setReady] = useState(false);
@@ -97,12 +103,27 @@ export function EventRecorder({
       ? "LEGIONELLA_RESULT_RECEIVED"
       : (initialEventType ?? "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"),
   );
-  const [eventDate, setEventDate] = useState(defaultDate);
+  const [eventDate, setEventDate] = useState("");
   const [cfuPerMl, setCfuPerMl] = useState("");
   const [sampleEventId, setSampleEventId] = useState(
     initialSampleEventId ?? samplesAwaitingResults[0]?.id ?? "",
   );
+  const directedEntry = Boolean(
+    initialSampleEventId || initialEventType || intentContext,
+  );
+  const advanceAfterSelection = useRef(false);
   useEffect(() => setReady(true), []);
+  useEffect(() => {
+    if (!eventSelected || !advanceAfterSelection.current) return;
+    advanceAfterSelection.current = false;
+    window.requestAnimationFrame(() => {
+      const details = document.getElementById("event-details");
+      details?.scrollIntoView({ behavior: "smooth", block: "start" });
+      details
+        ?.querySelector<HTMLElement>("[data-event-primary-field]")
+        ?.focus({ preventScroll: true });
+    });
+  }, [eventSelected, eventType]);
   const isResult = [
     "LEGIONELLA_RESULT_RECEIVED",
     "WEEKLY_BIOLOGICAL_INDICATOR_RESULT",
@@ -195,68 +216,45 @@ export function EventRecorder({
       !samplesAwaitingResults.length
     )
       return;
+    advanceAfterSelection.current = true;
     setEventType(value);
     setEventSelected(true);
   };
   return (
     <div id="record-event" className="scroll-mt-6">
-      <section className="panel p-5">
-        <div>
-          <div className="label">Step 1 of 2 · Choose completed work</div>
-          <h2 className="mt-1 text-xl font-black">What happened?</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Choose the familiar field or office task below. TowerTrack will
-            select the correct compliance record and calculate what comes next.
-          </p>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {visiblePrimaryEvents.map(({ label, type: value }) => {
-            const Icon = eventIcons[value as keyof typeof eventIcons];
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => selectEvent(value)}
-                disabled={
-                  !ready ||
-                  (value === "LEGIONELLA_RESULT_RECEIVED" &&
-                    !samplesAwaitingResults.length)
-                }
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
-                  !ready ||
-                  (value === "LEGIONELLA_RESULT_RECEIVED" &&
-                    !samplesAwaitingResults.length)
-                    ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                    : eventSelected && eventType === value
-                      ? "border-emerald-800 bg-emerald-50 text-emerald-900"
-                      : "border-slate-200 bg-white text-slate-700"
-                }`}
-              >
-                <Icon size={17} /> {label}
-              </button>
-            );
-          })}
-        </div>
-        <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-          <summary
-            className={buttonClass(
-              "secondary",
-              "w-full cursor-pointer text-sm",
-            )}
-          >
-            Other work and special conditions
-          </summary>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {moreEvents.map(({ label, type: value }) => {
+      {!intentContext && (
+        <section className="panel p-5">
+          <div>
+            <div className="label">Step 1 of 2 · Choose completed work</div>
+            <h2 className="mt-1 text-xl font-black">What happened?</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Choose the familiar field or office task below. TowerTrack will
+              select the correct compliance record and calculate what comes
+              next.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {visiblePrimaryEvents.map(({ label, type: value }) => {
               const Icon = eventIcons[value as keyof typeof eventIcons];
               return (
                 <button
                   key={value}
                   type="button"
-                  disabled={!ready}
+                  data-recorder-autofocus={
+                    !directedEntry && value === visiblePrimaryEvents[0]?.type
+                      ? "true"
+                      : undefined
+                  }
                   onClick={() => selectEvent(value)}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
-                    !ready
+                  disabled={
+                    !ready ||
+                    (value === "LEGIONELLA_RESULT_RECEIVED" &&
+                      !samplesAwaitingResults.length)
+                  }
+                  className={`flex min-h-12 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
+                    !ready ||
+                    (value === "LEGIONELLA_RESULT_RECEIVED" &&
+                      !samplesAwaitingResults.length)
                       ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                       : eventSelected && eventType === value
                         ? "border-emerald-800 bg-emerald-50 text-emerald-900"
@@ -268,78 +266,126 @@ export function EventRecorder({
               );
             })}
           </div>
-          {canConfirmOwnerManaged && (
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <div className="label">Office confirmation</div>
-              <p className="mt-1 text-sm text-slate-600">
-                These obligations belong to the cooling-tower owner or an
-                external provider and are not assigned to technicians.
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {officeEvents.map(({ label, type: value }) => {
-                  const Icon = eventIcons[value as keyof typeof eventIcons];
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      disabled={!ready}
-                      onClick={() => selectEvent(value)}
-                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-bold text-slate-700"
-                    >
-                      <Icon size={17} /> {label}
-                    </button>
-                  );
-                })}
-              </div>
+          <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+            <summary
+              className={buttonClass(
+                "secondary",
+                "w-full cursor-pointer text-sm",
+              )}
+            >
+              Other work and special conditions
+            </summary>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {moreEvents.map(({ label, type: value }) => {
+                const Icon = eventIcons[value as keyof typeof eventIcons];
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={!ready}
+                    onClick={() => selectEvent(value)}
+                    className={`flex min-h-12 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
+                      !ready
+                        ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                        : eventSelected && eventType === value
+                          ? "border-emerald-800 bg-emerald-50 text-emerald-900"
+                          : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    <Icon size={17} /> {label}
+                  </button>
+                );
+              })}
             </div>
-          )}
-          {canConfirmOwnerManaged && externalLegionella && (
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <div className="label">
-                Record External Legionella Information
+            {canConfirmOwnerManaged && (
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <div className="label">Office confirmation</div>
+                <p className="mt-1 text-sm text-slate-600">
+                  These obligations belong to the cooling-tower owner or an
+                  external provider and are not assigned to technicians.
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {officeEvents
+                    .filter(
+                      ({ type }) =>
+                        type !== "BACTERIOLOGICAL_SAMPLE_COLLECTED" ||
+                        bacteriologicalResponsibility !== "CUSTOMER",
+                    )
+                    .map(({ label, type: value }) => {
+                      const Icon = eventIcons[value as keyof typeof eventIcons];
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={!ready}
+                          onClick={() => selectEvent(value)}
+                          className="flex min-h-12 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-bold text-slate-700"
+                        >
+                          <Icon size={17} /> {label}
+                        </button>
+                      );
+                    })}
+                </div>
               </div>
-              <p className="mt-1 text-sm text-slate-600">
-                {serviceResponsibilityLabel(legionellaResponsibility)}. These
-                records are attributed externally, not to our technicians.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  className={buttonClass("secondary")}
-                  type="button"
-                  onClick={() =>
-                    selectEvent("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED")
-                  }
-                >
-                  Record external sample date
-                </button>
-                <button
-                  className={buttonClass("secondary")}
-                  type="button"
-                  disabled={!samplesAwaitingResults.length}
-                  onClick={() => selectEvent("LEGIONELLA_RESULT_RECEIVED")}
-                >
-                  Record external result
-                </button>
+            )}
+            {canConfirmOwnerManaged && externalLegionella && (
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <div className="label">
+                  Record External Legionella Information
+                </div>
+                <p className="mt-1 text-sm text-slate-600">
+                  {serviceResponsibilityLabel(legionellaResponsibility)}. These
+                  records are attributed externally, not to our technicians.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className={buttonClass("secondary")}
+                    type="button"
+                    onClick={() =>
+                      selectEvent("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED")
+                    }
+                  >
+                    Record external sample date
+                  </button>
+                  <button
+                    className={buttonClass("secondary")}
+                    type="button"
+                    disabled={!samplesAwaitingResults.length}
+                    onClick={() => selectEvent("LEGIONELLA_RESULT_RECEIVED")}
+                  >
+                    Record external result
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
+          </details>
+          {!samplesAwaitingResults.length && (
+            <p className="mt-3 text-sm font-bold text-slate-600">
+              Add a Legionella sample before adding a laboratory result. Every
+              result must be linked to the sample that produced it.
+            </p>
           )}
-        </details>
-        {!samplesAwaitingResults.length && (
-          <p className="mt-3 text-sm font-bold text-slate-600">
-            Add a Legionella sample before adding a laboratory result. Every
-            result must be linked to the sample that produced it.
-          </p>
-        )}
-      </section>
+        </section>
+      )}
       {eventSelected && (
         <form
+          id="event-details"
           action={recordServiceEventAction}
-          className="panel mt-4 grid gap-4 p-5 lg:grid-cols-4"
+          className={`panel grid gap-4 p-5 sm:grid-cols-2 ${intentContext ? "" : "mt-4"}`}
         >
-          <div className="border-b border-slate-200 pb-4 lg:col-span-4">
-            <div className="label">Step 2 of 2 · Enter verified details</div>
+          <div className="border-b border-slate-200 pb-4 sm:col-span-2">
+            <div className="label">
+              {intentContext
+                ? "Enter verified details"
+                : "Step 2 of 2 · Enter verified details"}
+            </div>
             <h3 className="mt-1 text-xl font-black">
-              Record {plainEnumLabel(eventType)}
+              {intentContext &&
+              isResampleObligation(intentContext.obligationType)
+                ? "Record Legionella resample"
+                : isCleaning
+                  ? "Record cleaning"
+                  : `Record ${plainEnumLabel(eventType)}`}
             </h3>
             <p className="mt-1 text-sm text-slate-600">
               Fields marked Required must be completed. TowerTrack will validate
@@ -349,6 +395,55 @@ export function EventRecorder({
           <input type="hidden" name="systemId" value={systemId} />
           {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
           <input type="hidden" name="eventType" value={eventType} />
+          {intentContext && (
+            <>
+              <input
+                type="hidden"
+                name="obligationId"
+                value={intentContext.obligationId}
+              />
+              {intentContext.triggerEventId && (
+                <input
+                  type="hidden"
+                  name="triggeringEventId"
+                  value={intentContext.triggerEventId}
+                />
+              )}
+              {intentContext.triggeringSampleId && (
+                <input
+                  type="hidden"
+                  name="triggeringSampleId"
+                  value={intentContext.triggeringSampleId}
+                />
+              )}
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-950 sm:col-span-2">
+                <div className="font-black">
+                  {plainEnumLabel(intentContext.obligationType)}
+                </div>
+                <p className="mt-1 text-sm">
+                  This record will be associated with the selected requirement
+                  and its triggering compliance record.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                  {(intentContext.targetStart || intentContext.targetEnd) && (
+                    <span>
+                      <strong>Service window:</strong>{" "}
+                      <ComplianceWindow
+                        start={intentContext.targetStart}
+                        end={intentContext.targetEnd}
+                      />
+                    </span>
+                  )}
+                  {intentContext.latest && (
+                    <span>
+                      <strong>Deadline:</strong>{" "}
+                      <ComplianceDate value={intentContext.latest} />
+                    </span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
           <input
             type="hidden"
             name="performedByResponsibility"
@@ -367,14 +462,10 @@ export function EventRecorder({
               "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
               "LEGIONELLA_RESULT_RECEIVED",
             ].includes(eventType) && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 lg:col-span-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
                 <div className="font-black">Externally completed</div>
                 <div className="mt-1 text-sm text-slate-600">
-                  Performed by{" "}
-                  {legionellaResponsibility === "CUSTOMER"
-                    ? "customer"
-                    : "another vendor"}
-                  ; date supplied to our office.
+                  Performed by another vendor; date supplied to our office.
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label>
@@ -396,12 +487,14 @@ export function EventRecorder({
                 </div>
               </div>
             )}
-          <label className={isHyper ? "lg:col-span-4 lg:max-w-sm" : ""}>
+          <label className={isHyper ? "sm:col-span-2 sm:max-w-sm" : ""}>
             <span className="label">{recordDateLabel} · Required</span>
             <input
               className="field mt-1"
               name="eventDate"
               type="date"
+              data-recorder-autofocus={directedEntry ? "true" : undefined}
+              data-event-primary-field
               max={defaultDate}
               required
               value={eventDate}
@@ -413,13 +506,13 @@ export function EventRecorder({
             </span>
           </label>
           {isHyper && (
-            <p className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 lg:col-span-4">
+            <p className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 sm:col-span-2">
               Record the date the summertime hyperhalogenation was completed.
               Treatment details are maintained on the separate service form.
             </p>
           )}
           {eventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 lg:col-span-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 sm:col-span-2">
               <div className="font-black">
                 Owner-managed cooling-tower culture
               </div>
@@ -485,7 +578,7 @@ export function EventRecorder({
             </>
           )}
           {eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT" && (
-            <label className="lg:col-span-2">
+            <label className="sm:col-span-2">
               <span className="label">Residual outcome after 3 days</span>
               <select
                 className="field mt-1"
@@ -501,7 +594,7 @@ export function EventRecorder({
             </label>
           )}
           {isRemediation && (
-            <fieldset className="lg:col-span-4">
+            <fieldset className="sm:col-span-2">
               <legend className="label">
                 What work was completed? · Required
               </legend>
@@ -537,11 +630,11 @@ export function EventRecorder({
           )}
           {isRemediation && (
             <div
-              className={`rounded-xl border p-4 text-sm lg:col-span-3 ${
+              className={`rounded-xl border p-4 text-sm ${
                 eventType === "FULL_REMEDIATION"
                   ? "border-red-200 bg-red-50 text-red-950"
                   : "border-amber-200 bg-amber-50 text-amber-950"
-              }`}
+              } sm:col-span-2`}
               aria-live="polite"
             >
               <div className="flex items-start gap-3">
@@ -624,7 +717,7 @@ export function EventRecorder({
             </label>
           )}
           {!isHyper && (
-            <details className="rounded-lg border border-slate-200 p-3 lg:col-span-4">
+            <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
               <summary className="cursor-pointer text-sm font-black text-emerald-800">
                 Add notes (optional)
               </summary>
@@ -640,14 +733,14 @@ export function EventRecorder({
           )}
           {preview.error && (
             <p
-              className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-950 lg:col-span-4"
+              className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-950 sm:col-span-2"
               role="alert"
             >
               Preview unavailable: {preview.error}
             </p>
           )}
           <section
-            className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950 lg:col-span-4"
+            className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950 sm:col-span-2"
             aria-live="polite"
           >
             <div className="label">Before saving</div>
@@ -668,52 +761,68 @@ export function EventRecorder({
                 </p>
               ) : preview.impact ? (
                 <div className="space-y-3">
-                  {preview.impact.messages.length > 0 && (
-                    <ul className="list-disc space-y-1 pl-5 text-sm font-bold">
-                      {preview.impact.messages.map((message) => (
-                        <li key={message}>{message}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {projectedObligations.length > 0 && (
-                    <div className="grid gap-3 lg:grid-cols-2">
-                      {projectedObligations.map((obligation) => (
-                        <article
-                          key={`${obligation.obligationType}-${obligation.latestDueDate}`}
-                          className="rounded-lg border border-blue-200 bg-white p-3"
-                        >
-                          <div className="font-black">
-                            Generates{" "}
-                            {requirementLabel(obligation.obligationType)}
-                          </div>
-                          <p className="mt-1 text-sm text-slate-600">
-                            {obligation.reason}
-                          </p>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                            <ComplianceWindow
-                              start={
-                                obligation.targetStartDate ??
-                                obligation.earliestDueDate
-                              }
-                              end={
-                                obligation.targetEndDate ??
-                                obligation.latestDueDate
-                              }
-                            />
-                            <ComplianceDate
-                              value={obligation.latestDueDate}
-                              label="Compliance deadline"
-                              deadline
-                              empty={
-                                obligation.priority === "EMERGENCY"
-                                  ? "Immediate / follow MPP"
-                                  : "No fixed deadline"
-                              }
-                            />
-                          </div>
-                        </article>
-                      ))}
-                    </div>
+                  <p className="text-sm font-bold">
+                    Saving will update this tower&apos;s history and compliance
+                    dates
+                    {projectedObligations.length
+                      ? ` and create ${projectedObligations.length} follow-up ${projectedObligations.length === 1 ? "requirement" : "requirements"}`
+                      : ""}
+                    .
+                  </p>
+                  {(preview.impact.messages.length > 0 ||
+                    projectedObligations.length > 0) && (
+                    <details className="rounded-lg border border-blue-200 bg-white p-3">
+                      <summary className="cursor-pointer font-black text-blue-900">
+                        View detailed compliance changes
+                      </summary>
+                      {preview.impact.messages.length > 0 && (
+                        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-bold">
+                          {preview.impact.messages.map((message) => (
+                            <li key={message}>{message}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {projectedObligations.length > 0 && (
+                        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                          {projectedObligations.map((obligation) => (
+                            <article
+                              key={`${obligation.obligationType}-${obligation.latestDueDate}`}
+                              className="rounded-lg border border-blue-200 bg-blue-50 p-3"
+                            >
+                              <div className="font-black">
+                                Creates{" "}
+                                {requirementLabel(obligation.obligationType)}
+                              </div>
+                              <p className="mt-1 text-sm text-slate-600">
+                                {obligation.reason}
+                              </p>
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <ComplianceWindow
+                                  start={
+                                    obligation.targetStartDate ??
+                                    obligation.earliestDueDate
+                                  }
+                                  end={
+                                    obligation.targetEndDate ??
+                                    obligation.latestDueDate
+                                  }
+                                />
+                                <ComplianceDate
+                                  value={obligation.latestDueDate}
+                                  label="Compliance deadline"
+                                  deadline
+                                  empty={
+                                    obligation.priority === "EMERGENCY"
+                                      ? "Immediate / follow MPP"
+                                      : "No fixed deadline"
+                                  }
+                                />
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </details>
                   )}
                 </div>
               ) : (
@@ -735,7 +844,7 @@ export function EventRecorder({
               </details>
             </div>
           </section>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end lg:col-span-4">
+          <div className="-mx-5 -mb-5 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-4 sm:col-span-2 sm:flex-row sm:justify-end">
             {onCancel && (
               <button
                 className={buttonClass(

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarCheck, Layers3 } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarCheck,
+  CheckCircle2,
+  Layers3,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
@@ -9,12 +14,17 @@ import {
   deadlinePeriodForDate,
   completionHrefForObligation,
 } from "@/lib/deadline-view";
-import { responsibilityForServiceObligation } from "@/lib/service-responsibility";
+import {
+  responsibilityFamilyForObligation,
+  responsibilityForServiceObligation,
+} from "@/lib/service-responsibility";
 import { buttonClass } from "@/lib/button-variants";
 import { complianceDashboardRows } from "@/lib/queries";
 import { requirementLabel, requiredActionLabel } from "@/lib/labels";
 import { requireUser } from "@/lib/auth";
 import { asUtc, todayDateOnly } from "@/lib/date";
+import { withReturnPath } from "@/lib/workflow-context";
+import { isResampleObligation } from "@/lib/event-entry-intent";
 
 type DashboardRows = Awaited<ReturnType<typeof complianceDashboardRows>>;
 type DashboardRow = DashboardRows[number];
@@ -155,24 +165,36 @@ function ActionRow({
           )}
           href={
             responsibility == null
-              ? `/systems/${row.id}?view=obligations`
-              : completionHrefForObligation(row.id, obligation)
+              ? withReturnPath(
+                  `/systems/${row.id}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
+                  "/",
+                )
+              : obligation.status === "OVERDUE"
+                ? `/systems/${row.id}?view=obligations`
+                : withReturnPath(
+                    completionHrefForObligation(row.id, obligation),
+                    "/",
+                  )
           }
         >
-          {responsibility == null || obligation.status === "OVERDUE"
+          {responsibility == null
             ? "Assign responsibility"
-            : obligation.category === "REPORTING_ACTION" &&
-                !obligation.type.includes("CORRECTIVE_ACTION") &&
-                obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
-                obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
-              ? "Record submission"
-              : obligation.category === "SAMPLE"
-                ? "Record sample"
-                : obligation.category === "INSPECTION"
-                  ? "Record inspection"
-                  : obligation.type.includes("CLEANING")
-                    ? "Record cleaning"
-                    : "Record completion"}
+            : obligation.status === "OVERDUE"
+              ? "Review issue"
+              : obligation.category === "REPORTING_ACTION" &&
+                  !obligation.type.includes("CORRECTIVE_ACTION") &&
+                  obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
+                  obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+                ? "Record submission"
+                : obligation.category === "SAMPLE"
+                  ? isResampleObligation(obligation.type)
+                    ? "Record resample"
+                    : "Record sample"
+                  : obligation.category === "INSPECTION"
+                    ? "Record inspection"
+                    : obligation.type.includes("CLEANING")
+                      ? "Record cleaning"
+                      : "Record completion"}
         </Link>
       </div>
     </article>
@@ -197,8 +219,15 @@ function actionDeadlineSort(
   );
 }
 
-export default async function ActionCenterPage() {
+export default async function ActionCenterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ workflowNotice?: string }>;
+}) {
   const user = await requireUser();
+  const query = await searchParams;
+  const workflowNotice =
+    typeof query.workflowNotice === "string" ? query.workflowNotice : null;
   const today = todayDateOnly();
   const rows = await complianceDashboardRows({
     organizationId: user.organizationId,
@@ -274,42 +303,20 @@ export default async function ActionCenterPage() {
       <PageHeader
         eyebrow="Daily operations"
         title="Action Center"
-        description="Start with the first item under Act now. If there are none, work down this page from top to bottom."
+        description="Start here. Complete the first item under Act now. If there are none, work down this page from top to bottom—TowerTrack will guide each step."
       />
-
-      <section
-        className="mb-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-        aria-label="Deadline summary"
-      >
-        <Link
-          className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-950"
-          href="/work/overdue-towers"
+      {workflowNotice && (
+        <div
+          className="mb-7 flex items-start gap-3 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 text-emerald-950"
+          role="status"
         >
-          <div className="text-2xl font-black">{issueCount}</div>
-          <div className="text-sm font-bold">Overdue compliance issues</div>
-        </Link>
-        <Link
-          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950"
-          href="/deadlines?period=THIS_WEEK"
-        >
-          <div className="text-2xl font-black">{thisWeekItems.length}</div>
-          <div className="text-sm font-bold">Due this week</div>
-        </Link>
-        <Link
-          className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950"
-          href="/deadlines?period=NEXT_WEEK"
-        >
-          <div className="text-2xl font-black">{nextWeekItems.length}</div>
-          <div className="text-sm font-bold">Due next week</div>
-        </Link>
-        <Link
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950"
-          href="/deadlines"
-        >
-          <div className="text-2xl font-black">{actionable.length}</div>
-          <div className="text-sm font-bold">Open upcoming deadlines</div>
-        </Link>
-      </section>
+          <CheckCircle2 className="mt-0.5 shrink-0" size={22} aria-hidden />
+          <div>
+            <div className="font-black">Record saved successfully</div>
+            <p className="mt-1 text-sm font-bold">{workflowNotice}</p>
+          </div>
+        </div>
+      )}
 
       {(issueCount > 0 || immediateItems.length > 0) && (
         <section className="panel mb-7 overflow-hidden border-red-200">

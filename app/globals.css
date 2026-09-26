@@ -9,7 +9,7 @@
   --cream: #f4f5ef;
   --surface: #ffffff;
   --surface-muted: #f8faf8;
-  --border: #dfe3dc;
+  --border: #cbd3cd;
   --forest: #173f31;
   --lime: #d9ef61;
   --focus: #6d4fc2;
@@ -66,10 +66,10 @@ textarea:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 5px rgb(20 40 30 / 0.08);
 }
 .label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -80,7 +80,7 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  min-height: 40px;
+  min-height: 48px;
   padding: 0.55rem 0.9rem;
   border-radius: 9px;
   font-weight: 800;
@@ -143,7 +143,7 @@ textarea:focus-visible {
 }
 .field {
   width: 100%;
-  min-height: 42px;
+  min-height: 48px;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.55rem 0.7rem;
@@ -177,7 +177,7 @@ table {
 }
 th {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   text-align: left;
@@ -203,12 +203,12 @@ tbody tr:hover {
 
 /* Keep operational and supporting text legible for older users. */
 .text-sm {
-  font-size: 0.9375rem;
-  line-height: 1.45rem;
+  font-size: 1rem;
+  line-height: 1.55rem;
 }
 .text-xs {
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.35rem;
 }
 
 @media (max-width: 767px) {
@@ -247,7 +247,7 @@ tbody tr:hover {
   .deadline-table td::before {
     content: attr(data-label);
     color: var(--muted);
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 900;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -267,8 +267,8 @@ tbody tr:hover {
 
 .theme-toggle {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid var(--border);

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { EventRecorderDrawer } from "@/components/event-recorder-drawer";
+import { NextActionCallout } from "@/components/next-action-callout";
 import { TowerActionList } from "@/components/tower-action-list";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
@@ -20,7 +21,7 @@ import {
   formatDate,
   addDays,
   dateOnly,
-  isWeekend,
+  isWorkingDay,
   nextWorkingDate,
   todayDateOnly,
 } from "@/lib/date";
@@ -38,6 +39,7 @@ import {
 import {
   canViewTowerSettings,
   resolveTowerDetailView,
+  selectNextTowerActions,
   selectOverviewObligations,
   sortTowerObligations,
 } from "@/lib/tower-details";
@@ -45,10 +47,17 @@ import { towerRuleConfigurationLabel } from "@/lib/tower-rule-configuration";
 import { buttonClass } from "@/lib/button-variants";
 import { completionHrefForObligation } from "@/lib/deadline-view";
 import {
+  responsibilityFamilyForObligation,
   responsibilityForServiceObligation,
   serviceResponsibilityFamilies,
   serviceResponsibilityLabel,
 } from "@/lib/service-responsibility";
+import {
+  eventEntryHref,
+  eventTypeForEntryIntent,
+  isResampleObligation,
+  parseEventEntryIntent,
+} from "@/lib/event-entry-intent";
 
 export default async function SystemPage({
   params,
@@ -59,6 +68,7 @@ export default async function SystemPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
+  const entryIntent = parseEventEntryIntent(id, query);
   const returnTo =
     typeof query.returnTo === "string" &&
     query.returnTo.startsWith("/") &&
@@ -80,30 +90,15 @@ export default async function SystemPage({
         : "overview";
   const view = resolveTowerDetailView(requestedView, user.role);
   const requestedSampleEventId =
-    typeof query.labSample === "string" ? query.labSample : undefined;
-  const externalLegionellaRequested = query.record === "external-legionella";
-  const initialEventType =
-    query.record === "sample"
-      ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
-      : query.record === "hyperhalogenation"
-        ? ("SUMMERTIME_HYPERHALOGENATION" as const)
-        : query.record === "inspection"
-          ? ("QUARTERLY_INSPECTION_COMPLETED" as const)
-          : query.record === "cleaning"
-            ? ("CLEANING_COMPLETED" as const)
-            : query.record === "startup-cleaning"
-              ? ("STARTUP_CLEANING_DISINFECTION" as const)
-              : query.record === "disinfection"
-                ? ("HIGH_LEGIONELLA_DISINFECTION" as const)
-                : query.record === "remediation"
-                  ? ("FULL_REMEDIATION" as const)
-                  : query.record === "biological"
-                    ? ("WEEKLY_BIOLOGICAL_INDICATOR_RESULT" as const)
-                    : query.record === "bacteriological"
-                      ? ("BACTERIOLOGICAL_SAMPLE_COLLECTED" as const)
-                      : externalLegionellaRequested
-                        ? ("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" as const)
-                        : undefined;
+    entryIntent?.sampleEventId ??
+    (typeof query.labSample === "string" ? query.labSample : undefined);
+  const externalLegionellaRequested =
+    entryIntent?.type === "external-legionella";
+  const initialEventType = entryIntent
+    ? entryIntent.type === "result"
+      ? ("LEGIONELLA_RESULT_RECEIVED" as const)
+      : eventTypeForEntryIntent(entryIntent.type)
+    : undefined;
   const roleAllowedInitialEventType =
     initialEventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
     !canConfirmOwnerManaged
@@ -253,15 +248,75 @@ export default async function SystemPage({
     }),
   ]);
   if (!system || !dashboardRow) notFound();
+  const selectedSampleObligation = entryIntent?.obligationId
+    ? system.sampleObligations.find(
+        (item) => item.id === entryIntent.obligationId,
+      )
+    : undefined;
+  const selectedInspectionObligation = entryIntent?.obligationId
+    ? system.inspectionObligations.find(
+        (item) => item.id === entryIntent.obligationId,
+      )
+    : undefined;
+  const selectedMaintenanceObligation = entryIntent?.obligationId
+    ? system.maintenanceObligations.find(
+        (item) => item.id === entryIntent.obligationId,
+      )
+    : undefined;
+  const selectedReportingObligation = entryIntent?.obligationId
+    ? system.reportingObligations.find(
+        (item) => item.id === entryIntent.obligationId,
+      )
+    : undefined;
+  const selectedObligation =
+    selectedSampleObligation ??
+    selectedInspectionObligation ??
+    selectedMaintenanceObligation ??
+    selectedReportingObligation;
+  const selectedObligationType = selectedSampleObligation
+    ? selectedSampleObligation.obligationType
+    : selectedInspectionObligation
+      ? "QUARTERLY_COMPLIANCE_INSPECTION"
+      : selectedMaintenanceObligation
+        ? selectedMaintenanceObligation.obligationType
+        : selectedReportingObligation?.obligationType;
+  const invalidIntentContext = Boolean(
+    entryIntent?.obligationId && !selectedObligation,
+  );
+  const resampleContextMismatch = Boolean(
+    entryIntent?.type === "resample" &&
+    selectedSampleObligation &&
+    !isResampleObligation(selectedSampleObligation.obligationType),
+  );
   const allowedInitialEventType =
-    externalLegionellaRequested &&
-    canConfirmOwnerManaged &&
-    ["CUSTOMER", "OTHER_VENDOR"].includes(system.legionellaResponsibility ?? "")
-      ? roleAllowedInitialEventType
-      : roleAllowedInitialEventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&
-          system.legionellaResponsibility !== "OUR_COMPANY"
-        ? undefined
-        : roleAllowedInitialEventType;
+    invalidIntentContext ||
+    resampleContextMismatch ||
+    (roleAllowedInitialEventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
+      system.bacteriologicalResponsibility === "CUSTOMER")
+      ? undefined
+      : externalLegionellaRequested &&
+          canConfirmOwnerManaged &&
+          system.legionellaResponsibility === "OTHER_VENDOR"
+        ? roleAllowedInitialEventType
+        : roleAllowedInitialEventType ===
+              "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&
+            system.legionellaResponsibility !== "OUR_COMPANY"
+          ? undefined
+          : roleAllowedInitialEventType;
+  const selectedTriggerEvent = selectedObligation?.triggerEvent;
+  const selectedTriggerRecord = selectedTriggerEvent
+    ? system.serviceEvents.find((event) => event.id === selectedTriggerEvent.id)
+    : undefined;
+  const selectedTriggerDetails = selectedTriggerRecord?.details as {
+    sampleEventId?: unknown;
+  } | null;
+  const triggeringSampleId =
+    typeof selectedTriggerDetails?.sampleEventId === "string"
+      ? selectedTriggerDetails.sampleEventId
+      : selectedTriggerEvent?.eventType ===
+          "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
+        ? selectedTriggerEvent.id
+        : undefined;
   const activeCleaningPlan = system.activities.find((activity) => {
     const details = activity.details as { planType?: unknown } | null;
     return (
@@ -282,7 +337,7 @@ export default async function SystemPage({
     .filter((value): value is string => Boolean(value))
     .sort()
     .at(-1)!;
-  while (isWeekend(cleaningPlanEarliest))
+  while (!isWorkingDay(cleaningPlanEarliest))
     cleaningPlanEarliest = addDays(cleaningPlanEarliest, 1);
   const latestMonthlySample = system.serviceEvents
     .filter(
@@ -324,6 +379,11 @@ export default async function SystemPage({
     samplesAwaitingResultIds.has(requestedSampleEventId)
       ? requestedSampleEventId
       : undefined;
+  const invalidResultContext = Boolean(
+    entryIntent?.type === "result" &&
+    requestedSampleEventId &&
+    !initialSampleEventId,
+  );
   const latestQuarterlyInspection = system.serviceEvents
     .filter(
       (event) =>
@@ -371,20 +431,82 @@ export default async function SystemPage({
   const newlyCreated = query.created === "1";
   const detailsUpdated = query.updated === "1";
   const today = todayDateOnly();
-  const nextRequired = [...dashboardRow.openObligations].sort(
-    (a, b) =>
-      (a.priority === "EMERGENCY" ? 0 : 1) -
-        (b.priority === "EMERGENCY" ? 0 : 1) ||
-      (a.latest ?? "0000-00-00").localeCompare(b.latest ?? "0000-00-00"),
-  )[0];
-  const nextResponsibility = nextRequired
-    ? responsibilityForServiceObligation(
-        nextRequired.type,
-        nextRequired.category,
-        system,
-      )
-    : null;
-  const warningCount = dashboardRow.openObligations.filter(
+  const trackedOpenObligations = dashboardRow.openObligations.filter(
+    (item) =>
+      !(
+        item.category === "SAMPLE" &&
+        responsibilityForServiceObligation(item.type, item.category, system) ===
+          "CUSTOMER"
+      ),
+  );
+  const nextActionSelection = selectNextTowerActions(
+    trackedOpenObligations,
+    today,
+  );
+  const nextRequired = nextActionSelection.items[0];
+  const nextActionItems = nextActionSelection.items.map((item) => {
+    const deadlineReviewRequired =
+      nextActionSelection.state === "REVIEW_REQUIRED";
+    const responsibility = responsibilityForServiceObligation(
+      item.type,
+      item.category,
+      system,
+    );
+    const actionLabel = deadlineReviewRequired
+      ? "Review missing information"
+      : responsibility == null
+        ? "Assign responsibility"
+        : responsibility === "CUSTOMER" || responsibility === "OTHER_VENDOR"
+          ? item.category === "SAMPLE"
+            ? isResampleObligation(item.type)
+              ? "Record external resample"
+              : "Record external sample"
+            : "Review responsibility"
+          : responsibility === "NOT_TRACKED"
+            ? "Review requirement"
+            : item.category === "REPORTING_ACTION"
+              ? item.type.includes("CORRECTIVE_ACTION")
+                ? "Record disinfection"
+                : item.type === "LEVEL_4_FULL_REMEDIATION"
+                  ? "Record remediation"
+                  : item.type === "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+                    ? "Record result"
+                    : "Record submission"
+              : item.category === "SAMPLE"
+                ? isResampleObligation(item.type)
+                  ? "Record resample"
+                  : "Record sample"
+                : item.category === "INSPECTION"
+                  ? "Record inspection"
+                  : item.type.includes("CLEANING")
+                    ? "Record cleaning"
+                    : "Record completion";
+    const actionHref = deadlineReviewRequired
+      ? `/systems/${id}?view=obligations#obligations`
+      : responsibility == null
+        ? `/systems/${id}/edit?focus=${responsibilityFamilyForObligation(item.type, item.category)}#service-responsibilities`
+        : (responsibility === "CUSTOMER" ||
+              responsibility === "OTHER_VENDOR") &&
+            item.category === "SAMPLE"
+          ? eventEntryHref({
+              type: "external-legionella",
+              towerId: id,
+              obligationId: item.id,
+            })
+          : responsibility === "OUR_COMPANY"
+            ? completionHrefForObligation(id, item)
+            : `/systems/${id}?view=obligations#obligations`;
+    return {
+      id: item.id,
+      requiredAction: requiredActionLabel(item.type),
+      hardDueDate: item.latest,
+      targetDate: item.targetStart,
+      obligationReason: item.reason,
+      actionLabel,
+      actionHref,
+    };
+  });
+  const warningCount = trackedOpenObligations.filter(
     (item) =>
       item.priority === "EMERGENCY" ||
       item.priority === "CRITICAL" ||
@@ -392,11 +514,11 @@ export default async function SystemPage({
       (item.latest != null && item.latest < today),
   ).length;
   const orderedOpenObligations = sortTowerObligations(
-    dashboardRow.openObligations,
+    trackedOpenObligations,
     today,
   );
   const overviewObligations = selectOverviewObligations(
-    dashboardRow.openObligations,
+    trackedOpenObligations,
     today,
   );
   const combinedObligationIds = new Set(
@@ -506,6 +628,9 @@ export default async function SystemPage({
                 (typeof query.voidedEvent === "string"
                   ? query.voidedEvent
                   : undefined) ??
+                (entryIntent
+                  ? `${entryIntent.type}:${entryIntent.obligationId ?? entryIntent.sampleEventId ?? "new"}`
+                  : undefined) ??
                 "event-recorder"
               }
               systemId={id}
@@ -515,12 +640,39 @@ export default async function SystemPage({
               initialSampleEventId={initialSampleEventId}
               initialEventType={allowedInitialEventType}
               initialOpen={Boolean(
-                allowedInitialEventType || initialSampleEventId,
+                !invalidResultContext &&
+                (allowedInitialEventType || initialSampleEventId),
               )}
               canConfirmOwnerManaged={canConfirmOwnerManaged}
               legionellaResponsibility={system.legionellaResponsibility}
+              bacteriologicalResponsibility={
+                system.bacteriologicalResponsibility
+              }
               legionellaVendorName={system.legionellaVendorName}
               returnTo={returnTo}
+              intentContext={
+                selectedObligation
+                  ? {
+                      intentType: entryIntent?.type,
+                      obligationId: selectedObligation.id,
+                      obligationType: selectedObligationType!,
+                      triggerEventId: selectedTriggerEvent?.id,
+                      triggeringSampleId,
+                      earliest: selectedObligation.earliestDueDate
+                        ? dateOnly(selectedObligation.earliestDueDate)
+                        : null,
+                      targetStart: selectedObligation.targetStartDate
+                        ? dateOnly(selectedObligation.targetStartDate)
+                        : null,
+                      targetEnd: selectedObligation.targetEndDate
+                        ? dateOnly(selectedObligation.targetEndDate)
+                        : null,
+                      latest: selectedObligation.latestDueDate
+                        ? dateOnly(selectedObligation.latestDueDate)
+                        : null,
+                    }
+                  : undefined
+              }
               openSampleObligations={system.sampleObligations.map((item) => ({
                 id: item.id,
                 type: item.obligationType,
@@ -537,13 +689,26 @@ export default async function SystemPage({
           </>
         }
       />
-      {system.legionellaResponsibility === "NOT_TRACKED" && (
-        <div className="mb-5 rounded-xl border border-purple-300 bg-purple-50 p-4 font-bold text-purple-900">
-          Legionella compliance is not tracked in TowerTrack for this tower.
-          This does not mean no legal requirement applies.
+      {(invalidIntentContext ||
+        resampleContextMismatch ||
+        invalidResultContext) && (
+        <div className="mb-5 rounded-xl border border-purple-300 bg-purple-50 p-4 text-purple-950">
+          <div className="font-black">This action is no longer available</div>
+          <p className="mt-1 text-sm">
+            The referenced requirement was completed, removed, or does not match
+            this workflow. Review the tower&apos;s current required work before
+            recording work.
+          </p>
         </div>
       )}
-      {!system.legionellaResponsibility && (
+      {view === "obligations" &&
+        system.legionellaResponsibility === "NOT_TRACKED" && (
+          <div className="mb-5 rounded-xl border border-purple-300 bg-purple-50 p-4 font-bold text-purple-900">
+            Legionella compliance is not tracked in TowerTrack for this tower.
+            This does not mean no legal requirement applies.
+          </div>
+        )}
+      {view === "obligations" && !system.legionellaResponsibility && (
         <div className="mb-5 rounded-xl border border-purple-300 bg-purple-50 p-4 font-bold text-purple-900">
           Legionella responsibility must be confirmed.
           {canViewSettings && (
@@ -559,8 +724,8 @@ export default async function SystemPage({
       >
         {[
           ["Overview", "overview"],
-          ["Requirements", "obligations"],
-          ["Records & History", "history"],
+          ["Required work", "obligations"],
+          ["Records", "history"],
           ["Tower Information", "information"],
           ...(canViewSettings ? [["Settings", "settings"]] : []),
         ].map(([label, tab]) => (
@@ -578,6 +743,30 @@ export default async function SystemPage({
           </Link>
         ))}
       </nav>
+      <div className="mb-6 border-l-4 border-emerald-700 pl-4">
+        <h2 className="text-lg font-black">
+          {view === "overview"
+            ? "Tower overview"
+            : view === "obligations"
+              ? "Required work"
+              : view === "history"
+                ? "Completed records"
+                : view === "information"
+                  ? "Tower information"
+                  : "Tower settings"}
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm text-slate-600">
+          {view === "overview"
+            ? "See what needs attention now, the next upcoming work, and the latest compliance dates."
+            : view === "obligations"
+              ? "Review unfinished work, dependencies, deadlines, and visit planning."
+              : view === "history"
+                ? "Review completed samples, results, inspections, cleaning, submissions, corrections, and audit history."
+                : view === "information"
+                  ? "Review the facility, equipment, identifiers, and service responsibilities."
+                  : "Manage operating patterns, recommended service dates, jurisdiction, and compliance rules."}
+        </p>
+      </div>
       {generated && (
         <section className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
           <div className="label">Compliance dates recalculated</div>
@@ -679,23 +868,29 @@ export default async function SystemPage({
       {typeof query.correctedEvent === "string" && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
           Compliance record corrected. The original record remains in audit
-          history, and all compliance requirements were recalculated. Review “Do
-          this next” below for any remaining work.
+          history, and all compliance requirements were recalculated. Review
+          “Next Action Required” below for any remaining work.
         </div>
       )}
       {query.voidedEvent === "1" && (
         <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-950">
           Compliance record marked invalid. It remains in audit history, and
           every dependent requirement was recalculated from the remaining valid
-          records. Review “Do this next” below for any remaining work.
+          records. Review “Next Action Required” below for any remaining work.
         </div>
+      )}
+      {view === "overview" && (
+        <NextActionCallout
+          selection={nextActionSelection}
+          items={nextActionItems}
+        />
       )}
       <section
         id="overview"
         className={`${view === "overview" ? "panel mb-6" : "hidden"} scroll-mt-6 p-5`}
       >
         <div className="label">What needs attention</div>
-        <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_1.25fr_1fr]">
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
           <div
             className={`rounded-xl border p-4 ${
               dashboardRow.complianceHealth.color === "RED"
@@ -715,51 +910,6 @@ export default async function SystemPage({
             <p className="mt-2 text-sm font-bold text-slate-700">
               {dashboardRow.complianceHealth.reason}
             </p>
-          </div>
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-            <div className="label">Do this next</div>
-            {nextRequired ? (
-              <>
-                <div className="mt-2 text-lg font-black">
-                  {requiredActionLabel(nextRequired.type)}
-                </div>
-                <ComplianceDate
-                  value={nextRequired.latest}
-                  label="Compliance deadline"
-                  deadline
-                  operational
-                  empty="Act immediately"
-                />
-                <p className="mt-2 text-sm font-bold text-slate-700">
-                  {serviceResponsibilityLabel(nextResponsibility)}
-                </p>
-                {nextResponsibility === "OUR_COMPANY" ? (
-                  <Link
-                    className={buttonClass("primary", "mt-3 min-h-11")}
-                    href={completionHrefForObligation(id, nextRequired)}
-                  >
-                    {nextRequired.category === "REPORTING_ACTION"
-                      ? "Submit required report"
-                      : nextRequired.category === "SAMPLE"
-                        ? "Record sample collection"
-                        : nextRequired.category === "INSPECTION"
-                          ? "Record completed inspection"
-                          : nextRequired.type.includes("CLEANING")
-                            ? "Record completed cleaning"
-                            : "Complete this requirement"}
-                  </Link>
-                ) : (
-                  <p className="mt-3 rounded-lg border border-purple-200 bg-white p-3 text-sm font-bold text-purple-900">
-                    No field action is assigned to your company. Follow up with
-                    the responsible party shown above.
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="mt-2 font-black text-emerald-900">
-                No open requirements need attention
-              </div>
-            )}
           </div>
           <div
             className={`rounded-xl border p-4 ${
@@ -816,13 +966,13 @@ export default async function SystemPage({
         </section>
       )}
       <section
-        className={view === "history" ? "mb-6" : "hidden"}
+        className={view === "overview" ? "mb-6" : "hidden"}
         aria-labelledby="key-compliance-dates"
       >
         <div className="mb-3">
-          <div className="label">Recurring compliance snapshot</div>
+          <div className="label">Latest dates and recurring work</div>
           <h2 id="key-compliance-dates" className="mt-1 text-xl font-black">
-            Key tower requirements
+            Compliance snapshot
           </h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1022,7 +1172,7 @@ export default async function SystemPage({
       {view === "obligations" && (
         <section className="panel mb-6 p-5">
           <div className="label">Active compliance work</div>
-          <h2 className="mt-1 text-xl font-black">All open requirements</h2>
+          <h2 className="mt-1 text-xl font-black">All required work</h2>
           <p className="mt-1 text-sm text-slate-600">
             Urgent items appear first. Dates show the operational target,
             allowable window, hard deadline, and working time remaining.
@@ -1036,7 +1186,7 @@ export default async function SystemPage({
               legionellaResponsibility={system.legionellaResponsibility}
               responsibilities={system}
               combinedObligationIds={combinedObligationIds}
-              emptyMessage="No open requirements are currently recorded for this tower."
+              emptyMessage="No required work is currently recorded for this tower."
             />
           </div>
         </section>
@@ -1749,7 +1899,12 @@ export default async function SystemPage({
                   {samplesAwaitingResultIds.has(event.id) && (
                     <Link
                       className="btn"
-                      href={`/systems/${id}?labSample=${event.id}#record-event`}
+                      href={eventEntryHref({
+                        type: "result",
+                        towerId: id,
+                        sampleEventId: event.id,
+                        returnTo: `/systems/${id}?view=history#regulatory-events`,
+                      })}
                     >
                       Record lab result
                     </Link>

@@ -12,6 +12,7 @@ export type LegacyEvent = {
 export type LegacyPreviewRow = {
   sourceRow: number;
   sourceKey: string;
+  item: string;
   jobNumber: string;
   jobName: string;
   address: string;
@@ -20,6 +21,7 @@ export type LegacyPreviewRow = {
   systemType: string;
   tonnage: number | null;
   operationPeriodType: "SEASONAL" | "YEAR_ROUND" | "UNKNOWN";
+  legionellaResponsibility: "OUR_COMPANY" | "OTHER_PARTY" | "NEEDS_REVIEW";
   latestLegionellaDate: string | null;
   latestHyperhalogenationDate: string | null;
   events: LegacyEvent[];
@@ -174,6 +176,16 @@ function cellText(value: CellValue | null) {
   return String(value).trim();
 }
 
+export function parseLegacyResponsibility(value: CellValue | Date | null) {
+  // Date-formatted numeric Excel cells are returned as Date objects by the
+  // workbook reader. Text that merely looks like a date remains a string.
+  if (typeof value === "number" || value instanceof Date)
+    return "OUR_COMPANY" as const;
+  if (typeof value === "string" && value.trim() === "NO")
+    return "OTHER_PARTY" as const;
+  return "NEEDS_REVIEW" as const;
+}
+
 export async function analyzeLegacyWorkbook(
   buffer: Buffer,
   filename: string,
@@ -184,9 +196,10 @@ export async function analyzeLegacyWorkbook(
   const data = sheets[0]?.data ?? [];
   const rows: LegacyPreviewRow[] = [];
 
-  for (let index = 3; index < data.length; index++) {
+  for (let index = 2; index < data.length; index++) {
     const sourceRow = index + 1;
     const row = data[index] ?? [];
+    const item = cellText(row[0] ?? null);
     const master = row.slice(1, 8).map(cellText);
     if (!master.some(Boolean)) continue;
     const [
@@ -198,6 +211,11 @@ export async function analyzeLegacyWorkbook(
       cleaning,
       schedule,
     ] = master;
+    if (
+      jobNumber.toLowerCase() === "job number" ||
+      jobName.toLowerCase() === "job name"
+    )
+      continue;
     const errors: string[] = [];
     const warnings: string[] = [];
     const ambiguousCells: LegacyPreviewRow["ambiguousCells"] = [];
@@ -230,8 +248,12 @@ export async function analyzeLegacyWorkbook(
       warnings.push(
         "Cleaning value preserved for review; no cleaning event will be created",
       );
+    const legionellaResponsibility = parseLegacyResponsibility(row[8] ?? null);
+    if (legionellaResponsibility === "NEEDS_REVIEW")
+      warnings.push("Legionella responsibility needs review");
 
-    for (let column = 9; column <= 82; column++) {
+    // Column I is a responsibility indicator, not a monthly event column.
+    for (let column = 10; column <= 82; column++) {
       const value = row[column - 1];
       if (value == null || value === "") continue;
       const context = column === 9 ? undefined : historyContext(column);
@@ -278,6 +300,7 @@ export async function analyzeLegacyWorkbook(
     rows.push({
       sourceRow,
       sourceKey: `${fileHash}:${worksheetName}:${sourceRow}`,
+      item,
       jobNumber,
       jobName,
       address,
@@ -286,6 +309,7 @@ export async function analyzeLegacyWorkbook(
       systemType,
       tonnage,
       operationPeriodType,
+      legionellaResponsibility,
       latestLegionellaDate: legionellaDates.at(-1) ?? null,
       latestHyperhalogenationDate: hyperDates.at(-1) ?? null,
       events,

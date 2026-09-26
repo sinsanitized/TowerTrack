@@ -13,6 +13,7 @@ import {
   complianceJurisdictionLabel,
   profileSourceLabel,
 } from "@/lib/compliance-profile";
+import { previousLegionellaSummary } from "@/lib/legionella-summary";
 import {
   bestVisitOpportunity,
   complianceBaselineReview,
@@ -20,7 +21,10 @@ import {
   getUrgency,
   inactiveComplianceStatus,
 } from "@/lib/compliance-intelligence";
-import { responsibilityForServiceObligation } from "@/lib/service-responsibility";
+import {
+  responsibilityForServiceObligation,
+  shouldTrackSampleObligation,
+} from "@/lib/service-responsibility";
 
 const cleaningServiceEventTypes = new Set([
   "CLEANING_COMPLETED",
@@ -126,11 +130,15 @@ export async function planningRows({
       }
     }
     const obligationRows = [
-      ...system.sampleObligations.map((item) => ({
-        ...item,
-        type: item.obligationType,
-        category: "SAMPLE" as const,
-      })),
+      ...system.sampleObligations
+        .filter((item) =>
+          shouldTrackSampleObligation(item.obligationType, system),
+        )
+        .map((item) => ({
+          ...item,
+          type: item.obligationType,
+          category: "SAMPLE" as const,
+        })),
       ...system.inspectionObligations.map((item) => ({
         ...item,
         type: "QUARTERLY_COMPLIANCE_INSPECTION",
@@ -366,7 +374,20 @@ export async function complianceDashboardRows({
         orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
         include: {
           triggerEvent: {
-            select: { id: true, eventType: true, eventDate: true },
+            select: {
+              id: true,
+              eventType: true,
+              eventDate: true,
+              triggeredReportingObligations: {
+                where: { obligationType: "PORTAL_SAMPLE_DATE" },
+                select: {
+                  status: true,
+                  completedByEvent: {
+                    select: { eventDate: true, status: true },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -416,24 +437,32 @@ export async function complianceDashboardRows({
     },
   });
   const rows = systems.map((system) => {
-    const samples = system.sampleObligations.map((item) => ({
-      id: item.id,
-      type: item.obligationType,
-      earliest: item.earliestDueDate ? dateOnly(item.earliestDueDate) : null,
-      targetStart: item.targetStartDate ? dateOnly(item.targetStartDate) : null,
-      targetEnd: item.targetEndDate ? dateOnly(item.targetEndDate) : null,
-      latest: item.latestDueDate ? dateOnly(item.latestDueDate) : null,
-      priority: item.priority,
-      status: item.status,
-      reason: item.reason,
-      sourceCitation: item.sourceCitation,
-      ruleSetVersion: item.ruleSetVersion,
-      trigger: {
-        id: item.triggerEvent.id,
-        type: item.triggerEvent.eventType,
-        date: dateOnly(item.triggerEvent.eventDate),
-      },
-    }));
+    const samples = system.sampleObligations
+      .filter((item) =>
+        shouldTrackSampleObligation(item.obligationType, system),
+      )
+      .map((item) => ({
+        id: item.id,
+        type: item.obligationType,
+        earliest: item.earliestDueDate ? dateOnly(item.earliestDueDate) : null,
+        targetStart: item.targetStartDate
+          ? dateOnly(item.targetStartDate)
+          : null,
+        targetEnd: item.targetEndDate ? dateOnly(item.targetEndDate) : null,
+        latest: item.latestDueDate ? dateOnly(item.latestDueDate) : null,
+        priority: item.priority,
+        status: item.status,
+        reason: item.reason,
+        sourceCitation: item.sourceCitation,
+        ruleSetVersion: item.ruleSetVersion,
+        trigger: {
+          id: item.triggerEvent.id,
+          type: item.triggerEvent.eventType,
+          date: dateOnly(item.triggerEvent.eventDate),
+          triggeredReportingObligations:
+            item.triggerEvent.triggeredReportingObligations,
+        },
+      }));
     const inspections = system.inspectionObligations.map((item) => ({
       id: item.id,
       type: "QUARTERLY_COMPLIANCE_INSPECTION",
@@ -494,6 +523,29 @@ export async function complianceDashboardRows({
       null;
     const routineSample =
       samples.find((item) => item.type === "ROUTINE_OPERATING_SAMPLE") || null;
+    const previousLegionella = previousLegionellaSummary({
+      ruleConfiguration: system.ruleConfiguration,
+      anchors: samples
+        .filter(
+          (item) =>
+            item.type === "ROUTINE_OPERATING_SAMPLE" &&
+            item.status !== "MISSED" &&
+            item.trigger.type === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+        )
+        .map((item) => ({
+          sampleId: item.trigger.id,
+          sampleCollectedDate: item.trigger.date,
+          portalObligations: item.trigger.triggeredReportingObligations.map(
+            (report) => ({
+              status: report.status,
+              submittedDate:
+                report.completedByEvent?.status === "ACTIVE"
+                  ? dateOnly(report.completedByEvent.eventDate)
+                  : null,
+            }),
+          ),
+        })),
+    });
     const nextInspection = inspections[0] || null;
     const isNyc = system.ruleConfiguration === "NYC_AND_NYS";
     const profileJurisdiction = complianceJurisdictionForConfiguration(
@@ -701,6 +753,7 @@ export async function complianceDashboardRows({
       riskDisplay,
       nextSample,
       routineSample,
+      previousLegionella,
       nextInspection,
       summertimeHyperhalogenation: {
         applicable: isNyc,

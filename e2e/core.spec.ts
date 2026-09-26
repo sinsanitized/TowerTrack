@@ -80,6 +80,7 @@ test("system view shows authority and separate target and hard due", async ({
       .first(),
   ).toBeVisible();
   await search.press("Enter");
+  await page.getByRole("option").first().click();
   await expect(page).toHaveURL(/\/systems\//);
   await expect(
     page.getByRole("heading", { name: "Next required actions" }),
@@ -89,7 +90,7 @@ test("system view shows authority and separate target and hard due", async ({
   ).toBeVisible();
   await expect(page.getByText("Compliance deadline").first()).toBeVisible();
   await expect(page.getByText("Next hard due")).toHaveCount(0);
-  await page.getByRole("link", { name: "Requirements", exact: true }).click();
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
   await page
     .getByText("Rule details and completion tools", { exact: true })
     .click();
@@ -139,7 +140,7 @@ test("theme toggle replaces the decorative bell and persists the choice", async 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
-test("unused corrective action and review destinations are removed", async ({
+test("secondary workflow destinations are removed from primary navigation", async ({
   page,
 }) => {
   await expect(
@@ -150,7 +151,7 @@ test("unused corrective action and review destinations are removed", async ({
   await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Overdue & Problems" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "Towers", exact: true }),
   ).toBeVisible();
@@ -160,6 +161,26 @@ test("unused corrective action and review destinations are removed", async ({
   await expect(
     page.getByRole("link", { name: "History", exact: true }),
   ).toBeVisible();
+
+  await page.goto("/work/overdue-towers");
+  await expect(
+    page.getByRole("heading", { name: "Compliance issues" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Tower work categories" }),
+  ).toHaveCount(0);
+
+  await page.goto("/work/open-obligations");
+  await expect(page).toHaveURL("/deadlines");
+  await page.goto("/work/emergency-samples");
+  await expect(page).toHaveURL("/");
+
+  await page.goto("/work/visit-opportunities");
+  await expect(
+    page.getByRole("heading", { name: "Combined visits" }),
+  ).toBeVisible();
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 });
 
 test("home presents mutually exclusive Action Center sections", async ({
@@ -189,7 +210,7 @@ test("home presents mutually exclusive Action Center sections", async ({
     page.getByRole("link", { name: /^Overdue towers:/ }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: /^Emergency samples:/ }),
+    page.getByRole("link", { name: /^Emergency samples/ }),
   ).toHaveCount(0);
   const homeText = await page.locator("main").innerText();
   expect(homeText).not.toContain("Missed or overdue obligations");
@@ -198,7 +219,7 @@ test("home presents mutually exclusive Action Center sections", async ({
   await page.getByRole("link", { name: "View all recommendations" }).click();
   await expect(page).toHaveURL("/work/visit-opportunities");
   await expect(
-    page.getByRole("heading", { name: "Visit opportunities" }),
+    page.getByRole("heading", { name: "Combined visits" }),
   ).toBeVisible();
 });
 
@@ -257,6 +278,7 @@ test("top search finds towers by building and job number", async ({ page }) => {
   await page.goto("/");
   await search.fill("JOB-1001");
   await search.press("Enter");
+  await page.getByRole("option").first().click();
   await expect(page).toHaveURL(/\/systems\/[a-z0-9]+$/);
 });
 
@@ -283,7 +305,7 @@ test("admin can view and revise a versioned rule definition", async ({
   page,
 }) => {
   await page.getByRole("link", { name: "Settings" }).click();
-  await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect(page.getByText("Effective start")).toHaveCount(0);
   await expect(page.getByText("Effective end")).toHaveCount(0);
   const nycProfile = page
@@ -460,6 +482,7 @@ test("operations manager can open and correct an individual event", async ({
   const search = page.getByRole("combobox", { name: "Find a tower" });
   await search.fill("JOB-1002");
   await search.press("Enter");
+  await page.getByRole("option").first().click();
   const eventHistory = page.locator("#regulatory-events");
   await eventHistory
     .getByRole("link", { name: /View or edit event/ })
@@ -514,7 +537,10 @@ test("operations manager records cleaning in the tower event workflow", async ({
   await addCleaning.click();
   await expect(page.getByLabel("Cleaning type")).toBeVisible();
   const eventForm = page.locator("#record-event form");
-  await eventForm.getByLabel(/date.*Required/).fill("2026-07-14");
+  const completionDate = eventForm.getByLabel(/date.*Required/);
+  await expect(completionDate).toBeFocused();
+  await expect(completionDate).toHaveValue("");
+  await completionDate.fill("2026-07-14");
   await eventForm.getByText("Add notes (optional)", { exact: true }).click();
   await eventForm.getByLabel("Notes").fill("Verified field cleaning record");
   await eventForm.getByRole("button", { name: "Save record" }).click();

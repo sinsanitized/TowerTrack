@@ -12,23 +12,21 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL("/");
 });
 
-test("deadline table uses the compact eight-column contract", async ({
+test("deadline table shows working days in a separate scan-friendly column", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1536, height: 900 });
   await page.getByRole("link", { name: "All Deadlines" }).click();
   const table = page.getByRole("table", {
-    name: "All cooling tower requirements",
+    name: "All cooling tower required work",
   });
   const expected = [
-    "Cooling Tower",
-    "Required Action",
-    "Recommended Service Date",
-    "Recommended Service Window",
-    "Compliance Deadline",
-    "Days Left",
-    "Status",
-    "Action",
+    "Cooling tower",
+    "Required work",
+    "Target window",
+    "Hard deadline",
+    "Working days left",
+    "Next step",
   ];
   await expect(table.getByRole("columnheader")).toHaveCount(expected.length);
   for (const heading of expected)
@@ -41,7 +39,9 @@ test("deadline table uses the compact eight-column contract", async ({
     "Rule set",
     "Authority",
     "Primary Action",
-    "Working Days Left",
+    "Service Date",
+    "Service Window",
+    "Status",
   ])
     await expect(
       table.getByRole("columnheader", { name: removed }),
@@ -54,9 +54,6 @@ test("deadline table uses the compact eight-column contract", async ({
   );
   await expect(firstDataRow).toContainText(
     /, [A-Z]{2} (?:\d{5}|Postal code not recorded)/,
-  );
-  await expect(firstDataRow).toContainText(
-    /(?:[\d,.]+ tons|Tonnage not recorded) · (?:Seasonal|Year-round|Schedule not set)/,
   );
   await expect(firstDataRow).toContainText(
     /Collect|Complete|Perform|Submit|Monitor|Review/,
@@ -79,25 +76,23 @@ test("smaller desktop keeps identity and decision columns visible", async ({
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto("/deadlines");
   const table = page.getByRole("table", {
-    name: "All cooling tower requirements",
+    name: "All cooling tower required work",
   });
   for (const heading of [
-    "Cooling Tower",
-    "Required Action",
-    "Compliance Deadline",
-    "Days Left",
-    "Status",
-    "Action",
+    "Cooling tower",
+    "Required work",
+    "Target window",
+    "Hard deadline",
+    "Working days left",
+    "Next step",
   ])
     await expect(
       table.getByRole("columnheader", { name: heading, exact: true }),
     ).toBeVisible();
-  await expect(
-    table.getByRole("columnheader", { name: "Recommended Service Date" }),
-  ).toBeHidden();
-  await expect(
-    table.getByText("Recommended service dates").first(),
-  ).toBeVisible();
+  for (const removed of ["Service Date", "Service Window", "Status"])
+    await expect(
+      table.getByRole("columnheader", { name: removed }),
+    ).toHaveCount(0);
 });
 
 test("due-date and work-type filters narrow displayed rows", async ({
@@ -212,12 +207,12 @@ test("mobile keeps reference metadata readable without adding columns", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/deadlines");
   const table = page.getByRole("table", {
-    name: "All cooling tower requirements",
+    name: "All cooling tower required work",
   });
-  await expect(table.locator("th")).toHaveCount(8);
+  await expect(table.locator("th")).toHaveCount(6);
   await expect(table.getByRole("columnheader")).toHaveCount(0);
   await expect(table.getByRole("row").nth(1)).toContainText(
-    /(?:[\d,.]+ tons|Tonnage not recorded) · (?:Seasonal|Year-round|Schedule not set)/,
+    /(?:[A-Z][a-z]{2} \d{1,2}, \d{4}|Not submitted|Submission date missing|Not applicable|Review)/,
   );
 });
 

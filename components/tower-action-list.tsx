@@ -8,6 +8,7 @@ import { requiredActionLabel, requirementLabel } from "@/lib/labels";
 import { isOwnerManagedObligation } from "@/lib/event-workflow";
 import { buttonClass } from "@/lib/button-variants";
 import { completionHrefForObligation } from "@/lib/deadline-view";
+import { eventEntryHref, isResampleObligation } from "@/lib/event-entry-intent";
 import {
   isLegionellaObligation,
   responsibilityForServiceObligation,
@@ -135,14 +136,17 @@ export function TowerActionList({
               {externallyManaged ? (
                 legionella &&
                 canConfirmOwnerManaged &&
-                (legionellaResponsibility === "CUSTOMER" ||
-                  legionellaResponsibility === "OTHER_VENDOR") ? (
+                legionellaResponsibility === "OTHER_VENDOR" ? (
                   <Link
                     className={buttonClass(
                       "secondary",
                       "min-h-11 w-full justify-center text-center xl:w-auto",
                     )}
-                    href={`/systems/${systemId}?record=external-legionella#record-event`}
+                    href={eventEntryHref({
+                      type: "external-legionella",
+                      towerId: systemId,
+                      obligationId: item.id,
+                    })}
                   >
                     Record external sample
                   </Link>
@@ -164,7 +168,11 @@ export function TowerActionList({
                       "secondary",
                       "min-h-11 w-full justify-center text-center xl:w-auto",
                     )}
-                    href={`/systems/${systemId}?record=bacteriological#record-event`}
+                    href={eventEntryHref({
+                      type: "bacteriological",
+                      towerId: systemId,
+                      obligationId: item.id,
+                    })}
                   >
                     Record bacteriological sample
                   </Link>
@@ -184,7 +192,9 @@ export function TowerActionList({
                   {item.category === "REPORTING_ACTION"
                     ? "Record submission"
                     : item.category === "SAMPLE"
-                      ? "Record sample"
+                      ? isResampleObligation(item.type)
+                        ? "Record resample"
+                        : "Record sample"
                       : item.category === "INSPECTION"
                         ? "Record inspection"
                         : item.type.includes("CLEANING")

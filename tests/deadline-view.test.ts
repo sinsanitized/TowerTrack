@@ -40,11 +40,19 @@ const tower = (
   operatingSchedule: "SEASONAL",
   ruleConfiguration: "NYC_AND_NYS",
   legionellaResponsibility: "OUR_COMPANY",
+  previousLegionella: {
+    sampleId: "sample-previous",
+    sampleCollectedDate: "2026-07-08",
+    portalReportingStatus: "SUBMITTED",
+    portalSubmittedDate: "2026-07-10",
+    explanation:
+      "The previous qualifying sample was submitted to the NYC portal.",
+  },
   openObligations,
 });
 
 describe("all tower deadline rows", () => {
-  it("filters responsibility without adding responsibility to the table shape", () => {
+  it("excludes customer-managed sampling from deadline work", () => {
     const our = buildTowerDeadlineRows(
       [tower("ours", "Ours", [obligation("o")])],
       "2026-07-20",
@@ -57,14 +65,12 @@ describe("all tower deadline rows", () => {
     expect(
       filterTowerDeadlineRows([...our, ...customer], "2026-07-20", {}),
     ).toHaveLength(1);
+    expect(customer).toHaveLength(0);
     expect(
       filterTowerDeadlineRows([...our, ...customer], "2026-07-20", {
         responsibility: "CUSTOMER",
-      })[0],
-    ).toMatchObject({
-      responsibility: "CUSTOMER",
-      responsibilityLabel: "Customer managed",
-    });
+      }),
+    ).toHaveLength(0);
   });
 
   it("keeps unconfirmed responsibility visible in the default company view", () => {
@@ -81,7 +87,7 @@ describe("all tower deadline rows", () => {
     expect(unknown[0]).toMatchObject({
       responsibility: null,
       executionState: "Waiting",
-      primaryActionLabel: "Assign responsibility",
+      primaryActionLabel: "Assign",
     });
   });
 
@@ -106,6 +112,9 @@ describe("all tower deadline rows", () => {
             type: "QUARTERLY_COMPLIANCE_INSPECTION",
             category: "INSPECTION",
           }),
+          obligation("resample", {
+            type: "LEGIONELLA_LEVEL_3_RETEST",
+          }),
           obligation("cleaning", {
             type: "ANNUAL_CLEANING",
             category: "MAINTENANCE",
@@ -126,6 +135,7 @@ describe("all tower deadline rows", () => {
       Object.fromEntries(rows.map((row) => [row.id, row.primaryActionHref])),
     ).toMatchObject({
       sample: expect.stringContaining("record=sample"),
+      resample: expect.stringContaining("record=resample&obligation=resample"),
       inspection: expect.stringContaining("record=inspection"),
       cleaning: expect.stringContaining("record=cleaning"),
       corrective: expect.stringContaining("record=disinfection"),
@@ -133,6 +143,11 @@ describe("all tower deadline rows", () => {
     });
     expect(
       rows.every((row) => !row.primaryActionHref.includes("record=event")),
+    ).toBe(true);
+    expect(
+      rows
+        .filter((row) => row.id !== "report")
+        .every((row) => row.primaryActionHref.includes(`obligation=${row.id}`)),
     ).toBe(true);
   });
   it("uses non-overlapping calendar-week and month buckets", () => {
@@ -213,7 +228,7 @@ describe("all tower deadline rows", () => {
     ]);
   });
 
-  it("sorts overdue first, then target date ascending", () => {
+  it("sorts every row by its hard deadline", () => {
     const rows = buildTowerDeadlineRows(
       [
         tower("tower-c", "Tower C", [
@@ -239,9 +254,9 @@ describe("all tower deadline rows", () => {
     );
     expect(rows.map((row) => row.id)).toEqual([
       "overdue",
+      "missing",
       "soon",
       "later",
-      "missing",
     ]);
   });
 
@@ -258,13 +273,100 @@ describe("all tower deadline rows", () => {
       ],
       "2026-07-30",
     );
-    expect(row.targetDateDisplay).toBe("Tue, Aug 4");
-    expect(row.targetWindowDisplay).toBe("Aug 4–7");
+    expect(row.targetWindowDisplay).toBe("Tue, Aug 4 – Fri, Aug 7");
+    expect(row.targetWindowAccessible).toContain(
+      "Tuesday, August 4, 2026 through Friday, August 7, 2026",
+    );
+    expect(row.previousLegionellaSampleDisplay).toBe("Jul 8, 2026");
+    expect(row.portalDisplay).toBe("Jul 10, 2026");
     expect(row.hardDueDateDisplay).toBe("Mon, Aug 3");
-    expect(row.workingDaysDisplay).toBe("2 days");
+    expect(row.workingDaysDisplay).toBe("2 working days left");
     expect(row.workingDaysAccessible).toBe("2 working days left");
     expect(row.status).toBe("Due next week");
-    expect(row.primaryActionLabel).toBe("Record sample");
+    expect(row.primaryActionLabel).toBe("Record");
+  });
+
+  it.each([
+    ["exact due date", "2026-09-26", "2026-09-26", "Due today"],
+    [
+      "Sunday deadline viewed Saturday",
+      "2026-09-26",
+      "2026-09-27",
+      "Due before the next working day",
+    ],
+    [
+      "Friday deadline viewed Saturday",
+      "2026-09-26",
+      "2026-09-25",
+      "Overdue; no working days have elapsed",
+    ],
+    [
+      "Monday deadline viewed Saturday",
+      "2026-09-26",
+      "2026-09-28",
+      "1 working day left",
+    ],
+  ])("labels %s from the actual dates", (_label, today, latest, expected) => {
+    const [row] = buildTowerDeadlineRows(
+      [
+        tower("tower-weekend", "Weekend tower", [
+          obligation("weekend", { latest }),
+        ]),
+      ],
+      today,
+    );
+    expect(row.workingDaysDisplay).toBe(expected);
+    expect(row.workingDaysAccessible).toBe(expected);
+  });
+
+  it("keeps sample collection and NYC portal submission dates separate", () => {
+    const [row] = buildTowerDeadlineRows(
+      [tower("tower-1", "Tower A", [obligation("due")])],
+      "2026-07-30",
+    );
+    expect(row).toMatchObject({
+      previousLegionellaSampleDate: "2026-07-08",
+      previousLegionellaSampleDisplay: "Jul 8, 2026",
+      portalReportingStatus: "SUBMITTED",
+      portalSubmittedDate: "2026-07-10",
+      portalDisplay: "Jul 10, 2026",
+    });
+    expect(row.previousLegionellaSampleAccessible).toContain(
+      "collected on Wednesday, July 8, 2026",
+    );
+    expect(row.portalAccessible).toContain(
+      "submitted to the NYC portal on Friday, July 10, 2026",
+    );
+  });
+
+  it("shows missing and non-applicable previous-sample reporting states", () => {
+    const missing = tower("missing", "Missing", [obligation("missing")]);
+    missing.previousLegionella = {
+      sampleId: null,
+      sampleCollectedDate: null,
+      portalReportingStatus: "REVIEW_REQUIRED",
+      portalSubmittedDate: null,
+      explanation:
+        "No qualifying Legionella sample currently anchors the recurring calculation.",
+    };
+    const nys = tower("nys", "NYS", [obligation("nys")]);
+    nys.ruleConfiguration = "NYS_ONLY";
+    nys.previousLegionella = {
+      sampleId: "nys-sample",
+      sampleCollectedDate: "2026-07-09",
+      portalReportingStatus: "NOT_APPLICABLE",
+      portalSubmittedDate: null,
+      explanation: "NYC portal reporting does not apply to this cooling tower.",
+    };
+    const rows = buildTowerDeadlineRows([missing, nys], "2026-07-30");
+    expect(rows.find((row) => row.id === "missing")).toMatchObject({
+      previousLegionellaSampleDisplay: "None recorded",
+      portalDisplay: "Review",
+    });
+    expect(rows.find((row) => row.id === "nys")).toMatchObject({
+      previousLegionellaSampleDisplay: "Jul 9, 2026",
+      portalDisplay: "Not applicable",
+    });
   });
 
   it("uses concise overdue and review states", () => {
@@ -283,14 +385,14 @@ describe("all tower deadline rows", () => {
       "2026-07-30",
     );
     expect(rows.find(({ id }) => id === "overdue")).toMatchObject({
-      workingDaysDisplay: "3 overdue",
+      workingDaysDisplay: "Overdue by 3 working days",
       status: "Overdue",
-      primaryActionLabel: "Review missed deadline",
+      primaryActionLabel: "Review",
     });
     expect(rows.find(({ id }) => id === "review")).toMatchObject({
-      workingDaysDisplay: "Review",
+      workingDaysDisplay: "Needs review",
       status: "Review required",
-      primaryActionLabel: "Review requirement",
+      primaryActionLabel: "Review",
     });
   });
 

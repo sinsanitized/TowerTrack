@@ -81,6 +81,19 @@ export function responsibilityForServiceObligation(
   return responsibilities[family] ?? null;
 }
 
+export function shouldTrackSampleObligation(
+  obligationType: string,
+  responsibilities: Partial<TowerServiceResponsibilities>,
+) {
+  return (
+    responsibilityForServiceObligation(
+      obligationType,
+      "SAMPLE",
+      responsibilities,
+    ) !== "CUSTOMER"
+  );
+}
+
 export function responsibilityForObligation(
   obligationType: string,
   legionellaResponsibility: ServiceResponsibility | null | undefined,
@@ -109,5 +122,5 @@ export function canRecordLegionellaFieldWork(
 export function canRecordExternalLegionella(
   responsibility: ServiceResponsibility | null | undefined,
 ) {
-  return responsibility === "CUSTOMER" || responsibility === "OTHER_VENDOR";
+  return responsibility === "OTHER_VENDOR";
 }

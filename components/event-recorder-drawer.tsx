@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { ClipboardPlus, X } from "lucide-react";
 import { EventRecorder } from "@/components/event-recorder";
 import type {
@@ -10,6 +11,22 @@ import type {
 } from "@/lib/obligation-engine";
 import { buttonClass } from "@/lib/button-variants";
 import type { ServiceResponsibility } from "@/lib/service-responsibility";
+import {
+  isResampleObligation,
+  type EventEntryIntentName,
+} from "@/lib/event-entry-intent";
+
+export type EventEntryContext = {
+  intentType?: EventEntryIntentName;
+  obligationId: string;
+  obligationType: string;
+  triggerEventId?: string;
+  triggeringSampleId?: string;
+  earliest: string | null;
+  targetStart: string | null;
+  targetEnd: string | null;
+  latest: string | null;
+};
 
 export function EventRecorderDrawer({
   systemId,
@@ -22,8 +39,10 @@ export function EventRecorderDrawer({
   canConfirmOwnerManaged = false,
   openSampleObligations = [],
   legionellaResponsibility,
+  bacteriologicalResponsibility,
   legionellaVendorName,
   returnTo,
+  intentContext,
 }: {
   systemId: string;
   defaultDate: string;
@@ -35,9 +54,13 @@ export function EventRecorderDrawer({
   canConfirmOwnerManaged?: boolean;
   openSampleObligations?: OpenSampleObligationForImpact[];
   legionellaResponsibility: ServiceResponsibility | null;
+  bacteriologicalResponsibility: ServiceResponsibility | null;
   legionellaVendorName?: string | null;
   returnTo?: string;
+  intentContext?: EventEntryContext;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(initialOpen);
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
@@ -45,7 +68,7 @@ export function EventRecorderDrawer({
   const closeRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
 
-  const requestClose = () => {
+  const requestClose = useCallback(() => {
     if (
       dirtyRef.current &&
       !window.confirm(
@@ -56,7 +79,8 @@ export function EventRecorderDrawer({
     dirtyRef.current = false;
     setDirty(false);
     setOpen(false);
-  };
+    if (initialOpen) router.replace(returnTo ?? pathname, { scroll: false });
+  }, [initialOpen, pathname, returnTo, router]);
 
   useEffect(() => {
     if (window.location.hash === "#record-event") setOpen(true);
@@ -67,7 +91,12 @@ export function EventRecorderDrawer({
     const trigger = triggerRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
+    window.requestAnimationFrame(() => {
+      const startingField = drawerRef.current?.querySelector<HTMLElement>(
+        "[data-recorder-autofocus]",
+      );
+      (startingField ?? closeRef.current)?.focus({ preventScroll: true });
+    });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") requestClose();
     };
@@ -77,7 +106,7 @@ export function EventRecorderDrawer({
       window.removeEventListener("keydown", closeOnEscape);
       trigger?.focus();
     };
-  }, [open]);
+  }, [open, requestClose]);
 
   return (
     <>
@@ -94,7 +123,7 @@ export function EventRecorderDrawer({
         <ClipboardPlus size={18} /> Add compliance record
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 sm:items-center sm:p-6">
           <button
             className="absolute inset-0 cursor-default"
             type="button"
@@ -103,7 +132,7 @@ export function EventRecorderDrawer({
           />
           <aside
             ref={drawerRef}
-            className="relative h-full w-full overflow-y-auto overscroll-contain bg-slate-50 shadow-2xl sm:max-w-4xl"
+            className="relative flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-[min(56rem,calc(100vh-3rem))] sm:max-w-4xl sm:rounded-2xl sm:border sm:border-slate-300"
             role="dialog"
             aria-modal="true"
             aria-labelledby="event-drawer-title"
@@ -138,25 +167,26 @@ export function EventRecorderDrawer({
               }
             }}
           >
-            <div className="sticky top-0 z-10 mb-4 flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/95 p-4 backdrop-blur sm:p-6">
-              <div>
+            <div className="z-10 flex shrink-0 items-start justify-between gap-3 border-b border-slate-300 bg-white p-4 sm:p-5">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="label">Focused workflow</div>
+                  <div className="label">Add a verified record</div>
                   {dirty && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-900">
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-sm font-black text-amber-900">
                       Unsaved changes
                     </span>
                   )}
                 </div>
-                <h2
-                  id="event-drawer-title"
-                  className="mt-1 text-xl font-black sm:text-2xl"
-                >
-                  Add compliance record
+                <h2 id="event-drawer-title" className="mt-1 text-xl font-black">
+                  {intentContext &&
+                  isResampleObligation(intentContext.obligationType)
+                    ? "Record resample"
+                    : "Add compliance record"}
                 </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Choose what happened, enter the verified date, and save the
-                  record. The cooling tower is already selected.
+                <p className="mt-1 max-w-xl text-sm text-slate-600">
+                  {intentContext
+                    ? "Review the deadline below, then enter the date the work actually happened."
+                    : "Start with “What happened?” below. The cooling tower is already selected."}
                 </p>
               </div>
               <button
@@ -173,7 +203,7 @@ export function EventRecorderDrawer({
                 <span className="sr-only sm:not-sr-only">Close</span>
               </button>
             </div>
-            <div className="px-4 pb-6 sm:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
               <EventRecorder
                 key={initialSampleEventId ?? initialEventType ?? "default"}
                 systemId={systemId}
@@ -185,8 +215,10 @@ export function EventRecorderDrawer({
                 canConfirmOwnerManaged={canConfirmOwnerManaged}
                 openSampleObligations={openSampleObligations}
                 legionellaResponsibility={legionellaResponsibility}
+                bacteriologicalResponsibility={bacteriologicalResponsibility}
                 legionellaVendorName={legionellaVendorName}
                 returnTo={returnTo}
+                intentContext={intentContext}
                 onCancel={requestClose}
               />
             </div>

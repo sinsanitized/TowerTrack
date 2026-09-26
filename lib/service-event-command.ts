@@ -3,7 +3,11 @@ import {
   SERVICE_EVENT_TYPES,
   type ServiceEventTypeValue,
 } from "@/lib/service-events";
-import { parseDateTimeInTimeZone, todayInTimeZone } from "@/lib/date";
+import {
+  parseDateTimeInTimeZone,
+  todayDateOnly,
+  todayInTimeZone,
+} from "@/lib/date";
 import { serviceResponsibilityValues } from "@/lib/service-responsibility";
 
 const optionalText = (maximum: number) =>
@@ -26,6 +30,9 @@ const serviceEventInputSchema = z.object({
   reportType: optionalText(120),
   reportingObligationId: optionalText(120),
   sampleEventId: optionalText(120),
+  obligationId: optionalText(120),
+  triggeringEventId: optionalText(120),
+  triggeringSampleId: optionalText(120),
   chemical: optionalText(200),
   quantity: optionalText(200),
   contactTime: optionalText(200),
@@ -50,6 +57,9 @@ export type ServiceEventCommand = {
     reportType: string | null;
     reportingObligationId: string | null;
     sampleEventId: string | null;
+    obligationId: string | null;
+    triggeringEventId: string | null;
+    triggeringSampleId: string | null;
     chemical: string | null;
     quantity: string | null;
     contactTime: string | null;
@@ -68,7 +78,7 @@ export function parseServiceEventCommand(
   options: { today?: string; now?: Date; allowFutureDate?: boolean } = {},
 ): ServiceEventCommand {
   const parsed = serviceEventInputSchema.parse(input);
-  const today = options.today ?? todayInTimeZone();
+  const today = options.today ?? todayDateOnly();
   if (!options.allowFutureDate && parsed.eventDate > today)
     throw new Error("Completed work cannot be recorded with a future date.");
 
@@ -122,6 +132,9 @@ export function parseServiceEventCommand(
       reportType: parsed.reportType,
       reportingObligationId: parsed.reportingObligationId,
       sampleEventId: parsed.sampleEventId,
+      obligationId: parsed.obligationId,
+      triggeringEventId: parsed.triggeringEventId,
+      triggeringSampleId: parsed.triggeringSampleId,
       chemical: parsed.chemical,
       quantity: parsed.quantity,
       contactTime: parsed.contactTime,
@@ -148,6 +161,9 @@ export function serviceEventInputFromFormData(formData: FormData) {
     reportType: text("reportType"),
     reportingObligationId: text("reportingObligationId"),
     sampleEventId: text("sampleEventId"),
+    obligationId: text("obligationId"),
+    triggeringEventId: text("triggeringEventId"),
+    triggeringSampleId: text("triggeringSampleId"),
     chemical: text("chemical"),
     quantity: text("quantity"),
     contactTime: text("contactTime"),

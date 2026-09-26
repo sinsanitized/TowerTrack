@@ -29,8 +29,16 @@ export function activityLabel(value: string): string {
 }
 
 export function plainEnumLabel(value: string): string {
-  const text = value.replaceAll("_", " ").toLowerCase();
+  const text = lowercaseWithJurisdictionAcronyms(value.replaceAll("_", " "));
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export function lowercaseWithJurisdictionAcronyms(value: string): string {
+  return value
+    .toLowerCase()
+    .replaceAll(/\bnyc\b/g, "NYC")
+    .replaceAll(/\bnys\b/g, "NYS")
+    .replaceAll(/\bdoh\b/g, "DOH");
 }
 
 export function formatLegionellaResult(value: number | null | undefined) {

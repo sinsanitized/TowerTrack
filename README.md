@@ -33,7 +33,7 @@ Scheduling does not satisfy an obligation. A compliance clock changes only when 
 ## Key product areas
 
 - **Action Center** — prioritized daily work and optional combined-visit suggestions.
-- **Overdue & Problems** — missed deadlines and issues requiring review.
+- **Compliance issues** — Action Center drill-down for missed deadlines and issues requiring review.
 - **All Deadlines** — portfolio-wide active requirements with due-date, work-type, responsibility, and schedule filters.
 - **Towers** — cooling-tower identity, current status, next action, requirements, records, and settings.
 - **Samples** — samples needing results, samples waiting on another party, and completed sample records.

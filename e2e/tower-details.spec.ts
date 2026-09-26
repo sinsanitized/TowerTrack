@@ -24,6 +24,9 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "Recent activity" }),
   ).toBeVisible();
   await expect(
+    page.getByRole("heading", { name: "Compliance snapshot" }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("heading", { name: "Two-day cleaning plan" }),
   ).toHaveCount(0);
 
@@ -55,25 +58,26 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     drawer.getByRole("button", {
       name: "Confirm owner-managed bacteriological sample",
     }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(recordButton).toBeFocused();
 
-  await page.getByRole("link", { name: "Requirements", exact: true }).click();
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "All open requirements" }),
+    page.getByRole("heading", { name: "All required work" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Two-day cleaning plan" }),
   ).toBeVisible();
 
-  await page
-    .getByRole("link", { name: "Records & History", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Records", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Compliance records" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Compliance snapshot" }),
+  ).toHaveCount(0);
 
   await page
     .getByRole("link", { name: "Tower Information", exact: true })
@@ -109,9 +113,10 @@ test("samples prioritize action and expose clear status views", async ({
     page.getByRole("link", { name: /Action needed/ }),
   ).toHaveAttribute("aria-current", "page");
   await expect(
-    page.getByRole("link", { name: /Waiting on another party/ }),
+    page.getByRole("link", { name: /Waiting \/ reference/ }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /Completed/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /All samples/ })).toHaveCount(0);
   await expect(
     page.getByRole("searchbox", {
       name: "Find a customer, facility, tower, or job",

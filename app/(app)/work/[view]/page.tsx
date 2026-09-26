@@ -1,12 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CalendarCheck,
-  FlaskConical,
-  Layers3,
-} from "lucide-react";
+import { notFound, redirect } from "next/navigation";
+import { AlertTriangle, ArrowLeft, Layers3 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
@@ -15,40 +9,25 @@ import { todayDateOnly } from "@/lib/date";
 import { plainEnumLabel } from "@/lib/labels";
 import { complianceDashboardRows } from "@/lib/queries";
 import { requireUser } from "@/lib/auth";
+import { responsibilityForServiceObligation } from "@/lib/service-responsibility";
 
 const views = {
   "overdue-towers": {
-    title: "Overdue & problem deadlines",
+    title: "Compliance issues",
     description:
       "Missed and overdue requirements are historical compliance issues, not tasks that can still be completed on time.",
     empty: "No active towers currently have a missed or overdue requirement.",
     unit: "issues",
     Icon: AlertTriangle,
   },
-  "emergency-samples": {
-    title: "Emergency samples",
-    description:
-      "Emergency Legionella sampling requirements that should be collected and recorded immediately.",
-    empty: "No emergency Legionella samples are currently open.",
-    unit: "samples",
-    Icon: FlaskConical,
-  },
   "visit-opportunities": {
-    title: "Visit opportunities",
+    title: "Combined visits",
     description:
       "Recommended dates for one field visit, including every compatible requirement the work can satisfy.",
     empty:
       "No on-site requirement currently has dates when the required work can still be completed.",
-    unit: "visit opportunities",
+    unit: "combined visits",
     Icon: Layers3,
-  },
-  "open-obligations": {
-    title: "Open requirements",
-    description:
-      "Every pending or overdue sampling, inspection, reporting, and corrective-action requirement across active towers.",
-    empty: "No requirements are currently open.",
-    unit: "requirements",
-    Icon: CalendarCheck,
   },
 } as const;
 
@@ -59,11 +38,11 @@ type DashboardRow = DashboardRows[number];
 function relevantObligations(row: DashboardRow, view: View) {
   if (view === "overdue-towers")
     return row.openObligations.filter(
-      (item) => item.status === "MISSED" || item.status === "OVERDUE",
-    );
-  if (view === "emergency-samples")
-    return row.openObligations.filter(
-      (item) => item.category === "SAMPLE" && item.priority === "EMERGENCY",
+      (item) =>
+        (item.status === "MISSED" || item.status === "OVERDUE") &&
+        ["OUR_COMPANY", null].includes(
+          responsibilityForServiceObligation(item.type, item.category, row),
+        ),
     );
   if (view === "visit-opportunities")
     return row.openObligations.filter(
@@ -72,7 +51,7 @@ function relevantObligations(row: DashboardRow, view: View) {
           (opportunityItem) => opportunityItem.id === item.id,
         ) ?? false,
     );
-  return row.openObligations;
+  return [];
 }
 
 export default async function WorkViewPage({
@@ -81,6 +60,8 @@ export default async function WorkViewPage({
   params: Promise<{ view: string }>;
 }) {
   const { view: requestedView } = await params;
+  if (requestedView === "emergency-samples") redirect("/");
+  if (requestedView === "open-obligations") redirect("/deadlines");
   if (!(requestedView in views)) notFound();
   const view = requestedView as View;
   const config = views[view];
@@ -103,23 +84,9 @@ export default async function WorkViewPage({
         : obligations.length > 0,
     );
   const count =
-    view === "overdue-towers" ||
-    view === "emergency-samples" ||
-    view === "open-obligations"
+    view === "overdue-towers"
       ? groups.reduce((sum, group) => sum + group.obligations.length, 0)
       : groups.length;
-  const tabCounts: Record<View, number> = {
-    "overdue-towers": rows.filter((row) => row.risk === "OVERDUE").length,
-    "emergency-samples": rows.reduce(
-      (sum, row) => sum + relevantObligations(row, "emergency-samples").length,
-      0,
-    ),
-    "visit-opportunities": rows.filter((row) => row.visitOpportunity).length,
-    "open-obligations": rows.reduce(
-      (sum, row) => sum + row.openObligations.length,
-      0,
-    ),
-  };
   const Icon = config.Icon;
 
   return (
@@ -134,32 +101,6 @@ export default async function WorkViewPage({
           </Link>
         }
       />
-
-      <nav
-        className="mb-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
-        aria-label="Tower work categories"
-      >
-        {(Object.keys(views) as View[]).map((item) => {
-          const ItemIcon = views[item].Icon;
-          return (
-            <Link
-              key={item}
-              href={`/work/${item}`}
-              aria-current={item === view ? "page" : undefined}
-              className={`flex items-center justify-between rounded-xl border p-3 text-sm font-black ${
-                item === view
-                  ? "border-emerald-800 bg-emerald-50 text-emerald-950"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <ItemIcon size={17} /> {views[item].title}
-              </span>
-              <span>{tabCounts[item]}</span>
-            </Link>
-          );
-        })}
-      </nav>
 
       <div className="mb-5 flex items-center gap-2 text-sm font-bold text-slate-600">
         <Icon size={18} />
@@ -205,9 +146,7 @@ export default async function WorkViewPage({
                   >
                     {view === "overdue-towers"
                       ? "Review history"
-                      : view === "visit-opportunities"
-                        ? "Open tower"
-                        : "Record completion"}
+                      : "Open tower"}
                   </Link>
                 </div>
               </div>

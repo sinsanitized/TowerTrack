@@ -108,12 +108,28 @@ describe("event impact preview", () => {
     ]);
   });
 
-  it("does not claim late work restores a missed obligation", () => {
+  it("recognizes a timely completion entered after an obligation was marked missed", () => {
     const preview = previewEventImpact({
       proposedEvent: {
         id: "preview",
         type: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
         date: "2026-08-20",
+      },
+      ruleConfig: config,
+      openSampleObligations: [
+        { ...obligations[0], id: "missed", status: "MISSED" },
+      ],
+    });
+    expect(preview.satisfied.map(({ id }) => id)).toEqual(["missed"]);
+    expect(preview.missedUnchanged).toEqual([]);
+  });
+
+  it("does not claim work performed after the window restores a missed obligation", () => {
+    const preview = previewEventImpact({
+      proposedEvent: {
+        id: "preview",
+        type: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+        date: "2026-09-01",
       },
       ruleConfig: config,
       openSampleObligations: [

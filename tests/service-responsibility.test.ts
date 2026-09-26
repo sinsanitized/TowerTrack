@@ -7,13 +7,14 @@ import {
   responsibilityFamilyForObligation,
   responsibilityForServiceObligation,
   serviceResponsibilityLabel,
+  shouldTrackSampleObligation,
 } from "@/lib/service-responsibility";
 import { previewEventImpact } from "@/lib/obligation-engine";
 
 describe("service responsibility", () => {
   it.each([
     ["OUR_COMPANY", true, false, "Our company"],
-    ["CUSTOMER", false, true, "Customer managed"],
+    ["CUSTOMER", false, false, "Customer managed"],
     ["OTHER_VENDOR", false, true, "Managed by another vendor"],
     ["NOT_TRACKED", false, false, "Reference only"],
   ] as const)(
@@ -71,26 +72,22 @@ describe("service responsibility", () => {
     expect(impact.messages.join(" ")).toMatch(/not by our company/i);
   });
 
-  it("describes customer-managed samples as external reference information", () => {
-    const impact = previewEventImpact({
-      proposedEvent: {
-        id: "preview",
-        type: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
-        date: "2026-07-10",
-      },
-      ruleConfig: {
-        isNyc: false,
-        includesNys: true,
-        operating: true,
-        monthlyTargetStartDay: 20,
-        monthlyTargetEndDay: 25,
-      },
-      openSampleObligations: [],
-      performedByResponsibility: "CUSTOMER",
-    });
-    expect(impact.messages).toContain(
-      "This external sample will be recorded for reference. Legionella remains customer managed.",
-    );
+  it("excludes customer-managed sampling while retaining vendor follow-up", () => {
+    expect(
+      shouldTrackSampleObligation("ROUTINE_OPERATING_SAMPLE", {
+        legionellaResponsibility: "CUSTOMER",
+      }),
+    ).toBe(false);
+    expect(
+      shouldTrackSampleObligation("ROUTINE_BACTERIOLOGICAL_SAMPLE", {
+        bacteriologicalResponsibility: "CUSTOMER",
+      }),
+    ).toBe(false);
+    expect(
+      shouldTrackSampleObligation("ROUTINE_OPERATING_SAMPLE", {
+        legionellaResponsibility: "OTHER_VENDOR",
+      }),
+    ).toBe(true);
   });
 });
 

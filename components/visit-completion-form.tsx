@@ -10,7 +10,11 @@ import {
   type CompletionPreviewActivity,
   type CompletionPreviewObligation,
 } from "@/lib/compliance-intelligence";
-import { activityLabel, plainEnumLabel } from "@/lib/labels";
+import {
+  activityLabel,
+  lowercaseWithJurisdictionAcronyms,
+  plainEnumLabel,
+} from "@/lib/labels";
 import { SubmitButton } from "@/components/submit-button";
 
 type Activity = CompletionPreviewActivity & {
@@ -190,7 +194,9 @@ export function VisitCompletionForm({
               {preview.generated.map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <Sparkles className="mt-0.5 shrink-0" size={16} />
-                  <span>Generates {item.toLowerCase()}</span>
+                  <span>
+                    Generates {lowercaseWithJurisdictionAcronyms(item)}
+                  </span>
                 </li>
               ))}
               {preview.cleaningOnlyWarning && (

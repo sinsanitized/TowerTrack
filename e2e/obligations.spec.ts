@@ -37,7 +37,7 @@ test.beforeEach(async ({ page }) => {
   expect(systemUrl).toMatch(/^\/systems\//);
   await page.goto(systemUrl!, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/systems\//);
-  await page.getByRole("link", { name: "Requirements", exact: true }).click();
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
   await page
     .getByText("Rule details and completion tools", { exact: true })
     .click();
@@ -187,8 +187,25 @@ test("correction and reversion replay a post-disinfection sample window", async 
     sampling.getByText(new RegExp(`Jan 15, ${year}`)).first(),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Sample" }).click();
+  const nextActionCallout = page.getByTestId("next-action-callout");
+  const recordResample = nextActionCallout.getByRole("link", {
+    name: "Record resample",
+  });
+  await expect(recordResample).toHaveAttribute(
+    "href",
+    /record=resample&obligation=/,
+  );
+  await recordResample.click();
+  await expect(
+    page.getByRole("dialog", { name: "Record resample" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What happened?" }),
+  ).toHaveCount(0);
   recorder = page.locator("#record-event");
+  await expect(recorder.locator('input[name="obligationId"]')).toHaveValue(
+    /.+/,
+  );
   await recorder.getByLabel(/date.*Required/).fill(collectionDate);
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder

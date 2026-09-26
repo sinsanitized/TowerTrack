@@ -216,12 +216,12 @@ export default async function AdminPage({
     <>
       <PageHeader
         eyebrow="Configuration"
-        title="Admin"
+        title="Settings"
         description="Set the compliance interval and the earlier recommended service date, then review each requirement in plain English. Every save is audited and recalculates affected towers."
       />
       <nav
         className="panel mb-6 flex flex-wrap gap-2 p-3"
-        aria-label="Admin sections"
+        aria-label="Settings sections"
       >
         <a className="btn" href="#users">
           Users

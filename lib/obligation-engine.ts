@@ -879,8 +879,11 @@ export function previewEventImpact(input: {
     input.proposedEvent,
     input.openSampleObligations,
   );
-  const satisfied = covered.filter((item) => item.status !== "MISSED");
-  const missedUnchanged = covered.filter((item) => item.status === "MISSED");
+  const satisfied = covered;
+  const coveredIds = new Set(covered.map((item) => item.id));
+  const missedUnchanged = input.openSampleObligations.filter(
+    (item) => item.status === "MISSED" && !coveredIds.has(item.id),
+  );
   const messages: string[] = [];
   if (input.performedByResponsibility === "CUSTOMER")
     messages.push(

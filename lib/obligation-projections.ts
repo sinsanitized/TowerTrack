@@ -19,6 +19,7 @@ import {
   type TowerRuleConfiguration,
 } from "@/lib/rule-profile";
 import { getComplianceStatus } from "@/lib/compliance-intelligence";
+import { shouldTrackSampleObligation } from "@/lib/service-responsibility";
 
 type Tx = Prisma.TransactionClient;
 
@@ -112,7 +113,7 @@ async function completeCoveredSamples(
   const open = await tx.sampleObligation.findMany({
     where: {
       coolingTowerSystemId: systemId,
-      status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
+      status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
     },
   });
   const covered = sampleObligationsCoveredByEvent(
@@ -218,6 +219,7 @@ export async function rebuildSystemComplianceProjections(
     where: {
       coolingTowerSystemId: systemId,
       eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+      status: "ACTIVE",
     },
     orderBy: [{ eventDate: "asc" }, { createdAt: "asc" }],
   });
@@ -233,6 +235,35 @@ export async function rebuildSystemComplianceProjections(
     include: { rules: true },
     orderBy: { effectiveStartDate: "desc" },
   });
+  // Corrected and voided source records remain in the audit history, but their
+  // derived obligations are no longer valid—even when a former deadline was
+  // already marked missed. Rebuild only from the active event history.
+  await Promise.all([
+    tx.sampleObligation.deleteMany({
+      where: {
+        coolingTowerSystemId: systemId,
+        triggerEvent: { status: { not: "ACTIVE" } },
+      },
+    }),
+    tx.inspectionObligation.deleteMany({
+      where: {
+        coolingTowerSystemId: systemId,
+        triggerEvent: { status: { not: "ACTIVE" } },
+      },
+    }),
+    tx.reportingObligation.deleteMany({
+      where: {
+        coolingTowerSystemId: systemId,
+        triggerEvent: { status: { not: "ACTIVE" } },
+      },
+    }),
+    tx.maintenanceObligation.deleteMany({
+      where: {
+        coolingTowerSystemId: systemId,
+        triggerEvent: { status: { not: "ACTIVE" } },
+      },
+    }),
+  ]);
   const priorMissedRows = await Promise.all([
     tx.sampleObligation.findMany({
       where: { coolingTowerSystemId: systemId, status: "MISSED" },
@@ -407,8 +438,12 @@ export async function rebuildSystemComplianceProjections(
           ...(event.reportingObligationId
             ? { id: event.reportingObligationId }
             : {}),
-          status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
+          status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
           earliestDueDate: { lte: stored.eventDate },
+          OR: [
+            { latestDueDate: null },
+            { latestDueDate: { gte: stored.eventDate } },
+          ],
         },
         data: { status: "COMPLETED", completedByEventId: event.id },
       });
@@ -422,7 +457,7 @@ export async function rebuildSystemComplianceProjections(
         where: {
           coolingTowerSystemId: systemId,
           obligationType: "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING",
-          status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
+          status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
           earliestDueDate: { lte: stored.eventDate },
           OR: [
             { latestDueDate: null },
@@ -448,7 +483,7 @@ export async function rebuildSystemComplianceProjections(
         where: {
           coolingTowerSystemId: systemId,
           obligationType: { in: completedFieldActionTypes },
-          status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
+          status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
           earliestDueDate: { lte: stored.eventDate },
           OR: [
             { latestDueDate: null },
@@ -476,7 +511,9 @@ export async function rebuildSystemComplianceProjections(
       event,
       ruleConfigForDate(event.date, operating),
     );
-    for (const obligation of projection.sample)
+    for (const obligation of projection.sample) {
+      if (!shouldTrackSampleObligation(obligation.obligationType, system))
+        continue;
       await tx.sampleObligation.createMany({
         data: [
           {
@@ -492,6 +529,7 @@ export async function rebuildSystemComplianceProjections(
         ],
         skipDuplicates: true,
       });
+    }
     for (const obligation of projection.inspection)
       await tx.inspectionObligation.createMany({
         data: [

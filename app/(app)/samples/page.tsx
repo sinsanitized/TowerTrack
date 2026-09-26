@@ -17,12 +17,12 @@ import {
 } from "@/lib/sample-queue";
 import { serviceResponsibilityLabel } from "@/lib/service-responsibility";
 import { withReturnPath } from "@/lib/workflow-context";
+import { eventEntryHref } from "@/lib/event-entry-intent";
 
 const filterLabels: Record<SampleQueueFilter, string> = {
   ACTION_NEEDED: "Action needed",
-  WAITING: "Waiting on another party",
+  WAITING: "Waiting / reference",
   COMPLETED: "Completed",
-  ALL: "All samples",
 };
 
 const statePresentation: Record<
@@ -88,6 +88,7 @@ export default async function SamplesPage({
       eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
       status: "ACTIVE",
       coolingTowerSystem: {
+        legionellaResponsibility: { not: "CUSTOMER" },
         building: { customer: { organizationId: user.organizationId } },
       },
     },
@@ -118,7 +119,6 @@ export default async function SamplesPage({
     COMPLETED: queue.filter((item) =>
       matchesSampleQueueFilter(item, "COMPLETED"),
     ).length,
-    ALL: queue.length,
   };
   const visibleSamples = queue.filter((item) => {
     if (!matchesSampleQueueFilter(item, filter)) return false;
@@ -148,7 +148,7 @@ export default async function SamplesPage({
         </div>
       )}
       <section
-        className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        className="mb-5 grid gap-3 sm:grid-cols-3"
         aria-label="Sample status summary"
       >
         {sampleQueueFilters.map((item) => {
@@ -208,10 +208,8 @@ export default async function SamplesPage({
           {filter === "ACTION_NEEDED"
             ? "Start with the oldest sample below. Enter its laboratory result or assign who is responsible."
             : filter === "WAITING"
-              ? "No entry is required yet. Follow up with the customer or vendor named on each sample."
-              : filter === "COMPLETED"
-                ? "These samples already have results. Open a record only to review its details."
-                : "All samples are shown. Use the status on each row to decide what happens next."}
+              ? "No result entry is required. Follow up when another party is responsible; reference-only samples remain visible here."
+              : "These samples already have results. Open a record only to review its details."}
         </div>
       </div>
       <div className="panel divide-y divide-slate-200 overflow-hidden">
@@ -284,7 +282,11 @@ export default async function SamplesPage({
                 href={
                   state === "ACTION_NEEDED"
                     ? withReturnPath(
-                        `/systems/${sample.coolingTowerSystemId}?labSample=${sample.id}#record-event`,
+                        eventEntryHref({
+                          type: "result",
+                          towerId: sample.coolingTowerSystemId,
+                          sampleEventId: sample.id,
+                        }),
                         sampleReturnTo,
                       )
                     : state === "RESPONSIBILITY_UNKNOWN"

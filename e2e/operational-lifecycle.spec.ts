@@ -14,7 +14,11 @@ async function login(page: Page) {
   await expect(page).toHaveURL("/");
 }
 
-async function createNycTower(page: Page, name: string) {
+async function createNycTower(
+  page: Page,
+  name: string,
+  legionellaResponsibility: "OUR_COMPANY" | "CUSTOMER" = "OUR_COMPANY",
+) {
   await page.getByRole("link", { name: "Customers" }).click();
   const customerForm = page.locator("form").filter({
     has: page.getByRole("button", {
@@ -40,42 +44,35 @@ async function createNycTower(page: Page, name: string) {
   await page.getByLabel("Year-round").check();
   await page
     .getByLabel("Legionella Responsibility")
-    .selectOption("OUR_COMPANY");
+    .selectOption(legionellaResponsibility);
   await page
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
   await page
     .getByLabel("Compliance rules", { exact: true })
     .selectOption("NYC_AND_NYS");
-  await page.getByLabel("Profile version", { exact: true }).selectOption({
-    label: "NYC Chapter 8 + New York State — NYC Chapter 8 2026 + NYS Part 4",
-  });
+  await page
+    .getByLabel("Profile version", { exact: true })
+    .selectOption("nyc-2026");
   await page.getByRole("button", { name: "Create cooling tower" }).click();
   await expect(page.getByText("Cooling tower created")).toBeVisible();
   await expect(page.getByText("Baseline required").first()).toBeVisible();
   return page.url().split("?")[0];
 }
 
-async function waitForNewEvent(page: Page, previousEvent: string | null) {
-  await page.waitForURL((url) => {
-    const event = url.searchParams.get("event");
-    return Boolean(event && event !== previousEvent);
-  });
-  await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
-  ).toBeVisible();
+async function waitForSavedRecord(page: Page) {
+  await expect(page.locator("#record-event")).toHaveCount(0);
 }
 
 async function saveRecorder(
   page: Page,
   configure: (form: Locator) => Promise<void>,
 ) {
-  const previousEvent = new URL(page.url()).searchParams.get("event");
   const form = page.locator("#record-event form");
   await form.getByText("Add notes (optional)", { exact: true }).click();
   await configure(form);
   await form.getByRole("button", { name: "Save record" }).click();
-  await waitForNewEvent(page, previousEvent);
+  await waitForSavedRecord(page);
 }
 
 async function recordEvent(
@@ -85,19 +82,25 @@ async function recordEvent(
   notes: string,
   configure?: (form: Locator) => Promise<void>,
 ) {
-  const eventButton = page.getByRole("button", { name: button });
-  if (!(await eventButton.isVisible())) {
+  const recorder = page.locator("#record-event");
+  const eventButton = recorder.getByRole("button", { name: button });
+  const moreActions = recorder.getByText("Other work and special conditions", {
+    exact: true,
+  });
+  if (!(await recorder.isVisible())) {
     const openRecorder = page.getByRole("button", {
       name: "Add compliance record",
     });
-    if (await openRecorder.isVisible()) await openRecorder.click();
+    await openRecorder.click();
+    await expect(recorder).toBeVisible();
   }
+  await expect(moreActions).toBeVisible();
   if (!(await eventButton.isVisible())) {
-    await page
-      .getByText("Other work and special conditions", { exact: true })
-      .click();
+    await moreActions.click();
   }
+  await expect(eventButton).toBeVisible();
   await eventButton.click();
+  await expect(recorder.getByLabel(/date.*Required/)).toBeVisible();
   await saveRecorder(page, async (form) => {
     await form.getByLabel(/date.*Required/).fill(date);
     await form.getByLabel("Notes").fill(notes);
@@ -127,7 +130,7 @@ async function submitReport(page: Page, reportType: string, date: string) {
 async function expandObligation(section: Locator, title: string) {
   const card = section.locator("article").filter({ hasText: title }).first();
   await card
-    .getByText("Required action, triggering event, and rule details", {
+    .getByText("Required action, source record, and rule details", {
       exact: true,
     })
     .click();
@@ -146,7 +149,7 @@ async function recordSampleAndPortal(
   );
   await expect(
     page.getByRole("heading", {
-      name: "Submit this sample date to the NYC DOH portal",
+      name: "Submit this sample date to the NYC Health Department portal",
     }),
   ).toBeVisible();
   await page
@@ -159,11 +162,42 @@ test.beforeEach(async ({ page }) => {
   await login(page);
 });
 
+test("customer-managed sampling is excluded from TowerTrack work", async ({
+  page,
+}) => {
+  const name = `Owner-Managed Tower ${Date.now()}`;
+  await createNycTower(page, name, "CUSTOMER");
+
+  await page.getByRole("button", { name: "Add compliance record" }).click();
+  const drawer = page.getByRole("dialog", { name: "Add compliance record" });
+  await expect(drawer.getByRole("button", { name: "Sample" })).toHaveCount(0);
+  await drawer
+    .getByText("Other work and special conditions", { exact: true })
+    .click();
+  await expect(
+    drawer.getByRole("button", {
+      name: "Confirm owner-managed bacteriological sample",
+    }),
+  ).toHaveCount(0);
+  await expect(
+    drawer.getByText("Record External Legionella Information"),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: /Record .*sample/i }),
+  ).toHaveCount(0);
+  await page.goto(`/deadlines?q=${encodeURIComponent(name)}`);
+  await expect(page.getByText(name)).toHaveCount(0);
+});
+
 test("new NYC tower completes an auditable lifecycle and one sample closes overlapping obligations", async ({
   page,
 }) => {
   const name = `Lifecycle Building ${Date.now()}`;
   const systemUrl = await createNycTower(page, name);
+  await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(
     page.getByRole("button", { name: "Laboratory result" }),
   ).toBeDisabled();
@@ -184,7 +218,9 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   );
   await expect(page.getByText("Baseline required").first()).toBeVisible();
   await expect(
-    page.getByText("No event-generated sample obligation is open."),
+    page.getByText(
+      "No sample requirement created by a compliance record is open.",
+    ),
   ).toBeVisible();
 
   await recordEvent(
@@ -208,15 +244,24 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await submitReport(page, "STARTUP_DOH_NOTIFICATION", "2026-07-03");
 
   await recordSampleAndPortal(page, "2026-07-06", "2026-07-07");
+  await expect(samples.getByText("Startup sample")).toHaveCount(0);
+  await expect(
+    samples.getByText("Monthly Legionella sample").first(),
+  ).toBeVisible();
+  await expandObligation(samples, "Monthly Legionella sample");
+  await expect(samples.getByText(/Aug 6, 2026/).first()).toBeVisible();
+  await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(
     page.getByRole("button", { name: "Laboratory result" }),
   ).toBeEnabled();
+  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "Records", exact: true }).click();
   const recordedSample = page
     .locator("#regulatory-events article")
     .filter({ hasText: "Routine legionella sample collected" })
     .first();
   await recordedSample.getByRole("link", { name: "Record lab result" }).click();
-  await expect(page).toHaveURL(/labSample=/);
+  await expect(page).toHaveURL(/record=result.*sample=/);
   await expect(
     page.locator("#record-event").getByRole("heading", {
       name: "Record Legionella result received",
@@ -225,22 +270,20 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await expect(
     page.locator("#record-event").getByLabel("Sample tested"),
   ).toHaveValue(/.+/);
-  await expect(samples.getByText("Startup sample")).toHaveCount(0);
-  await expect(
-    samples.getByText("Monthly Legionella sample").first(),
-  ).toBeVisible();
-  await expandObligation(samples, "Monthly Legionella sample");
-  await expect(samples.getByText(/Aug 6, 2026/).first()).toBeVisible();
-
   await recordEvent(
     page,
     "Inspection",
     "2026-07-06",
     "Qualified-person commissioning inspection",
   );
-  await expect(page.getByText(/Oct 4, 2026/).first()).toBeVisible();
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await expect(
+    page.locator('time[datetime="2026-10-04"]:visible').first(),
+  ).toBeVisible();
 
+  await page.getByRole("button", { name: "Add compliance record" }).click();
   await page
+    .locator("#record-event")
     .getByText("Other work and special conditions", { exact: true })
     .click();
   await page.getByRole("button", { name: "Disinfection" }).click();
@@ -257,6 +300,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await expandObligation(samples, "Post disinfection retest");
   await expect(samples.getByText(/Jul 9, 2026/).first()).toBeVisible();
 
+  await page.getByRole("link", { name: "Records", exact: true }).click();
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "High legionella disinfection" })
@@ -264,7 +308,9 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     .first()
     .click();
   await expect(
-    page.getByRole("heading", { name: "Correct record details" }),
+    page.getByRole("heading", {
+      name: "The information is wrong—replace it with corrected information",
+    }),
   ).toBeVisible();
   await page.getByLabel(/date.*Required/).fill("2026-07-05");
   await expect(page.getByLabel(/date.*Required/)).toHaveValue("2026-07-05");
@@ -273,8 +319,13 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     .fill("Corrected against the signed treatment ticket");
   await page.getByRole("button", { name: "Save corrected record" }).click();
   await expect(page.getByText(/Compliance record corrected/)).toBeVisible();
-  await expect(samples.getByText(/Jul 8, 2026/).first()).toBeVisible();
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await expect(samples.getByText("Post disinfection retest")).toHaveCount(1);
+  await expect(
+    page.locator('time[datetime="2026-07-12"]:visible').first(),
+  ).toBeVisible();
 
+  await page.getByRole("link", { name: "Records", exact: true }).click();
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "High legionella disinfection" })
@@ -284,34 +335,38 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await page
     .getByLabel("Reason this record is invalid · Required")
     .fill("Treatment was recorded against the wrong cooling tower");
-  await page.getByLabel(/I understand this voids the record/).check();
+  await page.getByLabel(/I understand this marks the record invalid/).check();
   await page.getByRole("button", { name: "Mark record invalid" }).click();
   await expect(
     page.getByText(/Compliance record marked invalid/),
   ).toBeVisible();
-  await expect(samples.getByText(/Jul 8, 2026/)).toHaveCount(0);
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await expect(samples.getByText("Post disinfection retest")).toHaveCount(0);
 
-  await recordEvent(
-    page,
-    "Laboratory result",
-    "2026-07-10",
-    "Final ELAP report reviewed by the qualified person",
-    async (form) => {
-      await expect(form.getByLabel("Sample tested")).toBeVisible();
-      await expect(
-        form.getByLabel("Sample tested").locator("option:checked"),
-      ).toContainText("Monday 07/06/2026");
-      await form.getByLabel("Result (CFU/mL)").fill("250");
-    },
-  );
+  await page.getByRole("link", { name: "Records", exact: true }).click();
+  await page
+    .locator("#regulatory-events article")
+    .filter({ hasText: "Routine legionella sample collected" })
+    .first()
+    .getByRole("link", { name: "Record lab result" })
+    .click();
+  await saveRecorder(page, async (form) => {
+    await form.getByLabel(/date.*Required/).fill("2026-07-10");
+    await form
+      .getByLabel("Notes")
+      .fill("Final ELAP report reviewed by the qualified person");
+    await expect(form.getByLabel("Sample tested")).toBeVisible();
+    await expect(
+      form.getByLabel("Sample tested").locator("option:checked"),
+    ).toContainText("Monday 07/06/2026");
+    await form.getByLabel("Result (CFU/mL)").fill("250");
+  });
+  await page.getByRole("link", { name: "Required work", exact: true }).click();
   await expect(
-    page.getByText("Level 3 corrective action").first(),
+    page.getByRole("heading", { name: "Level 3 corrective action" }).first(),
   ).toBeVisible();
   await expect(
-    page.getByText(/Sample collected Mon, Jul 6, 2026/),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Legionella LEVEL 3 RETEST").first(),
+    page.getByRole("heading", { name: "Legionella level 3 retest" }).first(),
   ).toBeVisible();
 
   await recordEvent(
@@ -320,7 +375,9 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     "2026-07-11",
     "Corrective biocide response to the Level 3 result",
   );
-  await expect(page.getByText("Level 3 corrective action")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Level 3 corrective action" }),
+  ).toHaveCount(0);
   await expect(
     samples.getByText("Post disinfection retest").first(),
   ).toBeVisible();
@@ -328,12 +385,10 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await page.goto("/work/visit-opportunities");
   const opportunity = page.locator("article").filter({ hasText: name });
   await expect(
-    opportunity.getByText(/One visit can complete [2-9] obligations/),
+    opportunity.getByText(/One visit can complete [2-9] requirements/),
   ).toBeVisible();
   await expect(opportunity.getByText("Schedule this visit")).toHaveCount(0);
-  await opportunity
-    .getByRole("link", { name: "Open tower & record work" })
-    .click();
+  await opportunity.getByRole("link", { name: "Open tower" }).last().click();
   await recordEvent(
     page,
     "Sample",
@@ -341,7 +396,9 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     "Technician collected one sample covering every compatible open window",
   );
   await expect(samples.getByText("Post disinfection retest")).toHaveCount(0);
-  await expect(samples.getByText(/Aug 18, 2026/).first()).toBeVisible();
+  await expect(
+    page.locator('time[datetime="2026-08-18"]:visible').first(),
+  ).toBeVisible();
   await expect(page.getByText("NYC portal follow-up").first()).toBeVisible();
 });
 
@@ -394,6 +451,10 @@ test("a year-round tower keeps one rolling sample clock and closes historical po
   await expect(page.getByText("NYC portal follow-up")).toHaveCount(0);
   await expect(page.getByText("Overdue requirement")).toHaveCount(0);
 
+  await page
+    .getByLabel("Tower workspace")
+    .getByRole("link", { name: "Settings", exact: true })
+    .click();
   const cleaningPlanForm = page.locator("#cleaning-plan form");
   await expect(
     cleaningPlanForm.getByRole("button", {
@@ -430,6 +491,10 @@ test("a seasonal tower preserves its history but stops the routine clock after s
 }) => {
   const name = `Seasonal Tower ${Date.now()}`;
   await createNycTower(page, name);
+  await page
+    .getByLabel("Tower workspace")
+    .getByRole("link", { name: "Settings", exact: true })
+    .click();
   const seasonalForm = page.locator("form").filter({
     has: page.getByRole("button", { name: "Save operating schedule" }),
   });

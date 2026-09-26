@@ -4,7 +4,6 @@ export const sampleQueueFilters = [
   "ACTION_NEEDED",
   "WAITING",
   "COMPLETED",
-  "ALL",
 ] as const;
 
 export type SampleQueueFilter = (typeof sampleQueueFilters)[number];
@@ -38,11 +37,11 @@ export function matchesSampleQueueFilter(
   item: SampleQueueItem,
   filter: SampleQueueFilter,
 ) {
-  if (filter === "ALL") return true;
   const state = sampleQueueState(item);
   if (filter === "ACTION_NEEDED")
     return state === "ACTION_NEEDED" || state === "RESPONSIBILITY_UNKNOWN";
-  if (filter === "WAITING") return state === "WAITING_EXTERNAL";
+  if (filter === "WAITING")
+    return state === "WAITING_EXTERNAL" || state === "REFERENCE_ONLY";
   return state === "COMPLETED";
 }
 

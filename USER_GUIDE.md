@@ -1,11 +1,42 @@
-# TowerTrack user guide
+# TowerTrack quick-start guide
 
-Start on **Planning**. Red means due today, overdue, or critical. Yellow means schedule soon. Green means complete or safely scheduled. Blue means waiting on a lab, portal, owner, or third party. Gray means inactive/suspended. Purple means a qualified person must review it. Text and icons always accompany color.
+## Start here
 
-Each system row shows the last qualifying sample, stable internal target, hard due date, route zone, planned coverage, source authority, and next action. Expand **Why?** to see the calculation and rule. Multiple systems at one building remain separate rows because their clocks may differ.
+Open **Action Center**. Begin with the first item under **Act now**. If that section is empty, work down the page from top to bottom. Red means overdue or urgent, amber means due soon, blue means upcoming or scheduled, purple means waiting or needs review, and green means complete or safely planned. A written status and icon always appear with the color.
 
-To build a route, select safe systems in one route zone, choose a date and technician, then create the route. Multiple selected systems at one building become one stop while retaining separate activities and deadlines. TowerTrack rejects a route date after a selected hard due date. Open a route stop to complete it. Confirm the performed date and check only activities actually completed. Cleaning does not count as Legionella sampling. Completion recalculates the next due date, creates a laboratory-result waiting item, and creates the NYC portal follow-up when applicable.
+## Complete required work
 
-Authority labels mean: **Regulatory** comes from a configured verified rule; **Guidance only** is best practice; **Company policy** is an operational target; **Contract requirement** comes from service scope; **Pending regulation** is monitoring only; **Needs review** is unverified. Ownership labels organize work and do not decide legal responsibility.
+Select the button on the item you are working on. TowerTrack opens the correct cooling tower and keeps your place so you can return to the list afterward.
 
-Use **Review** for duplicates, suspicious dates, pending rules, and unverified profiles. Corrections require a reason and must preview downstream changes. Admins use **Admin** to inspect profiles and exchange CSV data.
+When recording completed work:
+
+1. Choose what happened.
+2. Enter the date shown on the field record, laboratory report, or signed document.
+3. Read the plain-English **Before saving** summary.
+4. Select **Save record**.
+
+Only record work that actually happened. A planned visit does not complete required work. Cleaning and sampling are separate activities.
+
+## Find something
+
+- **All Deadlines** shows required work by due date. Use filters only when needed.
+- **Towers** lists every cooling tower. Open one to see its next required work and records.
+- **Samples** shows laboratory results that need entry, results waiting on another party, and completed results.
+- **History** contains completed compliance records and correction history.
+- **Customers** is for customer, address, and cooling-tower setup.
+- **Settings** is available to authorized managers for users, rules, imports, and exports.
+
+Use **Find a tower** at the top of any page. Type at least two letters or numbers, then choose the correct tower from the visible matches.
+
+## Correct a mistake
+
+Open **History**, select the record, and use the correction option. TowerTrack preserves the original record, requires a reason, and shows the effect before the correction is saved. Ask an administrator or operations manager if the correction option is unavailable.
+
+## Important terms
+
+- **Required work** means an unfinished compliance or service task.
+- **CFU/mL** is the laboratory result printed on a Legionella report.
+- **Responsibility not assigned** means a manager must confirm who performs that service.
+- **Compliance issue** means a deadline was missed or is overdue; completing new work does not erase the historical issue.
+
+If you are unsure, do not guess. Return to **Action Center** or ask a manager to review the item.

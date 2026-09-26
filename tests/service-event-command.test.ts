@@ -13,6 +13,9 @@ const baseInput = {
   reportType: "",
   reportingObligationId: "",
   sampleEventId: "sample-1",
+  obligationId: "obligation-1",
+  triggeringEventId: "result-1",
+  triggeringSampleId: "sample-1",
   chemical: "",
   quantity: "",
   contactTime: "",
@@ -105,5 +108,16 @@ describe("service event commands", () => {
     expect(serviceEventTypeForActivity("FULL_REMEDIATION")).toBe(
       "FULL_REMEDIATION",
     );
+  });
+
+  it("preserves contextual obligation associations for direct entry", () => {
+    const command = parseServiceEventCommand(baseInput, {
+      today: "2026-07-17",
+    });
+    expect(command.details).toMatchObject({
+      obligationId: "obligation-1",
+      triggeringEventId: "result-1",
+      triggeringSampleId: "sample-1",
+    });
   });
 });

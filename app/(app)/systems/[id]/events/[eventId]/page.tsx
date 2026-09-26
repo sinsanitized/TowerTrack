@@ -18,6 +18,7 @@ import {
   compileTowerRuleConfig,
   composeTowerRuleProfiles,
 } from "@/lib/rule-profile";
+import { eventEntryHref } from "@/lib/event-entry-intent";
 
 function textDetail(details: Record<string, unknown>, key: string) {
   const value = details[key];
@@ -166,7 +167,12 @@ export default async function EventPage({
             {sampleAwaitingResult && (
               <Link
                 className="btn"
-                href={`/systems/${id}?labSample=${event.id}#record-event`}
+                href={eventEntryHref({
+                  type: "result",
+                  towerId: id,
+                  sampleEventId: event.id,
+                  returnTo: `/systems/${id}/events/${event.id}`,
+                })}
               >
                 Record lab result for this sample
               </Link>

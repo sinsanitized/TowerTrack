@@ -17,7 +17,7 @@ test("operations manager can edit seasonal operation settings from a job", async
 }) => {
   await page.goto("/deadlines");
   const systemUrl = await page
-    .getByRole("table", { name: "All cooling tower requirements" })
+    .getByRole("table", { name: "All cooling tower required work" })
     .getByRole("row")
     .nth(1)
     .getByRole("link")

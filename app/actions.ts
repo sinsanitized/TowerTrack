@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   ActivityType,
+  ObligationStatus,
   type Prisma,
   SourceAuthority,
   UserRole,
@@ -16,7 +17,7 @@ import {
   addDays,
   asUtc,
   dateOnly,
-  isWeekend,
+  isWorkingDay,
   todayInTimeZone,
 } from "@/lib/date";
 import {
@@ -477,8 +478,22 @@ export async function recordServiceEventAction(formData: FormData) {
       id: systemId,
       building: { customer: { organizationId: user.organizationId } },
     },
-    select: { legionellaResponsibility: true, legionellaVendorName: true },
+    select: {
+      legionellaResponsibility: true,
+      bacteriologicalResponsibility: true,
+      legionellaVendorName: true,
+    },
   });
+  if (
+    ([
+      "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+      "LEGIONELLA_RESULT_RECEIVED",
+    ].includes(command.eventType) &&
+      eventSystem.legionellaResponsibility === "CUSTOMER") ||
+    (command.eventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED" &&
+      eventSystem.bacteriologicalResponsibility === "CUSTOMER")
+  )
+    throw new Error("Customer-managed sampling is not recorded in TowerTrack.");
   const isLegionellaEvent = [
     "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
     "LEGIONELLA_RESULT_RECEIVED",
@@ -523,6 +538,83 @@ export async function recordServiceEventAction(formData: FormData) {
       eventDate: command.eventDate,
       sampleEventId: command.details.sampleEventId,
     });
+    if (command.details.obligationId) {
+      const obligationWhere = {
+        id: command.details.obligationId,
+        coolingTowerSystemId: systemId,
+        status: {
+          in: [
+            ObligationStatus.PENDING,
+            ObligationStatus.SCHEDULED,
+            ObligationStatus.OVERDUE,
+            ObligationStatus.MISSED,
+          ],
+        },
+      };
+      const [sample, inspection, maintenance, reporting] = await Promise.all([
+        tx.sampleObligation.findFirst({
+          where: obligationWhere,
+          select: { id: true, triggerEventId: true },
+        }),
+        tx.inspectionObligation.findFirst({
+          where: obligationWhere,
+          select: { id: true, triggerEventId: true },
+        }),
+        tx.maintenanceObligation.findFirst({
+          where: obligationWhere,
+          select: { id: true, triggerEventId: true },
+        }),
+        tx.reportingObligation.findFirst({
+          where: obligationWhere,
+          select: {
+            id: true,
+            triggerEventId: true,
+            obligationType: true,
+          },
+        }),
+      ]);
+      const selected = sample ?? inspection ?? maintenance ?? reporting;
+      if (!selected)
+        throw new Error(
+          "The selected requirement is no longer open for this tower.",
+        );
+      if (
+        command.details.triggeringEventId &&
+        command.details.triggeringEventId !== selected.triggerEventId
+      )
+        throw new Error(
+          "The selected requirement no longer matches its triggering record.",
+        );
+      if (
+        (sample &&
+          ![
+            "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+            "BACTERIOLOGICAL_SAMPLE_COLLECTED",
+          ].includes(command.eventType)) ||
+        (inspection &&
+          command.eventType !== "QUARTERLY_INSPECTION_COMPLETED") ||
+        (maintenance &&
+          ![
+            "CLEANING_COMPLETED",
+            "STARTUP_CLEANING_DISINFECTION",
+            "SUMMERTIME_HYPERHALOGENATION",
+          ].includes(command.eventType)) ||
+        (reporting &&
+          !(
+            (reporting.obligationType.includes("CORRECTIVE_ACTION") &&
+              command.eventType === "HIGH_LEGIONELLA_DISINFECTION") ||
+            (reporting.obligationType === "LEVEL_4_FULL_REMEDIATION" &&
+              command.eventType === "FULL_REMEDIATION") ||
+            (reporting.obligationType ===
+              "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
+              command.eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT") ||
+            command.eventType === "REPORT_SUBMITTED"
+          ))
+      )
+        throw new Error(
+          "The selected requirement does not match this compliance record type.",
+        );
+    }
     if (command.eventType === "REPORT_SUBMITTED") {
       const reportType = command.details.reportType as string;
       const reportingObligationId = command.details.reportingObligationId;
@@ -1202,11 +1294,11 @@ export async function createAnnualCleaningPlanAction(formData: FormData) {
     });
   if (
     parsed.chemicalAddDate >= parsed.cleaningDate ||
-    isWeekend(parsed.chemicalAddDate) ||
-    isWeekend(parsed.cleaningDate)
+    !isWorkingDay(parsed.chemicalAddDate) ||
+    !isWorkingDay(parsed.cleaningDate)
   )
     throw new Error(
-      "Choose a Monday–Friday chemical-add date followed by a later Monday–Friday cleaning date.",
+      "Choose a working-day chemical-add date followed by a later working-day cleaning date.",
     );
 
   const cleaningYear = Number(parsed.cleaningDate.slice(0, 4));

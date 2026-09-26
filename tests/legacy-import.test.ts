@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   analyzeLegacyWorkbook,
+  parseLegacyResponsibility,
   parseLegacyDateCell,
 } from "@/lib/legacy-import/parser";
 import { isUnverifiedLegacyEvent } from "@/lib/legacy-import/safety";
@@ -53,6 +54,19 @@ describe("legacy Excel date parsing", () => {
   it("ignores blank cells", () => {
     expect(parseLegacyDateCell(null)).toEqual({ kind: "blank" });
     expect(parseLegacyDateCell("")).toEqual({ kind: "blank" });
+  });
+});
+
+describe("legacy responsibility parsing", () => {
+  it("preserves the three source states without guessing the other party", () => {
+    expect(parseLegacyResponsibility(44000)).toBe("OUR_COMPANY");
+    expect(parseLegacyResponsibility(new Date("2020-06-01T00:00:00Z"))).toBe(
+      "OUR_COMPANY",
+    );
+    expect(parseLegacyResponsibility("NO")).toBe("OTHER_PARTY");
+    expect(parseLegacyResponsibility("no")).toBe("NEEDS_REVIEW");
+    expect(parseLegacyResponsibility("8/21/2020")).toBe("NEEDS_REVIEW");
+    expect(parseLegacyResponsibility(null)).toBe("NEEDS_REVIEW");
   });
 });
 

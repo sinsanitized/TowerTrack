@@ -66,23 +66,9 @@ export function GlobalSearch() {
       <form
         className="flex items-center gap-2"
         role="search"
-        onSubmit={async (event) => {
+        onSubmit={(event) => {
           event.preventDefault();
-          let first: GlobalSearchItem | undefined = results[0];
-          if (!first && normalizedQuery.length >= 2) {
-            const response = await fetch(
-              `/api/search?q=${encodeURIComponent(normalizedQuery)}`,
-            );
-            if (response.ok) {
-              const data = (await response.json()) as {
-                items?: GlobalSearchItem[];
-              };
-              first = data.items?.[0];
-            }
-          }
-          if (!first) return;
-          setOpen(false);
-          window.location.assign(first.href);
+          setOpen(true);
         }}
       >
         <div className="relative min-w-0 flex-1">
@@ -117,8 +103,8 @@ export function GlobalSearch() {
           type="submit"
         >
           <Search size={17} aria-hidden />
-          <span className="hidden sm:inline">Find tower</span>
-          <span className="sr-only sm:hidden">Find tower</span>
+          <span className="hidden sm:inline">Show matches</span>
+          <span className="sm:hidden">Show</span>
         </button>
       </form>
       {open && normalizedQuery && (
@@ -129,23 +115,31 @@ export function GlobalSearch() {
           className="absolute left-0 right-0 top-[calc(100%+0.4rem)] z-50 overflow-hidden rounded-xl border border-slate-200 bg-[var(--surface)] shadow-xl"
         >
           {results.length ? (
-            results.map((item) => (
-              <a
-                key={item.id}
-                href={item.href}
-                role="option"
-                aria-selected="false"
-                className="block border-b border-slate-100 px-4 py-3 text-sm last:border-0 hover:bg-emerald-50 focus:bg-emerald-50"
-                onClick={() => setOpen(false)}
+            <>
+              <p
+                role="presentation"
+                className="border-b border-slate-100 px-4 py-2 text-sm font-bold text-slate-600"
               >
-                <span className="block font-black text-slate-950">
-                  {item.title}
-                </span>
-                <span className="mt-1 block text-xs font-bold text-slate-600">
-                  {item.subtitle}
-                </span>
-              </a>
-            ))
+                Choose a tower to open it.
+              </p>
+              {results.map((item) => (
+                <a
+                  key={item.id}
+                  href={item.href}
+                  role="option"
+                  aria-selected="false"
+                  className="block border-b border-slate-100 px-4 py-3 text-sm last:border-0 hover:bg-emerald-50 focus:bg-emerald-50"
+                  onClick={() => setOpen(false)}
+                >
+                  <span className="block font-black text-slate-950">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-xs font-bold text-slate-600">
+                    {item.subtitle}
+                  </span>
+                </a>
+              ))}
+            </>
           ) : loading ? (
             <p className="px-4 py-3 text-sm font-bold text-slate-600">
               Searching…
