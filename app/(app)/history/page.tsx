@@ -31,30 +31,31 @@ export default async function HistoryPage() {
         {events.map((event) => (
           <li
             key={event.id}
-            className={`record-row grid gap-4 border-l-4 p-5 sm:grid-cols-[170px_1fr_auto] sm:items-center ${event.status === "ACTIVE" ? "border-l-emerald-600" : "border-l-slate-400"}`}
+            className={`record-row border-l-4 ${event.status === "ACTIVE" ? "border-l-emerald-600" : "border-l-slate-400"}`}
+            data-testid="history-record-row"
           >
-            <ComplianceDate value={event.eventDate} compact />
-            <div className="identity-block">
-              <div className="font-black">
-                {plainEnumLabel(event.eventType)}
+            <Link
+              className="group grid gap-4 p-5 transition hover:bg-emerald-50/40 focus-visible:bg-emerald-50/40 sm:grid-cols-[170px_1fr_auto] sm:items-center"
+              href={`/systems/${event.coolingTowerSystemId}/events/${event.id}`}
+            >
+              <ComplianceDate value={event.eventDate} compact />
+              <div className="identity-block">
+                <div className="font-black group-hover:text-emerald-900">
+                  {plainEnumLabel(event.eventType)}
+                </div>
+                <div className="text-sm text-slate-600">
+                  {event.coolingTowerSystem.systemName} ·{" "}
+                  {event.coolingTowerSystem.building.buildingName}
+                </div>
               </div>
-              <div className="text-sm text-slate-600">
-                {event.coolingTowerSystem.systemName} ·{" "}
-                {event.coolingTowerSystem.building.buildingName}
+              <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                <StatusBadge
+                  color={event.status === "ACTIVE" ? "GREEN" : "GRAY"}
+                  label={plainEnumLabel(event.status)}
+                />
+                <span className="font-black text-emerald-800">Open →</span>
               </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-              <StatusBadge
-                color={event.status === "ACTIVE" ? "GREEN" : "GRAY"}
-                label={plainEnumLabel(event.status)}
-              />
-              <Link
-                className="font-bold text-emerald-800"
-                href={`/systems/${event.coolingTowerSystemId}/events/${event.id}`}
-              >
-                View record →
-              </Link>
-            </div>
+            </Link>
           </li>
         ))}
       </ol>
