@@ -3,7 +3,6 @@ import { Layers3 } from "lucide-react";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
 import { getUrgency } from "@/lib/compliance-intelligence";
-import { formatWorkingDaysLeft } from "@/lib/date";
 import { requiredActionLabel, requirementLabel } from "@/lib/labels";
 import { isOwnerManagedObligation } from "@/lib/event-workflow";
 import { buttonClass } from "@/lib/button-variants";
@@ -124,11 +123,6 @@ export function TowerActionList({
                   operational
                   empty={item.priority === "EMERGENCY" ? "Immediate" : "Open"}
                 />
-                <p className="mt-2 text-sm font-black text-slate-800">
-                  {item.latest
-                    ? formatWorkingDaysLeft(item.latest, today)
-                    : "No fixed working-day count"}
-                </p>
                 <div className="mt-2">
                   <StatusBadge color={urgency.color} label={urgency.label} />
                 </div>

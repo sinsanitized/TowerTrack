@@ -11,6 +11,7 @@ export type NextActionCalloutItem = {
   id: string;
   requiredAction: string;
   hardDueDate: string | null;
+  workingDaysLeft: number | null;
   targetDate: string | null;
   obligationReason: string;
   actionLabel: string;
@@ -142,7 +143,7 @@ export function NextActionCallout({
                     <ComplianceDate value={item.targetDate} compact />
                   </span>
                 )}
-                <strong>{workingDaysText(selection.workingDaysLeft)}</strong>
+                <strong>{workingDaysText(item.workingDaysLeft)}</strong>
               </div>
               <p className="mt-2 text-sm text-slate-700">
                 {item.obligationReason}

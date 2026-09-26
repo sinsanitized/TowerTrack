@@ -89,7 +89,7 @@
 
 - Date windows are based on configured calendar-day, business-day, or hour-based rules.
 
-- Business-day calculations assume a Monday-through-Friday operating schedule unless a different operating calendar is configured.
+- Working-day calculations use the versioned company calendar: Monday through Friday excluding observed U.S. federal holidays, except Veterans Day remains a working day and the Friday after Thanksgiving is a company holiday.
 
 - Weekends, holidays, building access restrictions, laboratory schedules, customer operating conditions, and technician availability may affect practical scheduling without automatically changing a regulatory deadline.
 

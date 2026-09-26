@@ -1,0 +1,53 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run format
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  browser-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: cp .env.docker.example .env
+      - run: docker compose up --build -d
+      - name: Wait for TowerTrack
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs web
+          exit 1
+      - name: Run browser workflows
+        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          INITIAL_ADMIN_EMAIL: admin@towertrack.local
+          INITIAL_ADMIN_PASSWORD: ChangeMe123!
+      - if: always()
+        run: docker compose down

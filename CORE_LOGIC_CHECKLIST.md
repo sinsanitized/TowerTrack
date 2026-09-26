@@ -118,8 +118,8 @@ The routine clock changes only when the underlying qualifying sample is correcte
 | Missed visit does not reset                                     | Implemented                  | Same status guard.                                                                                   |
 | Laboratory result date does not reset                           | Implemented                  | `LAB_RESULT` is not a qualifying sample type.                                                        |
 | Portal record correction does not change routine clock          | Needs explicit test          | Only the underlying sample should control the sampling anchor.                                       |
-| Portal record void does not reopen routine sampling             | Not implemented              | Requires separate portal void workflow and test.                                                     |
-| Underlying sample void reopens or recalculates routine sampling | Not implemented              | Schema supports void status, but no sample void workflow is exposed.                                 |
+| Portal record void does not reopen routine sampling             | Needs explicit test          | The generic audited void workflow exists; add a portal-specific regression test.                     |
+| Underlying sample void reopens or recalculates routine sampling | Implemented                  | The audited void workflow rebuilds projections from active events; correction/reversion is covered.  |
 | Month-end arithmetic                                            | Implemented                  | UTC-safe date-only arithmetic with unit coverage.                                                    |
 | Year-end arithmetic                                             | Implemented                  | Unit coverage.                                                                                       |
 | Leap-year arithmetic                                            | Implemented                  | Unit coverage.                                                                                       |

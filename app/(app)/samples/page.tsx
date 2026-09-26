@@ -4,7 +4,7 @@ import { ComplianceDate } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { dateOnly, diffDays, formatDate, todayDateOnly } from "@/lib/date";
+import { dateOnly, formatDate } from "@/lib/date";
 import { formatLegionellaResult, plainEnumLabel } from "@/lib/labels";
 import { buttonClass } from "@/lib/button-variants";
 import {
@@ -79,7 +79,6 @@ export default async function SamplesPage({
   const filter = requestedFilter(query.status);
   const search =
     typeof query.q === "string" ? query.q.trim().toLowerCase() : "";
-  const today = todayDateOnly();
   const workflowNotice =
     typeof query.workflowNotice === "string" ? query.workflowNotice : null;
   const sampleReturnTo = `/samples?status=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
@@ -217,7 +216,6 @@ export default async function SamplesPage({
           const result = sample.labResultsForSample[0];
           const state = sampleQueueState(sample);
           const presentation = statePresentation[state];
-          const age = diffDays(sample.eventDate, today);
           const responsibility =
             sample.coolingTowerSystem.laboratoryResultResponsibility;
           const statusLabel =
@@ -250,11 +248,6 @@ export default async function SamplesPage({
                   label="Sample collected"
                   compact
                 />
-                <div className="mt-2 text-xs font-bold text-slate-600">
-                  {age === 0
-                    ? "Collected today"
-                    : `${age} calendar day${age === 1 ? "" : "s"} ago`}
-                </div>
               </div>
               <div>
                 <div className="label">Laboratory result</div>

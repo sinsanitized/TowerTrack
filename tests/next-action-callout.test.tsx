@@ -24,6 +24,7 @@ describe("next action callout", () => {
             id: "obligation-1",
             requiredAction: "Collect Legionella resample",
             hardDueDate: "2026-08-03",
+            workingDaysLeft: -1,
             targetDate: "2026-08-01",
             obligationReason: "Required after the previous elevated result.",
             actionLabel: "Record resample",
@@ -59,6 +60,7 @@ describe("next action callout", () => {
             id: "routine-1",
             requiredAction: "Collect routine Legionella sample",
             hardDueDate: "2026-09-08",
+            workingDaysLeft: 20,
             targetDate: "2026-09-01",
             obligationReason: "Routine operating sample.",
             actionLabel: "Record sample",
@@ -73,5 +75,45 @@ describe("next action callout", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Next upcoming obligation:/)).toBeInTheDocument();
     expect(screen.getByText("Target date:")).toBeInTheDocument();
+  });
+
+  it("shows each obligation's own working-day distance", () => {
+    render(
+      <NextActionCallout
+        selection={{
+          state: "DUE_SOON",
+          items: [{}, {}],
+          controllingDate: "2026-08-03",
+          workingDaysLeft: 99,
+          reason: "Their hard deadlines require attention.",
+          immediate: true,
+        }}
+        items={[
+          {
+            id: "first",
+            requiredAction: "First action",
+            hardDueDate: "2026-08-03",
+            workingDaysLeft: -1,
+            targetDate: null,
+            obligationReason: "First reason.",
+            actionLabel: "Record first",
+            actionHref: "/first",
+          },
+          {
+            id: "second",
+            requiredAction: "Second action",
+            hardDueDate: "2026-08-06",
+            workingDaysLeft: 2,
+            targetDate: null,
+            obligationReason: "Second reason.",
+            actionLabel: "Record second",
+            actionHref: "/second",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Overdue by 1 working day")).toBeInTheDocument();
+    expect(screen.getByText("2 working days left")).toBeInTheDocument();
+    expect(screen.queryByText(/99 working days/)).not.toBeInTheDocument();
   });
 });

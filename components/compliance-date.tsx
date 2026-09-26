@@ -13,6 +13,7 @@ import {
   dateOnly,
   formatComplianceDate,
   formatOperationalDate,
+  formatWorkingDaysLeft,
   todayInTimeZone,
   weekendDatesInWindow,
 } from "@/lib/date";
@@ -63,6 +64,10 @@ export function ComplianceDate({
       </div>
     );
   const info = complianceDateInfo(value, today);
+  const relative =
+    !deadline && info.calendarDays < -1
+      ? `${Math.abs(info.calendarDays)} calendar days ago`
+      : info.relative;
   return (
     <div
       className={
@@ -76,20 +81,11 @@ export function ComplianceDate({
         {operational ? formatOperationalDate(info.date) : info.formatted}
       </time>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-        <span className="font-bold text-slate-600">{info.relative}</span>
+        <span className="font-bold text-slate-600">{relative}</span>
         {deadline && !compact && (
-          <>
-            <span className="text-slate-500">
-              {Math.abs(info.calendarDays)} calendar day
-              {Math.abs(info.calendarDays) === 1 ? "" : "s"}
-              {info.calendarDays < 0 ? " overdue" : " remaining"}
-            </span>
-            <span className="font-black text-emerald-900">
-              {Math.abs(info.workingDays)} working day
-              {Math.abs(info.workingDays) === 1 ? "" : "s"}
-              {info.workingDays < 0 ? " overdue" : " remaining"}
-            </span>
-          </>
+          <span className="font-black text-emerald-900">
+            {formatWorkingDaysLeft(info.date, today)}
+          </span>
         )}
         {info.weekend && (
           <span className="font-black text-slate-700">Weekend</span>

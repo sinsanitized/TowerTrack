@@ -22,6 +22,10 @@ uploads/*
 backups/*
 !backups/.gitkeep
 
+# Local operational import artifacts
+reports/
+scripts/*.xlsx
+
 # Logs
 *.log
 npm-debug.log*

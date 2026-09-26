@@ -24,6 +24,7 @@ import {
   isWorkingDay,
   nextWorkingDate,
   todayDateOnly,
+  workingDaysRemaining,
 } from "@/lib/date";
 import {
   formatLegionellaResult,
@@ -500,6 +501,9 @@ export default async function SystemPage({
       id: item.id,
       requiredAction: requiredActionLabel(item.type),
       hardDueDate: item.latest,
+      workingDaysLeft: item.latest
+        ? workingDaysRemaining(item.latest, today)
+        : null,
       targetDate: item.targetStart,
       obligationReason: item.reason,
       actionLabel,
