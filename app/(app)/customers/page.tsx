@@ -59,7 +59,7 @@ export default async function CustomersPage() {
         title="Customers"
         description="Create the customer and address first, then add the cooling tower equipment details."
       />
-      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
         <div className="panel table-wrap">
           <table>
             <thead>
@@ -139,14 +139,14 @@ export default async function CustomersPage() {
             </div>
           )}
         </div>
-        <aside className="panel p-5">
+        <aside className="panel p-5 xl:sticky xl:top-6">
           <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
             <span className="rounded-full bg-emerald-800 px-2 py-1 text-white">
               Step 1 of 2
             </span>
             Customer and address
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-4">
             <Plus size={18} />
             <h2 className="font-black">Add customer</h2>
           </div>

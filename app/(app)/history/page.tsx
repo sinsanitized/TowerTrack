@@ -27,14 +27,14 @@ export default async function HistoryPage() {
         title="All compliance records"
         description="Records from every tower, newest first. Open a record to review its evidence, correction history, or satisfied requirement."
       />
-      <ol className="panel divide-y divide-slate-200">
+      <ol className="panel overflow-hidden">
         {events.map((event) => (
           <li
             key={event.id}
-            className="grid gap-3 p-5 sm:grid-cols-[150px_1fr_auto] sm:items-center"
+            className={`record-row grid gap-4 border-l-4 p-5 sm:grid-cols-[170px_1fr_auto] sm:items-center ${event.status === "ACTIVE" ? "border-l-emerald-600" : "border-l-slate-400"}`}
           >
             <ComplianceDate value={event.eventDate} compact />
-            <div>
+            <div className="identity-block">
               <div className="font-black">
                 {plainEnumLabel(event.eventType)}
               </div>
@@ -43,7 +43,7 @@ export default async function HistoryPage() {
                 {event.coolingTowerSystem.building.buildingName}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
               <StatusBadge
                 color={event.status === "ACTIVE" ? "GREEN" : "GRAY"}
                 label={plainEnumLabel(event.status)}

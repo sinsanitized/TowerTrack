@@ -713,6 +713,7 @@ export async function complianceDashboardRows({
       building: system.building.buildingName,
       customer: system.building.customer.name,
       systemName: system.systemName,
+      jobNumber: system.internalJobNumber,
       tonnage: system.tonnage,
       operatingSchedule:
         system.operationPeriodType === "SEASONAL" ||

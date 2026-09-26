@@ -74,33 +74,21 @@ function ActionRow({
               : "Unscheduled";
   return (
     <article
-      className={`border-b p-4 last:border-b-0 sm:p-5 ${
+      className={`record-row border-l-4 p-4 sm:p-5 ${
         tone === "next"
-          ? "border-blue-100 bg-blue-50/40"
+          ? "urgency-blue"
           : tone === "immediate"
-            ? "border-red-100 bg-red-50/40"
-            : "border-slate-200"
+            ? "urgency-red"
+            : "urgency-amber"
       }`}
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(170px,.65fr)_minmax(260px,1.2fr)_minmax(190px,.75fr)_auto] lg:items-center">
+      <div className="grid gap-5 lg:grid-cols-[minmax(260px,1.15fr)_minmax(220px,.9fr)_minmax(210px,.8fr)_auto] lg:items-center">
         <div className="min-w-0">
-          <div className="font-black">{row.systemName}</div>
-          <div className="text-sm text-slate-600">{row.building}</div>
-          <div className="mt-1 text-xs font-bold text-slate-500">
-            {row.profileJurisdictionLabel}
-          </div>
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
-            Required action
-          </div>
-          <h3 className="mt-1 text-lg font-black">
+          <h3 className="text-lg font-black leading-snug">
             {requiredActionLabel(obligation.type)}
           </h3>
-          <details className="mt-2 text-sm">
-            <summary className="cursor-pointer font-bold text-emerald-800">
-              Why this is required
-            </summary>
+          <details className="detail-disclosure mt-3">
+            <summary>Why this is required</summary>
             <p className="mt-2 text-slate-600">{obligation.reason}</p>
             <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-500">
               {row.profileSourceLabel}
@@ -133,7 +121,22 @@ function ActionRow({
               </details>
             )}
         </div>
-        <div>
+        <div className="identity-block">
+          <Link
+            className="font-black text-emerald-900 underline decoration-emerald-300 underline-offset-2"
+            href={`/systems/${row.id}`}
+          >
+            {row.systemName}
+          </Link>
+          <div className="mt-1 font-bold text-slate-800">{row.building}</div>
+          <div className="mt-1 text-sm text-slate-600">{row.address}</div>
+          {row.jobNumber && (
+            <div className="mt-1 text-sm font-bold text-slate-600">
+              Job {row.jobNumber}
+            </div>
+          )}
+        </div>
+        <div className="date-block">
           <ComplianceDate
             value={obligation.latest}
             label="Deadline"
@@ -144,19 +147,23 @@ function ActionRow({
           <div className="mt-2">
             <StatusBadge color={urgency.color} label={urgency.label} />
           </div>
-          <div className="mt-1">
-            <StatusBadge
-              color={
-                obligation.status === "SCHEDULED"
-                  ? "BLUE"
-                  : executionLabel.startsWith("Waiting") ||
-                      executionLabel === "Reference only"
-                    ? "PURPLE"
-                    : "GRAY"
-              }
-              label={executionLabel}
-            />
-          </div>
+          {executionLabel === "Unscheduled" ? (
+            <p className="mt-2 text-sm font-bold text-slate-600">Unscheduled</p>
+          ) : (
+            <div className="mt-2">
+              <StatusBadge
+                color={
+                  obligation.status === "SCHEDULED"
+                    ? "BLUE"
+                    : executionLabel.startsWith("Waiting") ||
+                        executionLabel === "Reference only"
+                      ? "PURPLE"
+                      : "GRAY"
+                }
+                label={executionLabel}
+              />
+            </div>
+          )}
         </div>
         <Link
           className={buttonClass(
@@ -319,7 +326,7 @@ export default async function ActionCenterPage({
       )}
 
       {(issueCount > 0 || immediateItems.length > 0) && (
-        <section className="panel mb-7 overflow-hidden border-red-200">
+        <section className="section-panel mb-7 border-red-200">
           <div className="border-b border-red-200 bg-red-50 p-5">
             <h2 className="mt-1 text-xl font-black text-red-950">
               Immediate attention
@@ -372,7 +379,7 @@ export default async function ActionCenterPage({
       )}
 
       <section
-        className="panel mb-7 overflow-hidden border-amber-200"
+        className="section-panel mb-7 border-amber-200"
         data-testid="this-week-section"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 p-5">
@@ -412,7 +419,7 @@ export default async function ActionCenterPage({
       </section>
 
       <section
-        className="panel mb-7 overflow-hidden border-blue-200 bg-blue-50/20"
+        className="section-panel mb-7 border-blue-200"
         data-testid="next-week-section"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-200 bg-blue-50 p-5">

@@ -202,7 +202,7 @@ export default async function SamplesPage({
           </Link>
         )}
       </form>
-      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
+      <div className="mb-4 rounded-xl border border-slate-300 bg-white p-4 text-slate-800">
         <div className="font-black">
           {filter === "ACTION_NEEDED"
             ? "Start with the oldest sample below. Enter its laboratory result or assign who is responsible."
@@ -227,11 +227,10 @@ export default async function SamplesPage({
           return (
             <article
               key={sample.id}
-              className={`grid gap-4 border-l-4 p-5 xl:grid-cols-[minmax(240px,1.2fr)_180px_minmax(220px,1fr)_auto] xl:items-center ${presentation.article}`}
+              className={`record-row grid gap-5 border-l-4 p-5 xl:grid-cols-[minmax(250px,1.15fr)_minmax(180px,.7fr)_minmax(230px,.9fr)_auto] xl:items-center ${presentation.color === "YELLOW" ? "urgency-amber" : presentation.color === "PURPLE" ? "urgency-purple" : presentation.color === "GREEN" ? "border-l-emerald-600" : "border-l-slate-300"}`}
             >
-              <div>
-                <StatusBadge color={presentation.color} label={statusLabel} />
-                <div className="mt-3 font-black">
+              <div className="identity-block">
+                <div className="font-black">
                   {sample.coolingTowerSystem.systemName}
                 </div>
                 <div className="text-sm font-bold text-slate-700">
@@ -241,15 +240,18 @@ export default async function SamplesPage({
                   {sample.coolingTowerSystem.building.customer.name} ·{" "}
                   {sample.coolingTowerSystem.internalJobNumber}
                 </div>
+                <div className="mt-3">
+                  <StatusBadge color={presentation.color} label={statusLabel} />
+                </div>
               </div>
-              <div>
+              <div className="date-block">
                 <ComplianceDate
                   value={sample.eventDateValue}
                   label="Sample collected"
                   compact
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="label">Laboratory result</div>
                 <div className="mt-1 font-black">
                   {result

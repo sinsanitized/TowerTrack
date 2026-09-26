@@ -132,7 +132,7 @@ export function EventRecorderDrawer({
           />
           <aside
             ref={drawerRef}
-            className="relative flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-[min(56rem,calc(100vh-3rem))] sm:max-w-4xl sm:rounded-2xl sm:border sm:border-slate-300"
+            className="relative flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-[min(60rem,calc(100vh-2rem))] sm:max-w-5xl sm:rounded-2xl sm:border sm:border-slate-300"
             role="dialog"
             aria-modal="true"
             aria-labelledby="event-drawer-title"
@@ -203,7 +203,7 @@ export function EventRecorderDrawer({
                 <span className="sr-only sm:not-sr-only">Close</span>
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6">
               <EventRecorder
                 key={initialSampleEventId ?? initialEventType ?? "default"}
                 systemId={systemId}

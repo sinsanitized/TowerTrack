@@ -223,7 +223,7 @@ export function EventRecorder({
   return (
     <div id="record-event" className="scroll-mt-6">
       {!intentContext && (
-        <section className="panel p-5">
+        <section className="panel p-5 sm:p-6">
           <div>
             <div className="label">Step 1 of 2 · Choose completed work</div>
             <h2 className="mt-1 text-xl font-black">What happened?</h2>
@@ -233,7 +233,7 @@ export function EventRecorder({
               next.
             </p>
           </div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {visiblePrimaryEvents.map(({ label, type: value }) => {
               const Icon = eventIcons[value as keyof typeof eventIcons];
               return (
@@ -251,7 +251,7 @@ export function EventRecorder({
                     (value === "LEGIONELLA_RESULT_RECEIVED" &&
                       !samplesAwaitingResults.length)
                   }
-                  className={`flex min-h-12 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
+                  className={`flex min-h-14 items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm font-bold ${
                     !ready ||
                     (value === "LEGIONELLA_RESULT_RECEIVED" &&
                       !samplesAwaitingResults.length)
@@ -269,8 +269,8 @@ export function EventRecorder({
           <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
             <summary
               className={buttonClass(
-                "secondary",
-                "w-full cursor-pointer text-sm",
+                "ghost",
+                "w-full cursor-pointer justify-start text-sm",
               )}
             >
               Other work and special conditions

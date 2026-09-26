@@ -52,7 +52,7 @@ export function TowerActionList({
     return <p className="text-sm font-bold text-slate-600">{emptyMessage}</p>;
 
   return (
-    <div className="divide-y divide-slate-200">
+    <div>
       {items.map((item) => {
         const urgency = getUrgency({
           today,
@@ -70,11 +70,13 @@ export function TowerActionList({
         );
         const externallyManaged = responsibility !== "OUR_COMPANY";
         return (
-          <article key={item.id} className="py-5 first:pt-0 last:pb-0">
-            <div className="grid gap-4 xl:grid-cols-[minmax(250px,1.2fr)_minmax(210px,.8fr)_minmax(180px,.65fr)_auto] xl:items-center">
+          <article
+            key={item.id}
+            className={`record-row border-l-4 px-4 py-5 sm:px-5 ${urgency.color === "RED" ? "urgency-red" : urgency.color === "YELLOW" ? "urgency-amber" : urgency.color === "BLUE" ? "urgency-blue" : "border-l-slate-300"}`}
+          >
+            <div className="grid gap-5 xl:grid-cols-[minmax(260px,1.15fr)_minmax(230px,.9fr)_minmax(200px,.75fr)_auto] xl:items-center">
               <div>
-                <div className="label">Required action</div>
-                <h3 className="mt-1 text-lg font-black">
+                <h3 className="text-lg font-black leading-snug">
                   {requiredActionLabel(item.type)}
                 </h3>
                 <p className="mt-1 text-sm text-slate-600">
@@ -115,7 +117,7 @@ export function TowerActionList({
                   operational
                 />
               </div>
-              <div>
+              <div className="date-block">
                 <ComplianceDate
                   value={item.latest}
                   label="Compliance deadline"
@@ -197,10 +199,8 @@ export function TowerActionList({
                 </Link>
               )}
             </div>
-            <details className="mt-3 text-sm">
-              <summary className="cursor-pointer font-bold text-emerald-800">
-                Why this is required
-              </summary>
+            <details className="detail-disclosure mt-4">
+              <summary>Why this is required</summary>
               <p className="mt-2 text-slate-600">{item.reason}</p>
             </details>
           </article>

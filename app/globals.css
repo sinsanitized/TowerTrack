@@ -68,6 +68,56 @@ textarea:focus-visible {
   border-radius: 14px;
   box-shadow: 0 2px 5px rgb(20 40 30 / 0.08);
 }
+.section-panel {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+.record-row {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.record-row:last-child {
+  border-bottom: 0;
+}
+.identity-block {
+  min-width: 0;
+  padding-left: 0.875rem;
+  border-left: 3px solid #cbd5e1;
+}
+.date-block {
+  min-width: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+.detail-disclosure {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.detail-disclosure summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #166534;
+  font-weight: 800;
+}
+.detail-disclosure summary:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .label {
   font-size: 14px;
   font-weight: 800;
@@ -201,6 +251,20 @@ tbody tr:hover {
   background-color: rgb(248 250 248 / 0.7);
 }
 
+/* Urgency belongs on the status edge, not across the entire row. */
+.urgency-red {
+  border-left-color: #dc2626;
+}
+.urgency-amber {
+  border-left-color: #d97706;
+}
+.urgency-blue {
+  border-left-color: #2563eb;
+}
+.urgency-purple {
+  border-left-color: #9333ea;
+}
+
 /* Keep operational and supporting text legible for older users. */
 .text-sm {
   font-size: 1rem;
@@ -212,6 +276,12 @@ tbody tr:hover {
 }
 
 @media (max-width: 767px) {
+  .section-header {
+    padding: 1rem;
+  }
+  .date-block {
+    padding: 0.75rem;
+  }
   .deadline-table,
   .deadline-table tbody,
   .deadline-table tr,

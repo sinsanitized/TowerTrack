@@ -47,13 +47,19 @@ export default async function TowersPage() {
           return (
             <article
               key={row.id}
-              className="grid gap-3 border-b p-5 last:border-b-0 lg:grid-cols-[1.1fr_.7fr_1.2fr_.8fr_.35fr_auto] lg:items-center"
+              className={`record-row grid gap-4 border-l-4 p-5 lg:grid-cols-[1.1fr_.7fr_1.2fr_.8fr_.35fr_auto] lg:items-center ${issues ? "urgency-red" : row.complianceHealth.color === "YELLOW" ? "urgency-amber" : "border-l-slate-300"}`}
             >
-              <div>
-                <div className="font-black">{row.systemName}</div>
+              <div className="identity-block">
+                <Link
+                  className="font-black text-emerald-900 underline decoration-emerald-300 underline-offset-2"
+                  href={`/systems/${row.id}`}
+                >
+                  {row.systemName}
+                </Link>
                 <div className="text-sm text-slate-600">
                   {row.building} · {row.customer}
                 </div>
+                <div className="mt-1 text-sm text-slate-600">{row.address}</div>
               </div>
               <StatusBadge
                 color={row.complianceHealth.color}
@@ -84,7 +90,7 @@ export default async function TowersPage() {
                 {issues}
               </div>
               <Link
-                className="btn min-h-11 justify-center"
+                className="btn btn-ghost min-h-11 justify-center"
                 href={`/systems/${row.id}`}
               >
                 Open tower

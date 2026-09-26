@@ -152,16 +152,16 @@ export default async function DeadlinesPage({
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className={`align-top border-l-4 ${
+                    className={`align-top border-l-4 bg-white ${
                       row.status === "Overdue"
-                        ? "border-l-red-500 bg-red-50/60"
+                        ? "urgency-red"
                         : row.status === "Due this week"
-                          ? "border-l-amber-500 bg-amber-50/50"
+                          ? "urgency-amber"
                           : row.status === "Due next week"
-                            ? "border-l-blue-500 bg-blue-50/40"
+                            ? "urgency-blue"
                             : row.status === "Review required"
-                              ? "border-l-purple-500 bg-purple-50/40"
-                              : "border-l-slate-200 bg-white"
+                              ? "urgency-purple"
+                              : "border-l-slate-300"
                     }`}
                   >
                     <td
