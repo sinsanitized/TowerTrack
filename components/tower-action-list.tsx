@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Layers3 } from "lucide-react";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
+import { ClickableRow } from "@/components/clickable-row";
 import { getUrgency } from "@/lib/compliance-intelligence";
 import { requiredActionLabel, requirementLabel } from "@/lib/labels";
 import { isOwnerManagedObligation } from "@/lib/event-workflow";
@@ -69,9 +70,31 @@ export function TowerActionList({
           responsibilities,
         );
         const externallyManaged = responsibility !== "OUR_COMPANY";
+        const rowHref = externallyManaged
+          ? legionella &&
+            canConfirmOwnerManaged &&
+            legionellaResponsibility === "OTHER_VENDOR"
+            ? eventEntryHref({
+                type: "external-legionella",
+                towerId: systemId,
+                obligationId: item.id,
+              })
+            : null
+          : ownerManaged
+            ? canConfirmOwnerManaged
+              ? eventEntryHref({
+                  type: "bacteriological",
+                  towerId: systemId,
+                  obligationId: item.id,
+                })
+              : null
+            : completionHrefForObligation(systemId, item);
         return (
-          <article
+          <ClickableRow
+            as="article"
             key={item.id}
+            href={rowHref}
+            label={`Open ${requiredActionLabel(item.type)}`}
             className={`record-row border-l-4 px-4 py-5 sm:px-5 ${urgency.color === "RED" ? "urgency-red" : urgency.color === "YELLOW" ? "urgency-amber" : urgency.color === "BLUE" ? "urgency-blue" : "border-l-slate-300"}`}
           >
             <div className="grid gap-5 xl:grid-cols-[minmax(260px,1.15fr)_minmax(230px,.9fr)_minmax(200px,.75fr)_auto] xl:items-center">
@@ -203,7 +226,7 @@ export function TowerActionList({
               <summary>Why this is required</summary>
               <p className="mt-2 text-slate-600">{item.reason}</p>
             </details>
-          </article>
+          </ClickableRow>
         );
       })}
     </div>

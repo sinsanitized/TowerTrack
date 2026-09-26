@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
+import { ClickableRow } from "@/components/clickable-row";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dateOnly, formatDate } from "@/lib/date";
@@ -224,9 +225,38 @@ export default async function SamplesPage({
                 ? "Waiting on customer"
                 : "Waiting on vendor"
               : presentation.label;
+          const primaryHref =
+            state === "ACTION_NEEDED"
+              ? withReturnPath(
+                  eventEntryHref({
+                    type: "result",
+                    towerId: sample.coolingTowerSystemId,
+                    sampleEventId: sample.id,
+                  }),
+                  sampleReturnTo,
+                )
+              : state === "RESPONSIBILITY_UNKNOWN"
+                ? withReturnPath(
+                    `/systems/${sample.coolingTowerSystemId}/edit?focus=laboratoryResultResponsibility#service-responsibilities`,
+                    sampleReturnTo,
+                  )
+                : `/systems/${sample.coolingTowerSystemId}?view=history`;
+          const primaryLabel =
+            state === "ACTION_NEEDED"
+              ? "Enter laboratory result"
+              : state === "RESPONSIBILITY_UNKNOWN"
+                ? "Assign responsibility"
+                : state === "WAITING_EXTERNAL"
+                  ? "View waiting details"
+                  : state === "COMPLETED"
+                    ? "View sample record"
+                    : "Open tower";
           return (
-            <article
+            <ClickableRow
+              as="article"
               key={sample.id}
+              href={primaryHref}
+              label={`${primaryLabel} for ${sample.coolingTowerSystem.systemName}`}
               className={`record-row grid gap-5 border-l-4 p-5 xl:grid-cols-[minmax(250px,1.15fr)_minmax(180px,.7fr)_minmax(230px,.9fr)_auto] xl:items-center ${presentation.color === "YELLOW" ? "urgency-amber" : presentation.color === "PURPLE" ? "urgency-purple" : presentation.color === "GREEN" ? "border-l-emerald-600" : "border-l-slate-300"}`}
             >
               <div className="identity-block">
@@ -274,35 +304,11 @@ export default async function SamplesPage({
                   state === "ACTION_NEEDED" ? "primary" : "secondary",
                   "min-h-11 w-full justify-center text-center xl:w-auto",
                 )}
-                href={
-                  state === "ACTION_NEEDED"
-                    ? withReturnPath(
-                        eventEntryHref({
-                          type: "result",
-                          towerId: sample.coolingTowerSystemId,
-                          sampleEventId: sample.id,
-                        }),
-                        sampleReturnTo,
-                      )
-                    : state === "RESPONSIBILITY_UNKNOWN"
-                      ? withReturnPath(
-                          `/systems/${sample.coolingTowerSystemId}/edit?focus=laboratoryResultResponsibility#service-responsibilities`,
-                          sampleReturnTo,
-                        )
-                      : `/systems/${sample.coolingTowerSystemId}?view=history`
-                }
+                href={primaryHref}
               >
-                {state === "ACTION_NEEDED"
-                  ? "Enter laboratory result"
-                  : state === "RESPONSIBILITY_UNKNOWN"
-                    ? "Assign responsibility"
-                    : state === "WAITING_EXTERNAL"
-                      ? "View waiting details"
-                      : state === "COMPLETED"
-                        ? "View sample record"
-                        : "Open tower"}
+                {primaryLabel}
               </Link>
-            </article>
+            </ClickableRow>
           );
         })}
         {!visibleSamples.length && (

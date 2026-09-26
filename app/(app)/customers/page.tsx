@@ -1,6 +1,7 @@
 import { Building2, Plus } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { ClickableTableRow } from "@/components/clickable-row";
 import { createCustomerAction } from "@/app/actions";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -70,64 +71,81 @@ export default async function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ customer, building, system }) => (
-                <tr key={system?.id || building?.id || customer.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
-                        <Building2 size={18} />
-                      </span>
-                      <div>
-                        <div className="font-black">{customer.name}</div>
-                        <div className="text-xs text-slate-500">
-                          Account {customer.accountNumber}
+              {rows.map(({ customer, building, system }) => {
+                const primaryHref = system
+                  ? `/systems/${system.id}`
+                  : building
+                    ? `/customers/${customer.id}/towers/new?buildingId=${building.id}`
+                    : null;
+                return (
+                  <ClickableTableRow
+                    key={system?.id || building?.id || customer.id}
+                    href={primaryHref}
+                    label={
+                      system
+                        ? `Open ${system.systemName}`
+                        : building
+                          ? `Add tower details for ${customer.name}`
+                          : undefined
+                    }
+                  >
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <span className="grid size-9 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
+                          <Building2 size={18} />
+                        </span>
+                        <div>
+                          <div className="font-black">{customer.name}</div>
+                          <div className="text-xs text-slate-500">
+                            Account {customer.accountNumber}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    {building ? (
-                      <>
-                        <div className="font-bold">
-                          {building.streetAddress}
+                    </td>
+                    <td>
+                      {building ? (
+                        <>
+                          <div className="font-bold">
+                            {building.streetAddress}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {system
+                              ? `${system.systemName} · `
+                              : "Cooling tower details not added · "}
+                            {building.city}, {building.state}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-bold text-slate-500">
+                          Address not added
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {system
-                            ? `${system.systemName} · `
-                            : "Cooling tower details not added · "}
-                          {building.city}, {building.state}
+                      )}
+                    </td>
+                    <td>
+                      {system ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Link className="btn" href={`/systems/${system.id}`}>
+                            Open tower
+                          </Link>
+                          <Link
+                            className="btn"
+                            href={`/systems/${system.id}/edit`}
+                          >
+                            Edit details
+                          </Link>
                         </div>
-                      </>
-                    ) : (
-                      <div className="font-bold text-slate-500">
-                        Address not added
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {system ? (
-                      <div className="flex flex-wrap gap-2">
-                        <Link className="btn" href={`/systems/${system.id}`}>
-                          Open tower
-                        </Link>
+                      ) : building ? (
                         <Link
-                          className="btn"
-                          href={`/systems/${system.id}/edit`}
+                          className="btn btn-primary"
+                          href={`/customers/${customer.id}/towers/new?buildingId=${building.id}`}
                         >
-                          Edit details
+                          Add tower details
                         </Link>
-                      </div>
-                    ) : building ? (
-                      <Link
-                        className="btn btn-primary"
-                        href={`/customers/${customer.id}/towers/new?buildingId=${building.id}`}
-                      >
-                        Add tower details
-                      </Link>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+                      ) : null}
+                    </td>
+                  </ClickableTableRow>
+                );
+              })}
             </tbody>
           </table>
           {!rows.length && (

@@ -3,6 +3,7 @@ import { CalendarRange } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DeadlineFilterControls } from "@/components/deadline-filter-controls";
 import { StatusBadge } from "@/components/status-badge";
+import { ClickableTableRow } from "@/components/clickable-row";
 import { requireUser } from "@/lib/auth";
 import { buttonClass } from "@/lib/button-variants";
 import {
@@ -226,116 +227,115 @@ export default async function DeadlinesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={`align-top border-l-4 bg-white ${
-                      row.status === "Overdue"
-                        ? "urgency-red"
-                        : row.status === "Due this week"
-                          ? "urgency-amber"
-                          : row.status === "Due next week"
-                            ? "urgency-blue"
-                            : row.status === "Review required"
-                              ? "urgency-purple"
-                              : "border-l-slate-300"
-                    }`}
-                  >
-                    <td
-                      className="break-words px-3 py-4"
-                      data-label="Cooling tower"
+                {rows.map((row) => {
+                  const primaryHref =
+                    row.primaryActionHref.includes("#record-event") ||
+                    row.primaryActionHref.includes("#service-responsibilities")
+                      ? withReturnPath(row.primaryActionHref, deadlineReturnTo)
+                      : row.primaryActionHref;
+                  return (
+                    <ClickableTableRow
+                      key={row.id}
+                      href={primaryHref}
+                      label={`${row.primaryActionLabel}: ${row.requiredAction} for ${row.systemName}`}
+                      className={`align-top border-l-4 bg-white ${
+                        row.status === "Overdue"
+                          ? "urgency-red"
+                          : row.status === "Due this week"
+                            ? "urgency-amber"
+                            : row.status === "Due next week"
+                              ? "urgency-blue"
+                              : row.status === "Review required"
+                                ? "urgency-purple"
+                                : "border-l-slate-300"
+                      }`}
                     >
-                      <Link
-                        className="font-black text-emerald-900 underline decoration-emerald-300 underline-offset-2"
-                        href={`/systems/${row.towerId}`}
+                      <td
+                        className="break-words px-3 py-4"
+                        data-label="Cooling tower"
                       >
-                        {row.systemName}
-                      </Link>
-                      <div className="mt-1 text-slate-600">{row.address}</div>
-                    </td>
-                    <td
-                      className="break-words px-3 py-4 font-bold text-slate-900"
-                      data-label="Required work"
-                    >
-                      {row.requiredAction}
-                      <div className="mt-1 text-xs font-bold text-slate-500">
-                        {row.executionLane}
-                        {row.dependency ? ` · ${row.dependency}` : ""}
-                      </div>
-                      <div className="mt-2">
-                        <StatusBadge
-                          compact
-                          color={
-                            row.status === "Overdue"
-                              ? "RED"
-                              : row.status === "Due this week"
-                                ? "YELLOW"
-                                : row.status === "Due next week"
-                                  ? "BLUE"
-                                  : row.status === "Review required"
-                                    ? "PURPLE"
-                                    : "GREEN"
-                          }
-                          label={row.status}
-                        />
-                      </div>
-                      {row.responsibility !== "OUR_COMPANY" && (
-                        <span
-                          className={`mt-2 inline-flex rounded-full border px-2 py-1 text-sm font-bold ${row.responsibility == null ? "border-purple-300 bg-purple-50 text-purple-900" : "border-slate-200 bg-slate-100 text-slate-700"}`}
+                        <Link
+                          className="font-black text-emerald-900 underline decoration-emerald-300 underline-offset-2"
+                          href={`/systems/${row.towerId}`}
                         >
-                          {row.responsibilityLabel}
-                        </span>
-                      )}
-                    </td>
-                    <td
-                      data-label="Target window"
-                      className="px-3 py-4 font-bold text-slate-800"
-                    >
-                      <span aria-label={row.targetWindowAccessible}>
-                        {row.targetWindowDisplay}
-                      </span>
-                    </td>
-                    <td
-                      data-label="Hard deadline"
-                      className={`px-3 py-4 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due this week" ? "text-amber-900" : row.status === "Due next week" ? "text-blue-800" : row.status === "Review required" ? "text-purple-800" : "text-slate-800"}`}
-                    >
-                      <span aria-label={row.hardDueDateAccessible}>
-                        {row.hardDueDateDisplay}
-                      </span>
-                    </td>
-                    <td
-                      data-label="Working days left"
-                      className={`px-3 py-4 text-lg font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due this week" ? "text-amber-900" : row.status === "Due next week" ? "text-blue-800" : row.status === "Review required" ? "text-purple-800" : "text-slate-800"}`}
-                      aria-label={row.workingDaysAccessible}
-                    >
-                      {row.workingDaysDisplay}
-                    </td>
-                    <td className="px-3 py-4" data-label="Next step">
-                      <Link
-                        aria-label={row.primaryActionAccessible}
-                        className={buttonClass(
-                          row.primaryActionLabel.startsWith("Record")
-                            ? "primary"
-                            : "secondary",
-                          "w-full min-w-0 px-3 py-2 text-center leading-tight",
-                        )}
-                        href={
-                          row.primaryActionHref.includes("#record-event") ||
-                          row.primaryActionHref.includes(
-                            "#service-responsibilities",
-                          )
-                            ? withReturnPath(
-                                row.primaryActionHref,
-                                deadlineReturnTo,
-                              )
-                            : row.primaryActionHref
-                        }
+                          {row.systemName}
+                        </Link>
+                        <div className="mt-1 text-slate-600">{row.address}</div>
+                      </td>
+                      <td
+                        className="break-words px-3 py-4 font-bold text-slate-900"
+                        data-label="Required work"
                       >
-                        {row.primaryActionLabel}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                        {row.requiredAction}
+                        <div className="mt-1 text-xs font-bold text-slate-500">
+                          {row.executionLane}
+                          {row.dependency ? ` · ${row.dependency}` : ""}
+                        </div>
+                        <div className="mt-2">
+                          <StatusBadge
+                            compact
+                            color={
+                              row.status === "Overdue"
+                                ? "RED"
+                                : row.status === "Due this week"
+                                  ? "YELLOW"
+                                  : row.status === "Due next week"
+                                    ? "BLUE"
+                                    : row.status === "Review required"
+                                      ? "PURPLE"
+                                      : "GREEN"
+                            }
+                            label={row.status}
+                          />
+                        </div>
+                        {row.responsibility !== "OUR_COMPANY" && (
+                          <span
+                            className={`mt-2 inline-flex rounded-full border px-2 py-1 text-sm font-bold ${row.responsibility == null ? "border-purple-300 bg-purple-50 text-purple-900" : "border-slate-200 bg-slate-100 text-slate-700"}`}
+                          >
+                            {row.responsibilityLabel}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        data-label="Target window"
+                        className="px-3 py-4 font-bold text-slate-800"
+                      >
+                        <span aria-label={row.targetWindowAccessible}>
+                          {row.targetWindowDisplay}
+                        </span>
+                      </td>
+                      <td
+                        data-label="Hard deadline"
+                        className={`px-3 py-4 font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due this week" ? "text-amber-900" : row.status === "Due next week" ? "text-blue-800" : row.status === "Review required" ? "text-purple-800" : "text-slate-800"}`}
+                      >
+                        <span aria-label={row.hardDueDateAccessible}>
+                          {row.hardDueDateDisplay}
+                        </span>
+                      </td>
+                      <td
+                        data-label="Working days left"
+                        className={`px-3 py-4 text-lg font-black ${row.status === "Overdue" ? "text-red-800" : row.status === "Due this week" ? "text-amber-900" : row.status === "Due next week" ? "text-blue-800" : row.status === "Review required" ? "text-purple-800" : "text-slate-800"}`}
+                        aria-label={row.workingDaysAccessible}
+                      >
+                        {row.workingDaysDisplay}
+                      </td>
+                      <td className="px-3 py-4" data-label="Next step">
+                        <Link
+                          aria-label={row.primaryActionAccessible}
+                          className={buttonClass(
+                            row.primaryActionLabel.startsWith("Record")
+                              ? "primary"
+                              : "secondary",
+                            "w-full min-w-0 px-3 py-2 text-center leading-tight",
+                          )}
+                          href={primaryHref}
+                        >
+                          {row.primaryActionLabel}
+                        </Link>
+                      </td>
+                    </ClickableTableRow>
+                  );
+                })}
               </tbody>
             </table>
           </div>

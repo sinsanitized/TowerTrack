@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
 import { StatusBadge } from "@/components/status-badge";
+import { ClickableRow } from "@/components/clickable-row";
 import { todayDateOnly } from "@/lib/date";
 import { plainEnumLabel } from "@/lib/labels";
 import { complianceDashboardRows } from "@/lib/queries";
@@ -118,7 +119,15 @@ export default async function WorkViewPage({
         <div className="space-y-5">
           {groups.map(({ row, obligations }) => (
             <article key={row.id} className="panel overflow-hidden">
-              <div className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start">
+              <ClickableRow
+                href={
+                  view === "overdue-towers"
+                    ? `/systems/${row.id}#compliance-history`
+                    : `/systems/${row.id}#record-event`
+                }
+                label={`${view === "overdue-towers" ? "Review history" : "Open tower"}: ${row.systemName}`}
+                className="flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-start"
+              >
                 <div>
                   <StatusBadge
                     color={row.complianceHealth.color}
@@ -149,7 +158,7 @@ export default async function WorkViewPage({
                       : "Open tower"}
                   </Link>
                 </div>
-              </div>
+              </ClickableRow>
               {view === "visit-opportunities" && row.visitOpportunity && (
                 <div className="mx-5 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
                   <div className="label">

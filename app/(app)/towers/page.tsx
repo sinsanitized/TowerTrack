@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
+import { ClickableRow } from "@/components/clickable-row";
 import { complianceDashboardRows } from "@/lib/queries";
 import { requireUser } from "@/lib/auth";
 import { requiredActionLabel } from "@/lib/labels";
@@ -27,7 +28,7 @@ export default async function TowersPage() {
           <div>Status</div>
           <div>Next required action</div>
           <div>Deadline</div>
-          <div>Issues</div>
+          <div>Unresolved issues</div>
           <span />
         </div>
         {rows.map((row) => {
@@ -45,8 +46,11 @@ export default async function TowersPage() {
             ["MISSED", "OVERDUE"].includes(item.status),
           ).length;
           return (
-            <article
+            <ClickableRow
+              as="article"
               key={row.id}
+              href={`/systems/${row.id}`}
+              label={`Open ${row.systemName}`}
               className={`record-row grid gap-4 border-l-4 p-5 lg:grid-cols-[1.1fr_.7fr_1.2fr_.8fr_.35fr_auto] lg:items-center ${issues ? "urgency-red" : row.complianceHealth.color === "YELLOW" ? "urgency-amber" : "border-l-slate-300"}`}
             >
               <div className="identity-block">
@@ -86,8 +90,9 @@ export default async function TowersPage() {
                     : "font-bold text-slate-600"
                 }
               >
-                <span className="lg:hidden">Unresolved issues: </span>
-                {issues}
+                {issues === 0
+                  ? "No issues"
+                  : `${issues} unresolved ${issues === 1 ? "issue" : "issues"}`}
               </div>
               <Link
                 className="btn btn-ghost min-h-11 justify-center"
@@ -95,7 +100,7 @@ export default async function TowersPage() {
               >
                 Open tower
               </Link>
-            </article>
+            </ClickableRow>
           );
         })}
       </div>

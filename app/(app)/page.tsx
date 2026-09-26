@@ -8,6 +8,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
+import { ClickableRow } from "@/components/clickable-row";
 import { getUrgency } from "@/lib/compliance-intelligence";
 import {
   deadlinePeriodBounds,
@@ -72,8 +73,39 @@ function ActionRow({
             : responsibility === "NOT_TRACKED"
               ? "Reference only"
               : "Unscheduled";
+  const primaryHref =
+    responsibility == null
+      ? withReturnPath(
+          `/systems/${row.id}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
+          "/",
+        )
+      : obligation.status === "OVERDUE"
+        ? `/systems/${row.id}?view=obligations`
+        : withReturnPath(completionHrefForObligation(row.id, obligation), "/");
+  const primaryLabel =
+    responsibility == null
+      ? "Assign responsibility"
+      : obligation.status === "OVERDUE"
+        ? "Review issue"
+        : obligation.category === "REPORTING_ACTION" &&
+            !obligation.type.includes("CORRECTIVE_ACTION") &&
+            obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
+            obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+          ? "Record submission"
+          : obligation.category === "SAMPLE"
+            ? isResampleObligation(obligation.type)
+              ? "Record resample"
+              : "Record sample"
+            : obligation.category === "INSPECTION"
+              ? "Record inspection"
+              : obligation.type.includes("CLEANING")
+                ? "Record cleaning"
+                : "Record completion";
   return (
-    <article
+    <ClickableRow
+      as="article"
+      href={primaryHref}
+      label={`${primaryLabel}: ${requiredActionLabel(obligation.type)} for ${row.systemName}`}
       className={`record-row border-l-4 p-4 sm:p-5 ${
         tone === "next"
           ? "urgency-blue"
@@ -130,11 +162,6 @@ function ActionRow({
           </Link>
           <div className="mt-1 font-bold text-slate-800">{row.building}</div>
           <div className="mt-1 text-sm text-slate-600">{row.address}</div>
-          {row.jobNumber && (
-            <div className="mt-1 text-sm font-bold text-slate-600">
-              Job {row.jobNumber}
-            </div>
-          )}
         </div>
         <div className="date-block">
           <ComplianceDate
@@ -170,41 +197,12 @@ function ActionRow({
             "primary",
             "min-h-11 w-full justify-center whitespace-normal text-center lg:w-auto",
           )}
-          href={
-            responsibility == null
-              ? withReturnPath(
-                  `/systems/${row.id}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
-                  "/",
-                )
-              : obligation.status === "OVERDUE"
-                ? `/systems/${row.id}?view=obligations`
-                : withReturnPath(
-                    completionHrefForObligation(row.id, obligation),
-                    "/",
-                  )
-          }
+          href={primaryHref}
         >
-          {responsibility == null
-            ? "Assign responsibility"
-            : obligation.status === "OVERDUE"
-              ? "Review issue"
-              : obligation.category === "REPORTING_ACTION" &&
-                  !obligation.type.includes("CORRECTIVE_ACTION") &&
-                  obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
-                  obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
-                ? "Record submission"
-                : obligation.category === "SAMPLE"
-                  ? isResampleObligation(obligation.type)
-                    ? "Record resample"
-                    : "Record sample"
-                  : obligation.category === "INSPECTION"
-                    ? "Record inspection"
-                    : obligation.type.includes("CLEANING")
-                      ? "Record cleaning"
-                      : "Record completion"}
+          {primaryLabel}
         </Link>
       </div>
-    </article>
+    </ClickableRow>
   );
 }
 
