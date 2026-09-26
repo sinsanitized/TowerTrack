@@ -92,6 +92,12 @@ export default async function DeadlinesPage({
   const deadlineReturnTo = returnQuery.size
     ? `/deadlines?${returnQuery}`
     : "/deadlines";
+  const deadlinePeriodHref = (nextPeriod: DeadlinePeriod) => {
+    const query = new URLSearchParams(returnQuery);
+    if (nextPeriod === "ALL") query.delete("period");
+    else query.set("period", nextPeriod);
+    return query.size ? `/deadlines?${query}` : "/deadlines";
+  };
   return (
     <>
       <PageHeader
@@ -112,27 +118,48 @@ export default async function DeadlinesPage({
       />
 
       <div className="mb-5 flex flex-wrap gap-3 text-sm font-bold text-slate-700">
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <Link
+          aria-current={period === "ALL" ? "page" : undefined}
+          className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm"
+          href={deadlinePeriodHref("ALL")}
+        >
           <CalendarRange size={18} className="text-emerald-800" />
           {rows.length} active requirement{rows.length === 1 ? "" : "s"}
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          {towerCount} cooling tower{towerCount === 1 ? "" : "s"}
-        </div>
+          <span aria-hidden>→</span>
+        </Link>
+        <Link
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm"
+          href="/towers"
+        >
+          {towerCount} cooling tower{towerCount === 1 ? "" : "s"}{" "}
+          <span aria-hidden>→</span>
+        </Link>
         {statusCounts.overdue > 0 && (
-          <div className="rounded-xl border border-red-300 bg-white px-4 py-3 text-red-800">
-            {statusCounts.overdue} overdue
-          </div>
+          <Link
+            aria-current={period === "OVERDUE" ? "page" : undefined}
+            className="rounded-xl border border-red-300 bg-white px-4 py-3 text-red-800 transition hover:border-red-600 hover:bg-red-50 hover:shadow-sm"
+            href={deadlinePeriodHref("OVERDUE")}
+          >
+            {statusCounts.overdue} overdue <span aria-hidden>→</span>
+          </Link>
         )}
         {statusCounts.thisWeek > 0 && (
-          <div className="rounded-xl border border-amber-300 bg-white px-4 py-3 text-amber-900">
-            {statusCounts.thisWeek} due this week
-          </div>
+          <Link
+            aria-current={period === "THIS_WEEK" ? "page" : undefined}
+            className="rounded-xl border border-amber-300 bg-white px-4 py-3 text-amber-900 transition hover:border-amber-600 hover:bg-amber-50 hover:shadow-sm"
+            href={deadlinePeriodHref("THIS_WEEK")}
+          >
+            {statusCounts.thisWeek} due this week <span aria-hidden>→</span>
+          </Link>
         )}
         {statusCounts.nextWeek > 0 && (
-          <div className="rounded-xl border border-blue-300 bg-white px-4 py-3 text-blue-800">
-            {statusCounts.nextWeek} due next week
-          </div>
+          <Link
+            aria-current={period === "NEXT_WEEK" ? "page" : undefined}
+            className="rounded-xl border border-blue-300 bg-white px-4 py-3 text-blue-800 transition hover:border-blue-600 hover:bg-blue-50 hover:shadow-sm"
+            href={deadlinePeriodHref("NEXT_WEEK")}
+          >
+            {statusCounts.nextWeek} due next week <span aria-hidden>→</span>
+          </Link>
         )}
       </div>
 

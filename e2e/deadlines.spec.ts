@@ -17,6 +17,15 @@ test("deadline table shows working days in a separate scan-friendly column", asy
 }) => {
   await page.setViewportSize({ width: 1536, height: 900 });
   await page.getByRole("link", { name: "All Deadlines" }).click();
+  await expect(
+    page.getByRole("link", { name: /active requirements/ }),
+  ).toHaveAttribute("href", "/deadlines");
+  await expect(
+    page.getByRole("link", { name: /cooling towers/ }),
+  ).toHaveAttribute("href", "/towers");
+  await expect(
+    page.getByRole("link", { name: /^\d+ overdue/ }),
+  ).toHaveAttribute("href", "/deadlines?period=OVERDUE");
   const table = page.getByRole("table", {
     name: "All cooling tower required work",
   });
