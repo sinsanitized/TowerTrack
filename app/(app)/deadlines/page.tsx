@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarRange } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DeadlineFilterControls } from "@/components/deadline-filter-controls";
+import { StatusBadge } from "@/components/status-badge";
 import { requireUser } from "@/lib/auth";
 import { buttonClass } from "@/lib/button-variants";
 import {
@@ -117,51 +118,69 @@ export default async function DeadlinesPage({
         filters={{ period, action, schedule, responsibility, search }}
       />
 
-      <div className="mb-5 flex flex-wrap gap-3 text-sm font-bold text-slate-700">
-        <Link
-          aria-current={period === "ALL" ? "page" : undefined}
-          className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm"
-          href={deadlinePeriodHref("ALL")}
-        >
-          <CalendarRange size={18} className="text-emerald-800" />
-          {rows.length} active requirement{rows.length === 1 ? "" : "s"}
-          <span aria-hidden>→</span>
-        </Link>
-        <Link
-          className="rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm"
-          href="/towers"
-        >
-          {towerCount} cooling tower{towerCount === 1 ? "" : "s"}{" "}
-          <span aria-hidden>→</span>
-        </Link>
-        {statusCounts.overdue > 0 && (
-          <Link
-            aria-current={period === "OVERDUE" ? "page" : undefined}
-            className="rounded-xl border border-red-300 bg-white px-4 py-3 text-red-800 transition hover:border-red-600 hover:bg-red-50 hover:shadow-sm"
-            href={deadlinePeriodHref("OVERDUE")}
-          >
-            {statusCounts.overdue} overdue <span aria-hidden>→</span>
-          </Link>
-        )}
-        {statusCounts.thisWeek > 0 && (
-          <Link
-            aria-current={period === "THIS_WEEK" ? "page" : undefined}
-            className="rounded-xl border border-amber-300 bg-white px-4 py-3 text-amber-900 transition hover:border-amber-600 hover:bg-amber-50 hover:shadow-sm"
-            href={deadlinePeriodHref("THIS_WEEK")}
-          >
-            {statusCounts.thisWeek} due this week <span aria-hidden>→</span>
-          </Link>
-        )}
-        {statusCounts.nextWeek > 0 && (
-          <Link
-            aria-current={period === "NEXT_WEEK" ? "page" : undefined}
-            className="rounded-xl border border-blue-300 bg-white px-4 py-3 text-blue-800 transition hover:border-blue-600 hover:bg-blue-50 hover:shadow-sm"
-            href={deadlinePeriodHref("NEXT_WEEK")}
-          >
-            {statusCounts.nextWeek} due next week <span aria-hidden>→</span>
-          </Link>
-        )}
-      </div>
+      <section
+        className="panel mb-5 grid gap-5 p-4 lg:grid-cols-[auto_1fr] lg:items-end"
+        aria-labelledby="deadline-overview-heading"
+      >
+        <div>
+          <h2 id="deadline-overview-heading" className="section-heading">
+            Deadline overview
+          </h2>
+          <p className="supporting-text mt-1">
+            Choose a status to filter the register below.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold text-slate-700">
+            <Link
+              aria-current={period === "ALL" ? "page" : undefined}
+              className={`flex items-center gap-2 rounded-xl border bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm ${period === "ALL" ? "border-emerald-700 ring-2 ring-emerald-100" : "border-slate-300"}`}
+              href={deadlinePeriodHref("ALL")}
+            >
+              <CalendarRange size={18} className="text-emerald-800" />
+              {rows.length} active requirement{rows.length === 1 ? "" : "s"}
+              <span aria-hidden>→</span>
+            </Link>
+            <Link
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm"
+              href="/towers"
+            >
+              {towerCount} cooling tower{towerCount === 1 ? "" : "s"}{" "}
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        </div>
+        <div>
+          <div className="label mb-2">Deadline status</div>
+          <div className="flex flex-wrap gap-2 text-sm font-bold">
+            {statusCounts.overdue > 0 && (
+              <Link
+                aria-current={period === "OVERDUE" ? "page" : undefined}
+                className={`rounded-xl border bg-white px-4 py-3 text-red-800 transition hover:border-red-600 hover:bg-red-50 hover:shadow-sm ${period === "OVERDUE" ? "border-red-600 ring-2 ring-red-100" : "border-red-300"}`}
+                href={deadlinePeriodHref("OVERDUE")}
+              >
+                {statusCounts.overdue} overdue <span aria-hidden>→</span>
+              </Link>
+            )}
+            {statusCounts.thisWeek > 0 && (
+              <Link
+                aria-current={period === "THIS_WEEK" ? "page" : undefined}
+                className={`rounded-xl border bg-white px-4 py-3 text-amber-900 transition hover:border-amber-600 hover:bg-amber-50 hover:shadow-sm ${period === "THIS_WEEK" ? "border-amber-600 ring-2 ring-amber-100" : "border-amber-300"}`}
+                href={deadlinePeriodHref("THIS_WEEK")}
+              >
+                {statusCounts.thisWeek} due this week <span aria-hidden>→</span>
+              </Link>
+            )}
+            {statusCounts.nextWeek > 0 && (
+              <Link
+                aria-current={period === "NEXT_WEEK" ? "page" : undefined}
+                className={`rounded-xl border bg-white px-4 py-3 text-blue-800 transition hover:border-blue-600 hover:bg-blue-50 hover:shadow-sm ${period === "NEXT_WEEK" ? "border-blue-600 ring-2 ring-blue-100" : "border-blue-300"}`}
+                href={deadlinePeriodHref("NEXT_WEEK")}
+              >
+                {statusCounts.nextWeek} due next week <span aria-hidden>→</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
 
       {rows.length === 0 ? (
         <div className="panel p-8 text-center">
@@ -172,6 +191,17 @@ export default async function DeadlinesPage({
         </div>
       ) : (
         <div className="panel overflow-hidden">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div>
+              <h2 className="section-heading">Deadline register</h2>
+              <p className="supporting-text mt-1">
+                Earliest hard deadlines appear first.
+              </p>
+            </div>
+            <div className="text-sm font-black text-slate-700">
+              {rows.length} result{rows.length === 1 ? "" : "s"}
+            </div>
+          </div>
           <div className="overflow-x-auto" data-testid="deadline-table-scroll">
             <table
               className="deadline-table w-full table-fixed text-left text-xs xl:text-sm"
@@ -231,6 +261,23 @@ export default async function DeadlinesPage({
                       <div className="mt-1 text-xs font-bold text-slate-500">
                         {row.executionLane}
                         {row.dependency ? ` · ${row.dependency}` : ""}
+                      </div>
+                      <div className="mt-2">
+                        <StatusBadge
+                          compact
+                          color={
+                            row.status === "Overdue"
+                              ? "RED"
+                              : row.status === "Due this week"
+                                ? "YELLOW"
+                                : row.status === "Due next week"
+                                  ? "BLUE"
+                                  : row.status === "Review required"
+                                    ? "PURPLE"
+                                    : "GREEN"
+                          }
+                          label={row.status}
+                        />
                       </div>
                       {row.responsibility !== "OUR_COMPANY" && (
                         <span
