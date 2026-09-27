@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL("/");
 });
 
-test("tower settings expose explicit effective-dated compliance rules", async ({
+test("tower settings derive effective-dated compliance rules from location", async ({
   page,
 }) => {
   await page.goto("/deadlines?configuration=NYC_AND_NYS");
@@ -38,11 +38,20 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
     .locator("summary")
     .filter({ hasText: "Change compliance rules" })
     .click();
+  const jurisdiction = page.getByLabel(/Tower jurisdiction/);
+  await expect(jurisdiction).toBeVisible();
   await expect(
-    page.getByRole("group", { name: "Rule configuration" }),
+    page.getByRole("heading", { name: "New York City regulatory program" }),
+  ).toBeVisible();
+  await jurisdiction.selectOption({ label: "Newark, NJ" });
+  await expect(
+    page.getByRole("heading", { name: "New Jersey regulation monitoring" }),
   ).toBeVisible();
   await expect(
-    page.getByLabel("Profile version", { exact: true }),
+    page.getByText(/will not generate legal deadlines from it/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Using: Pending Regulation Review/),
   ).toBeVisible();
   await expect(page.getByLabel(/^Effective date/)).toBeVisible();
 });

@@ -411,6 +411,24 @@ export function EventRecorder({
           <input type="hidden" name="systemId" value={systemId} />
           {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
           <input type="hidden" name="eventType" value={eventType} />
+          <label className="sm:col-span-2 sm:max-w-sm">
+            <span className="label">1. {recordDateLabel} · Required</span>
+            <input
+              className="field mt-1 border-2 border-emerald-700 bg-emerald-50 text-lg font-bold"
+              name="eventDate"
+              type="date"
+              data-recorder-autofocus={directedEntry ? "true" : undefined}
+              data-event-primary-field
+              max={defaultDate}
+              required
+              value={eventDate}
+              onChange={(event) => setEventDate(event.target.value)}
+            />
+            <span className="mt-1 block text-sm text-slate-600">
+              Use the date shown on the field record, laboratory report, or
+              signed service document—not today&apos;s entry date.
+            </span>
+          </label>
           {intentContext && (
             <>
               <input
@@ -437,8 +455,8 @@ export function EventRecorder({
                   {plainEnumLabel(intentContext.obligationType)}
                 </div>
                 <p className="mt-1 text-sm">
-                  This record will be associated with the selected requirement
-                  and its triggering compliance record.
+                  Confirm that the actual date above falls within the valid
+                  dates shown here.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                   {(intentContext.targetStart || intentContext.targetEnd) && (
@@ -503,24 +521,6 @@ export function EventRecorder({
                 </div>
               </div>
             )}
-          <label className={isHyper ? "sm:col-span-2 sm:max-w-sm" : ""}>
-            <span className="label">{recordDateLabel} · Required</span>
-            <input
-              className="field mt-1"
-              name="eventDate"
-              type="date"
-              data-recorder-autofocus={directedEntry ? "true" : undefined}
-              data-event-primary-field
-              max={defaultDate}
-              required
-              value={eventDate}
-              onChange={(event) => setEventDate(event.target.value)}
-            />
-            <span className="mt-1 block text-sm text-slate-600">
-              Use the date shown on the field record, laboratory report, or
-              signed service document—not today&apos;s entry date.
-            </span>
-          </label>
           {isHyper && (
             <p className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 sm:col-span-2">
               Record the date the summertime hyperhalogenation was completed.
@@ -744,7 +744,7 @@ export function EventRecorder({
                   [
                     "CLEANING_COMPLETED",
                     "Routine cleaning",
-                    "Scheduled cleaning during normal operation.",
+                    "Cleaning completed during normal operation.",
                   ],
                   [
                     "STARTUP_CLEANING_DISINFECTION",

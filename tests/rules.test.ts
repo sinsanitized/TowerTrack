@@ -194,7 +194,7 @@ describe("anti-cascade planning", () => {
       plannedDate: "2026-07-15",
     });
     expect(p.hardDueDate).toBe("2026-07-18");
-    expect(p.status.label).toBe("Safely scheduled");
+    expect(p.status.label).toBe("Completion date set");
   });
   it("late planned coverage stays overdue", () => {
     const p = calculateLegionellaPlan({

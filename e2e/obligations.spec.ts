@@ -342,7 +342,9 @@ test("emergency event creates an immediate sample without a made-up latest date"
     emergencyPreview.getByText(/Generates Emergency sample/),
   ).toBeVisible();
   await expect(
-    emergencyPreview.getByText(/Schedule immediately; no precise legal window/),
+    emergencyPreview.getByText(
+      /Collect it immediately; no precise legal window/,
+    ),
   ).toBeVisible();
   await expect(
     emergencyPreview.getByText(/Immediate \/ follow MPP/),

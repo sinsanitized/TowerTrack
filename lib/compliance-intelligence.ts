@@ -77,7 +77,7 @@ export function getUrgency(input: {
       label: "Due now",
       color: "RED",
       explanation:
-        "This requirement should not wait for a combined visit unless it can be completed immediately.",
+        "This requirement should not wait for other work unless it can be completed immediately.",
       calendarDaysRemaining: dateInfo?.calendarDays ?? null,
       workingDaysRemaining: dateInfo?.workingDays ?? null,
     };
@@ -371,7 +371,7 @@ export function previewVisitCompletion(input: {
         !activity.qualifiesForRoutineLegionella,
     ),
     explanation: satisfied.length
-      ? `Recording completion on ${input.performedDate} can satisfy ${satisfied.length} open requirement${satisfied.length === 1 ? "" : "s"}. Compliance dates are recalculated after the visit is saved.`
+      ? `Recording completion on ${input.performedDate} can satisfy ${satisfied.length} open requirement${satisfied.length === 1 ? "" : "s"}. Compliance dates are recalculated after the work record is saved.`
       : `No open requirement is both covered by the selected work and within its valid completion dates on ${input.performedDate}.`,
   };
 }

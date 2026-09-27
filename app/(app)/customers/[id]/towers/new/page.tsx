@@ -61,7 +61,7 @@ export default async function NewCoolingTowerPage({
       <PageHeader
         eyebrow="Customer setup · Step 2 of 2"
         title="Add cooling tower details"
-        description={`Customer and address saved for ${customer.name}. Now identify the cooling tower equipment at ${building.streetAddress}, ${building.city}, ${building.state}.`}
+        description={`Customer and address saved for ${customer.name}. Complete the three short sections below for the tower at ${building.streetAddress}, ${building.city}, ${building.state}.`}
       />
       <div className="panel mx-auto max-w-3xl p-6">
         <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
@@ -78,8 +78,9 @@ export default async function NewCoolingTowerPage({
         >
           <input type="hidden" name="customerId" value={customer.id} />
           <input type="hidden" name="buildingId" value={building.id} />
-          <div className="sm:col-span-2">
-            <h2 className="text-lg font-black">1. Tower equipment</h2>
+          <div className="rounded-xl border-l-4 border-emerald-700 bg-emerald-50 p-4 sm:col-span-2">
+            <div className="label text-emerald-800">Section 1 of 3</div>
+            <h2 className="mt-1 text-lg font-black">Tower equipment</h2>
             <p className="mt-1 text-sm text-slate-600">
               Fields marked Required must be completed.
             </p>
@@ -125,46 +126,37 @@ export default async function NewCoolingTowerPage({
               required
             />
           </label>
-          <OperatingScheduleFields />
-          <div className="border-t border-slate-200 pt-5 sm:col-span-2">
-            <h2 className="text-lg font-black">2. Service responsibility</h2>
+          <div className="mt-3 rounded-xl border-l-4 border-blue-700 bg-blue-50 p-4 sm:col-span-2">
+            <div className="label text-blue-800">Section 2 of 3</div>
+            <h2 className="mt-1 text-lg font-black">
+              Operation and responsibility
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
               Choose who manages Legionella sampling and laboratory follow-up.
             </p>
           </div>
+          <OperatingScheduleFields />
           <LegionellaResponsibilityFields />
-          <div className="border-t border-slate-200 pt-5 sm:col-span-2">
-            <h2 className="text-lg font-black">
-              3. Compliance rules · Administrator review
+          <div className="mt-3 rounded-xl border-l-4 border-amber-600 bg-amber-50 p-4 sm:col-span-2">
+            <div className="label text-amber-900">Section 3 of 3</div>
+            <h2 className="mt-1 text-lg font-black">
+              Compliance rules · Administrator review
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              These selections determine which requirements and deadlines the
-              tower will receive. Verify them for this address before saving.
+              High-impact choice: these selections create the tower&apos;s
+              future requirements and deadlines. Verify them for this address
+              before saving.
             </p>
           </div>
-          <div>
-            <label className="label" htmlFor="new-tower-jurisdiction">
-              Jurisdiction · Required
-            </label>
-            <select
-              id="new-tower-jurisdiction"
-              aria-label="Jurisdiction"
-              className="field mt-1"
-              name="jurisdictionId"
-              defaultValue=""
-              required
-            >
-              <option value="" disabled>
-                Choose jurisdiction
-              </option>
-              {jurisdictions.map((jurisdiction) => (
-                <option key={jurisdiction.id} value={jurisdiction.id}>
-                  {jurisdictionLabel(jurisdiction)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <ComplianceRuleProfileFields profiles={profiles} />
+          <ComplianceRuleProfileFields
+            profiles={profiles}
+            jurisdictions={jurisdictions.map((jurisdiction) => ({
+              id: jurisdiction.id,
+              label: jurisdictionLabel(jurisdiction),
+              state: jurisdiction.state,
+              city: jurisdiction.city,
+            }))}
+          />
           <label>
             <span className="label">Rules effective date · Required</span>
             <input
@@ -178,8 +170,11 @@ export default async function NewCoolingTowerPage({
               Enter the date as month, day, and year.
             </span>
           </label>
-          <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
-            <p className="mt-2 text-xs text-slate-500">
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 sm:col-span-2">
+            <div className="font-black text-amber-950">
+              Before creating the tower
+            </div>
+            <p className="mt-1 text-sm text-amber-950">
               Jurisdiction and rules are stored on this cooling tower. NYC rules
               are never selected automatically. Choose the verified combination
               that actually applies to this address.

@@ -185,7 +185,7 @@ async function main() {
       id: "pending",
       name: "Pending Regulation Review",
       mode: JurisdictionMode.PENDING_REGULATION,
-      jurisdictionId: nj.id,
+      jurisdictionId: null,
       interval: null,
       authority: SourceAuthority.PENDING_REGULATION,
       description: "Monitoring only. Generates no hard deadline.",
@@ -202,7 +202,8 @@ async function main() {
     },
   ].filter(
     (profile) =>
-      demoMode || ["nyc-2026", "nys-only", "oos-policy"].includes(profile.id),
+      demoMode ||
+      ["nyc-2026", "nys-only", "oos-policy", "pending"].includes(profile.id),
   );
   for (const p of profiles) {
     await db.ruleProfile.create({
@@ -359,7 +360,7 @@ async function main() {
   const pending = await db.pendingRegulation.create({
     data: {
       jurisdictionId: nj.id,
-      expectedRuleName: "Fictional New Jersey cooling-tower rule monitoring",
+      expectedRuleName: "New Jersey cooling-tower regulation monitoring",
       expectedAuthority: "State/municipal authority — unverified",
       monitoringNotes:
         "Example only. Review official sources before conversion.",

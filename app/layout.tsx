@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TowerTrack",
-  description: "Legionella-first cooling tower scheduling",
+  description: "Legionella-first cooling tower compliance date tracking",
 };
 
 const themeScript = `

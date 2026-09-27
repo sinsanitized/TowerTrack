@@ -365,7 +365,7 @@ export function completionHrefForObligation(
                     : null;
   return recordType
     ? eventEntryHref({ type: recordType, towerId, obligationId: obligation.id })
-    : `/systems/${towerId}?view=obligations#reporting-${obligation.id}`;
+    : `/systems/${towerId}?view=obligations&report=${encodeURIComponent(obligation.id)}#reporting-${obligation.id}`;
 }
 
 export function executionStateFor(

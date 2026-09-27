@@ -215,6 +215,32 @@ describe("compiled rule profiles", () => {
     });
   });
 
+  it("keeps NYC rules out of an NYS-only tower", () => {
+    const nycProfile: CompilableRuleProfile = {
+      ...profile,
+      id: "nyc",
+      jurisdictionMode: "NYC_CHAPTER_8_2026_PLUS_NYS_PART_4",
+    };
+    const nysProfile: CompilableRuleProfile = {
+      ...profile,
+      id: "nys",
+      jurisdictionMode: "NYS_PART_4_ONLY",
+      rules: profile.rules.map((rule) => ({
+        ...rule,
+        id: `nys-${rule.id}`,
+      })),
+    };
+
+    const composed = composeTowerRuleProfiles("NYS_ONLY", [
+      nycProfile,
+      nysProfile,
+    ]);
+
+    expect(composed.jurisdictionMode).toBe("NYS_PART_4_ONLY");
+    expect(composed.includedJurisdictionModes).toEqual(["NYS_PART_4_ONLY"]);
+    expect(composed.rules.every((rule) => rule.id.includes("nys-"))).toBe(true);
+  });
+
   it("keeps incompatible same-type rules separate", () => {
     const rules = composeCompatibleRuleDefinitions([
       {

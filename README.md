@@ -97,6 +97,12 @@ npm run build
 npm run test:e2e
 ```
 
+Browser tests are destructive and must target an isolated database. Set
+`E2E_DATABASE_URL` to a database whose name contains `test` or `e2e`, run
+`npm run test:e2e:prepare`, and start the tested server with both
+`DATABASE_URL=$E2E_DATABASE_URL` and `E2E_TEST_MODE=true`. Playwright refuses
+to run when the target server does not advertise test mode.
+
 The test suite includes date-only behavior, Chapter 8 rule matrices, obligation generation, service responsibility, corrections, workflow coverage, responsive layouts, and browser-level operational scenarios.
 
 ## Technology

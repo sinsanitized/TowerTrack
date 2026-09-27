@@ -73,6 +73,8 @@ export default async function SystemPage({
     !query.returnTo.startsWith("//")
       ? query.returnTo
       : undefined;
+  const focusedReportingId =
+    typeof query.report === "string" ? query.report : undefined;
   const user = await requireUser();
   const canViewSettings = canViewTowerSettings(user.role);
   const canConfirmOwnerManaged = ["ADMIN", "OPERATIONS_MANAGER"].includes(
@@ -560,7 +562,7 @@ export default async function SystemPage({
           id: `deadline-${nextRequired.id}`,
           label: "Compliance deadline",
           detail:
-            "Completion must be recorded by this date. Scheduling alone does not stop the clock.",
+            "Completion must be recorded by this date. A proposed or expected date does not stop the clock.",
           date: nextRequired.latest,
           state: "DEADLINE" as const,
         },
@@ -831,7 +833,7 @@ export default async function SystemPage({
                 />
                 <Link
                   className="btn btn-primary"
-                  href={`#reporting-${recordedPortalFollowUp.id}`}
+                  href={`?view=obligations&report=${encodeURIComponent(recordedPortalFollowUp.id)}#reporting-${recordedPortalFollowUp.id}`}
                 >
                   Record NYC portal submission
                 </Link>
@@ -860,8 +862,8 @@ export default async function SystemPage({
       )}
       {operationPatternUpdated && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Operating schedule saved. This planning change did not record a
-          startup or shutdown event.
+          Operating schedule saved. This setting did not record a startup or
+          shutdown event.
         </div>
       )}
       {targetWindowUpdated && (
@@ -1216,7 +1218,7 @@ export default async function SystemPage({
           recordedEventId ||
           query.correctedEvent ||
           query.voidedEvent ||
-          system.reportingObligations.length,
+          focusedReportingId,
         )}
       >
         <summary className="cursor-pointer text-base font-black text-emerald-900">
@@ -1352,7 +1354,11 @@ export default async function SystemPage({
                   <section
                     key={item.id}
                     id={`reporting-${item.id}`}
-                    className="scroll-mt-6 rounded-lg bg-blue-50 p-3 text-sm"
+                    className={`scroll-mt-24 rounded-xl border p-4 text-sm ${
+                      focusedReportingId === item.id
+                        ? "border-emerald-500 bg-emerald-50 ring-4 ring-emerald-100"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
                   >
                     <ObligationIntelligenceCard
                       today={today}
@@ -1388,11 +1394,20 @@ export default async function SystemPage({
                       !item.obligationType.includes("CORRECTIVE_ACTION") &&
                       item.obligationType !== "LEVEL_4_FULL_REMEDIATION" &&
                       item.obligationType !==
-                        "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" && (
+                        "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
+                      (focusedReportingId === item.id ? (
                         <form
                           action={recordServiceEventAction}
-                          className="mt-3"
+                          className="mt-3 rounded-xl border border-emerald-200 bg-white p-4"
                         >
+                          <div className="mb-3 border-b border-slate-200 pb-3">
+                            <div className="label">
+                              Record actual submission
+                            </div>
+                            <p className="mt-1 text-sm text-slate-600">
+                              Enter the verified completion date, then save.
+                            </p>
+                          </div>
                           {item.status === "MISSED" && (
                             <p className="mb-2 font-bold text-red-900">
                               Record this as a late historical submission. It
@@ -1446,7 +1461,20 @@ export default async function SystemPage({
                               : "Record submission"}
                           </SubmitButton>
                         </form>
-                      )
+                      ) : (
+                        <Link
+                          className={buttonClass("primary", "mt-3")}
+                          href={completionHrefForObligation(id, {
+                            id: item.id,
+                            type: item.obligationType,
+                            category: "REPORTING_ACTION",
+                          })}
+                        >
+                          {item.obligationType === "PORTAL_SAMPLE_DATE"
+                            ? "Record NYC portal submission"
+                            : "Record submission"}
+                        </Link>
+                      ))
                     )}
                   </section>
                 ))
@@ -1693,8 +1721,8 @@ export default async function SystemPage({
               </p>
               <p className="mt-1 text-sm text-slate-600">
                 Choose whether this tower operates continuously or during a
-                recurring season. This guides planning; actual startup and
-                shutdown remain separate audited events.
+                recurring season. This controls date calculations; actual
+                startup and shutdown remain separate audited events.
               </p>
             </div>
           </div>

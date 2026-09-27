@@ -438,7 +438,7 @@ export default async function ActionCenterPage({
             <div>
               <h2 className="mt-1 text-xl font-black">Next week</h2>
               <p className="mt-1 text-sm font-bold text-blue-800">
-                Near-term planning
+                Upcoming completion dates
               </p>
               <p className="mt-1 text-sm text-slate-700">
                 {compactWeekDate(periodBounds.nextWeekStart)} through{" "}
@@ -498,7 +498,7 @@ export default async function ActionCenterPage({
           </div>
           <Link
             className="text-sm font-black text-emerald-800"
-            href="/work/visit-opportunities"
+            href="/work/compatible-work"
           >
             View all compatible work →
           </Link>

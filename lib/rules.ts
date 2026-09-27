@@ -315,9 +315,9 @@ export function assignStatus(args: {
   if (args.plannedDate && args.plannedDate <= args.due)
     return {
       status: "SCHEDULED_PENDING",
-      label: "Safely scheduled",
+      label: "Completion date set",
       color: "GREEN",
-      nextAction: "Complete the planned visit",
+      nextAction: "Record the completed work",
     };
   const days = diffDays(args.today, args.due);
   if (days < 0)
@@ -325,7 +325,7 @@ export function assignStatus(args: {
       status: "OVERDUE",
       label: "Overdue",
       color: "RED",
-      nextAction: "Schedule sampling immediately",
+      nextAction: "Collect the sample immediately",
     };
   if (days === 0)
     return {
@@ -339,7 +339,7 @@ export function assignStatus(args: {
       status: "DUE_SOON",
       label: "Due soon",
       color: "RED",
-      nextAction: "Schedule before the hard due date",
+      nextAction: "Complete work before the hard due date",
     };
   if (days <= args.warning)
     return {
@@ -351,9 +351,9 @@ export function assignStatus(args: {
   if (days <= args.planning)
     return {
       status: "READY_TO_SCHEDULE",
-      label: "Needs scheduling",
+      label: "Completion needed",
       color: "YELLOW",
-      nextAction: "Schedule or combine this work",
+      nextAction: "Complete or combine this work",
     };
   return {
     status: "FUTURE",

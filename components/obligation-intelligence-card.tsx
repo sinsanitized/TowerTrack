@@ -87,7 +87,7 @@ export function ObligationIntelligenceCard({
             operational
             empty={
               obligation.priority === "EMERGENCY"
-                ? "Schedule immediately / follow MPP"
+                ? "Act immediately / follow MPP"
                 : "No fixed compliance deadline"
             }
           />

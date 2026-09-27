@@ -20,11 +20,11 @@ export default async function LoginPage({
             <br />
             Every deadline.
             <br />
-            One clear plan.
+            Every date clear.
           </h1>
           <p className="mt-6 max-w-sm text-lg text-emerald-950/70">
-            Legionella-first scheduling that keeps compliance timing ahead of
-            route efficiency.
+            Legionella-first date tracking that keeps completed work, valid
+            windows, and compliance deadlines clear.
           </p>
         </section>
         <section className="p-8 md:p-12">
@@ -38,7 +38,9 @@ export default async function LoginPage({
               role="alert"
               className="mt-5 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-800"
             >
-              Email or password was incorrect.
+              {error === "rate-limited"
+                ? "Too many unsuccessful attempts. Wait 15 minutes, then try again or contact an administrator."
+                : "Email or password was incorrect."}
             </div>
           )}
           <form action="/api/login" method="post" className="mt-7 space-y-5">

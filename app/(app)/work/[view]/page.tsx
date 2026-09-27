@@ -21,7 +21,7 @@ const views = {
     unit: "issues",
     Icon: AlertTriangle,
   },
-  "visit-opportunities": {
+  "compatible-work": {
     title: "Work that can be completed together",
     description:
       "Shared valid dates when one set of completed field work can satisfy multiple requirements.",
@@ -45,7 +45,7 @@ function relevantObligations(row: DashboardRow, view: View) {
           responsibilityForServiceObligation(item.type, item.category, row),
         ),
     );
-  if (view === "visit-opportunities")
+  if (view === "compatible-work")
     return row.openObligations.filter(
       (item) =>
         row.visitOpportunity?.obligations.some(
@@ -63,6 +63,8 @@ export default async function WorkViewPage({
   const { view: requestedView } = await params;
   if (requestedView === "emergency-samples") redirect("/");
   if (requestedView === "open-obligations") redirect("/deadlines");
+  if (requestedView === "visit-opportunities")
+    redirect("/work/compatible-work");
   if (!(requestedView in views)) notFound();
   const view = requestedView as View;
   const config = views[view];
@@ -80,7 +82,7 @@ export default async function WorkViewPage({
       ),
     }))
     .filter(({ row, obligations }) =>
-      view === "visit-opportunities"
+      view === "compatible-work"
         ? Boolean(row.visitOpportunity) && obligations.length > 0
         : obligations.length > 0,
     );
@@ -159,7 +161,7 @@ export default async function WorkViewPage({
                   </Link>
                 </div>
               </ClickableRow>
-              {view === "visit-opportunities" && row.visitOpportunity && (
+              {view === "compatible-work" && row.visitOpportunity && (
                 <div className="mx-5 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
                   <div className="label">Shared valid completion dates</div>
                   <div className="mt-3 grid gap-4 lg:grid-cols-2">

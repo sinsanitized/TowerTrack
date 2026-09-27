@@ -29,8 +29,12 @@ export function LegionellaResponsibilityFields() {
   const [responsibility, setResponsibility] = useState("");
 
   return (
-    <fieldset className="grid gap-3 sm:col-span-2">
+    <fieldset className="grid gap-3 rounded-xl border border-blue-300 bg-blue-50/40 p-4 sm:col-span-2">
       <legend className="label">Legionella responsibility · Required</legend>
+      <p className="text-sm font-bold text-blue-950">
+        Affects the Action Center: choose who must complete and report this
+        work.
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {choices.map((choice) => (
           <label

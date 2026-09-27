@@ -233,7 +233,7 @@ test("action center separates this week from next week", async ({ page }) => {
     /border-blue-200/,
   );
   await expect(page.getByText("Work requiring action now")).toBeVisible();
-  await expect(page.getByText("Near-term planning")).toBeVisible();
+  await expect(page.getByText("Upcoming completion dates")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();

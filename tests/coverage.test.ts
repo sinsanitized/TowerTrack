@@ -88,7 +88,7 @@ describe("coverageRecommendations", () => {
     expect(recommendations[0].remainingCount).toBe(0);
     expect(recommendations[0].combinesMultipleObligations).toBe(true);
     expect(recommendations[0].why).toContain(
-      "Combined visit: one visit can satisfy all 2 requirements.",
+      "Shared completion date: completed work can satisfy all 2 requirements.",
     );
   });
 });

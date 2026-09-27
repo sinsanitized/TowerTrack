@@ -146,7 +146,7 @@ function sampleTiming(rule: RuleSummary, internalTargetDays: number | null) {
   if (rule.requirementType === "ROUTINE_BACTERIOLOGICAL_SAMPLE")
     return "This is a separate bacteriological monitoring requirement and does not replace the Legionella culture schedule.";
   if (rule.requirementType === "ANNUAL_CLEANING")
-    return "Cleaning is separate from sampling. Startup sampling is valid only 3–14 days after startup; another cleaning may share a visit with routine sampling only on mutually valid dates.";
+    return "Cleaning is separate from sampling. Startup sampling is valid only 3–14 days after startup; cleaning and routine sampling may share a completion date only when both are valid on that date.";
   if (
     rule.minimumDaysAfterTrigger != null &&
     rule.maximumDaysAfterTrigger != null
@@ -541,8 +541,8 @@ export default async function AdminPage({
                     <p className="mt-2 max-w-3xl text-sm text-slate-600">
                       The hard interval is the maximum permitted gap between
                       qualifying samples. The internal target should be earlier
-                      so a missed visit does not immediately create a compliance
-                      risk.
+                      so a late or missed completion does not immediately create
+                      a compliance risk.
                     </p>
                     <form
                       action={updateRuleProfileAction}
@@ -676,7 +676,7 @@ export default async function AdminPage({
                             <tr>
                               <th className="py-3 pr-4">Emergency condition</th>
                               <td className="py-3 pr-4 font-bold">
-                                Schedule immediately
+                                Collect immediately
                               </td>
                               <td className="py-3">
                                 No invented fixed legal date range

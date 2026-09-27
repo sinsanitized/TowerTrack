@@ -3,7 +3,11 @@ import { db } from "@/lib/db";
 export async function GET() {
   try {
     await db.$queryRaw`SELECT 1`;
-    return NextResponse.json({ status: "ok", database: "connected" });
+    return NextResponse.json({
+      status: "ok",
+      database: "connected",
+      testMode: process.env.E2E_TEST_MODE === "true",
+    });
   } catch {
     return NextResponse.json(
       { status: "degraded", database: "unavailable" },

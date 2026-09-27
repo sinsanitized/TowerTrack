@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   profileMatchesTowerConfiguration,
+  towerRuleConfigurationForJurisdiction,
   towerRuleConfigurationForMode,
   towerRuleConfigurationLabel,
 } from "@/lib/tower-rule-configuration";
 
 describe("tower rule configurations", () => {
+  it.each([
+    [{ state: "NY", city: "New York" }, "NYC_AND_NYS"],
+    [{ state: "NY", city: "White Plains" }, "NYS_ONLY"],
+    [{ state: "NY", city: "Albany" }, "NYS_ONLY"],
+    [{ state: "NY", city: null }, "NYS_ONLY"],
+    [{ state: "NJ", city: "Newark" }, "CUSTOM"],
+  ])("derives $expected from $jurisdiction", (jurisdiction, expected) => {
+    expect(towerRuleConfigurationForJurisdiction(jurisdiction)).toBe(expected);
+  });
+
   it.each([
     ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYC_AND_NYS"],
     ["NYS_PART_4_ONLY", "NYS_ONLY"],

@@ -383,7 +383,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     samples.getByText("Post disinfection retest").first(),
   ).toBeVisible();
 
-  await page.goto("/work/visit-opportunities");
+  await page.goto("/work/compatible-work");
   const opportunity = page.locator("article").filter({ hasText: name });
   await expect(
     opportunity.getByText(

@@ -175,7 +175,7 @@ test("secondary workflow destinations are removed from primary navigation", asyn
   await page.goto("/work/emergency-samples");
   await expect(page).toHaveURL("/");
 
-  await page.goto("/work/visit-opportunities");
+  await page.goto("/work/compatible-work");
   await expect(
     page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
@@ -217,7 +217,7 @@ test("home presents mutually exclusive Action Center sections", async ({
   expect(homeText).not.toContain("Recently completed");
   expect(homeText).not.toContain("Annual and recurring requirements");
   await page.getByRole("link", { name: "View all compatible work" }).click();
-  await expect(page).toHaveURL("/work/visit-opportunities");
+  await expect(page).toHaveURL("/work/compatible-work");
   await expect(
     page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
@@ -285,7 +285,7 @@ test("top search finds towers by building and job number", async ({ page }) => {
 test("compatible work guides users to record actual work without scheduling", async ({
   page,
 }) => {
-  await page.goto("/work/visit-opportunities");
+  await page.goto("/work/compatible-work");
   await expect(page.getByText("Schedule this visit")).toHaveCount(0);
   await expect(page.getByText("Create this visit")).toHaveCount(0);
   await expect(
@@ -411,12 +411,11 @@ test("customer onboarding continues from address to cooling tower details", asyn
   await page.getByLabel("Year-round").check();
   await page.getByLabel("Our company manages Legionella").check();
   await page
-    .getByLabel("Jurisdiction", { exact: true })
+    .getByLabel(/Tower jurisdiction/)
     .selectOption({ label: "New York, NY" });
-  await page.getByLabel("NYC Chapter 8 and NYS Part 4").check();
-  await page.getByLabel("Profile version", { exact: true }).selectOption({
-    label: "NYC Chapter 8 2026 + NYS Part 4",
-  });
+  await expect(
+    page.getByRole("heading", { name: "New York City regulatory program" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Create cooling tower" }).click();
   await expect(page.getByText("Cooling tower created")).toBeVisible();
   await page.getByRole("link", { name: "Tower Information" }).click();

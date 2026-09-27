@@ -228,11 +228,11 @@ function serviceRecommendations(row: CoverageRow): WorkRecommendation[] {
       color,
       label: row.plannedDate
         ? covered.length > 1
-          ? "Planned visit covers multiple requirements"
+          ? "One completion date covers multiple requirements"
           : "Covered by planned activity"
         : color === "RED"
-          ? "Schedule visit now"
-          : "Recommended visit",
+          ? "Complete work in this window"
+          : "Recommended completion date",
       detail:
         covered.length > 1
           ? `One completion date can satisfy ${covered.length} requirements.`
@@ -251,14 +251,14 @@ function serviceRecommendations(row: CoverageRow): WorkRecommendation[] {
       why: covered
         .map((coveredRequirement) => {
           const { start, end } = requirementWindow(coveredRequirement);
-          return `${obligationName(coveredRequirement)} is covered by this visit on ${date}${
+          return `${obligationName(coveredRequirement)} can be fulfilled by work completed on ${date}${
             start && end ? ` inside ${start} to ${end}` : ""
           }.`;
         })
         .concat(
           combinesMultipleObligations
             ? [
-                `Combined visit: one visit can satisfy all ${covered.length} requirements.`,
+                `Shared completion date: completed work can satisfy all ${covered.length} requirements.`,
               ]
             : [],
         ),

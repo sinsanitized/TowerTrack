@@ -363,25 +363,16 @@ export default async function EditCustomerTowerPage({
               <input type="hidden" name="systemId" value={system.id} />
               <ComplianceRuleProfileFields
                 profiles={profiles}
+                jurisdictions={jurisdictions.map((jurisdiction) => ({
+                  id: jurisdiction.id,
+                  label: jurisdictionLabel(jurisdiction),
+                  state: jurisdiction.state,
+                  city: jurisdiction.city,
+                }))}
                 initialConfiguration={system.ruleConfiguration}
                 initialProfileId={system.ruleProfileId}
-                legend="Rule configuration"
+                initialJurisdictionId={system.jurisdictionId}
               />
-              <label>
-                <span className="label">Jurisdiction</span>
-                <select
-                  className="field mt-1"
-                  name="jurisdictionId"
-                  defaultValue={system.jurisdictionId}
-                  required
-                >
-                  {jurisdictions.map((jurisdiction) => (
-                    <option key={jurisdiction.id} value={jurisdiction.id}>
-                      {jurisdictionLabel(jurisdiction)}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label>
                 <span className="label">Effective date</span>
                 <input

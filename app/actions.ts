@@ -44,6 +44,7 @@ import { DEFAULT_ROUTINE_SAMPLE_TARGET_WINDOW } from "@/lib/rules";
 import { ruleSetVersion } from "@/lib/rule-profile";
 import {
   profileMatchesTowerConfiguration,
+  towerRuleConfigurationForJurisdiction,
   towerRuleConfigurationValues,
 } from "@/lib/tower-rule-configuration";
 import { serviceResponsibilityValues } from "@/lib/service-responsibility";
@@ -1717,7 +1718,7 @@ async function createVisitOpportunityAction(formData: FormData) {
     return created;
   });
   revalidatePath("/");
-  revalidatePath("/work/visit-opportunities");
+  revalidatePath("/work/compatible-work");
   revalidatePath(`/systems/${system.id}`);
   redirect(`/visits/${visit.id}`);
 }
@@ -2889,6 +2890,20 @@ export async function createCoolingTowerSystemAction(formData: FormData) {
   const jurisdiction = await db.jurisdiction.findUniqueOrThrow({
     where: { id: parsed.jurisdictionId },
   });
+  if (
+    parsed.ruleConfiguration !==
+    towerRuleConfigurationForJurisdiction(jurisdiction)
+  )
+    throw new Error(
+      "The compliance program does not match the selected tower jurisdiction.",
+    );
+  if (
+    jurisdiction.state === "NJ" &&
+    profile.jurisdictionMode !== "PENDING_REGULATION"
+  )
+    throw new Error(
+      "New Jersey towers must remain regulation-monitoring only until a verified active rule is configured.",
+    );
   const internalJobNumber = `JOB-${crypto.randomUUID().slice(0, 10).toUpperCase()}`;
   const system = await db.$transaction(async (tx) => {
     const created = await tx.coolingTowerSystem.create({
@@ -3175,6 +3190,20 @@ export async function changeTowerRuleConfigurationAction(formData: FormData) {
   )
     throw new Error(
       "The selected profile does not match the tower compliance-rule configuration.",
+    );
+  if (
+    parsed.ruleConfiguration !==
+    towerRuleConfigurationForJurisdiction(jurisdiction)
+  )
+    throw new Error(
+      "The compliance program does not match the selected tower jurisdiction.",
+    );
+  if (
+    jurisdiction.state === "NJ" &&
+    profile.jurisdictionMode !== "PENDING_REGULATION"
+  )
+    throw new Error(
+      "New Jersey towers must remain regulation-monitoring only until a verified active rule is configured.",
     );
   if (parsed.ruleConfiguration === "NYC_AND_NYS") {
     const hasNysProfile = await db.ruleProfile.count({

@@ -25,8 +25,11 @@ export function OperatingScheduleFields() {
   const [endDay, setEndDay] = useState(31);
 
   return (
-    <fieldset className="rounded-xl border border-slate-200 p-4 sm:col-span-2">
-      <legend className="label px-1">Operating schedule</legend>
+    <fieldset className="rounded-xl border border-blue-300 bg-blue-50/40 p-4 sm:col-span-2">
+      <legend className="label px-1">Operating dates · Required</legend>
+      <p className="mb-3 text-sm font-bold text-blue-950">
+        Affects future deadlines: choose when this tower normally operates.
+      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {[
           ["YEAR_ROUND", "Year-round", "Operates throughout the year."],

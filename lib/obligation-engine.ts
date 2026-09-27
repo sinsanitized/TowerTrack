@@ -608,7 +608,7 @@ export function projectEventObligations(
       latestDueDate: null,
       priority: "EMERGENCY",
       reason:
-        "This risk event requires additional emergency Legionella sampling. Schedule immediately; no precise legal window is invented unless the MPP supplies one.",
+        "This risk event requires additional emergency Legionella sampling. Collect it immediately; no precise legal window is invented unless the MPP supplies one.",
       ruleSetVersion: NYC_CHAPTER_8_RULESET_VERSION,
       sourceCitation: isNys ? "10 NYCRR §4-1.4(b)(3)" : NYC_CITATION,
     });

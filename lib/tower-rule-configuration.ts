@@ -6,6 +6,16 @@ export const towerRuleConfigurationValues = [
   "CUSTOM",
 ] as const satisfies readonly TowerRuleConfiguration[];
 
+export function towerRuleConfigurationForJurisdiction(jurisdiction: {
+  state: string;
+  city?: string | null;
+}): TowerRuleConfiguration {
+  if (jurisdiction.state === "NY" && jurisdiction.city === "New York")
+    return "NYC_AND_NYS";
+  if (jurisdiction.state === "NY") return "NYS_ONLY";
+  return "CUSTOM";
+}
+
 export function towerRuleConfigurationForMode(
   jurisdictionMode: string,
 ): TowerRuleConfiguration {

@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/status-badge";
 describe("StatusBadge", () => {
   it.each([
     ["GREEN", "Good"],
-    ["YELLOW", "Needs scheduling"],
+    ["YELLOW", "Completion needed"],
     ["RED", "Overdue"],
     ["BLUE", "Waiting on lab"],
     ["GRAY", "Inactive"],
@@ -20,9 +20,9 @@ describe("StatusBadge", () => {
 
   it("allows long status labels to wrap inside narrow containers", () => {
     render(
-      <StatusBadge color="BLUE" label="Scheduled (not completed)" compact />,
+      <StatusBadge color="BLUE" label="Completion not recorded" compact />,
     );
-    const label = screen.getByText("Scheduled (not completed)");
+    const label = screen.getByText("Completion not recorded");
     expect(label).toHaveClass("min-w-0", "break-words");
     expect(label.parentElement).toHaveClass("max-w-full", "min-w-0");
   });
