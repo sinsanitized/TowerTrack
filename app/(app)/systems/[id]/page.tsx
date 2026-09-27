@@ -1242,11 +1242,11 @@ export default async function SystemPage({
         )}
       >
         <summary className="cursor-pointer text-base font-black text-emerald-900">
-          Rule details and completion tools
+          Reporting and advanced requirement details
         </summary>
         <p className="mt-2 text-sm text-slate-600">
-          Expand the source-triggered records and reporting controls when you
-          need the underlying rule detail.
+          Review source rules, record required submissions, or inspect detailed
+          sampling requirements.
         </p>
         <div
           id="obligations"
@@ -1540,8 +1540,20 @@ export default async function SystemPage({
         </div>
         {view === "information" && (
           <section className="panel p-5">
-            <div className="label">Service responsibility</div>
-            <h2 className="mt-1 font-black">Who handles each service</h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="label">Service responsibility</div>
+                <h2 className="mt-1 font-black">Who handles each service</h2>
+              </div>
+              {canViewSettings && (
+                <Link
+                  className="btn"
+                  href={`/systems/${id}?view=settings#service-responsibilities`}
+                >
+                  Change in Settings
+                </Link>
+              )}
+            </div>
             <p className="mt-1 text-sm text-slate-600">
               These assignments control which work appears as our action and
               which work is shown as an external dependency.
@@ -1573,8 +1585,20 @@ export default async function SystemPage({
         )}
         {view === "information" && (
           <div className="panel p-5">
-            <div className="label">Facility and identifiers</div>
-            <h2 className="mt-1 font-black">Tower location</h2>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="label">Facility and identifiers</div>
+                <h2 className="mt-1 font-black">Tower location</h2>
+              </div>
+              {canViewSettings && (
+                <Link
+                  className="btn"
+                  href={`/systems/${id}/edit?returnTo=${encodeURIComponent(`/systems/${id}?view=information`)}`}
+                >
+                  Edit customer and tower information
+                </Link>
+              )}
+            </div>
             <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
               <div>
                 <dt className="label">Customer</dt>
@@ -1652,7 +1676,27 @@ export default async function SystemPage({
             </div>
           </dl>
         </div>
+        {view === "settings" && (
+          <section
+            id="service-responsibilities"
+            className="panel scroll-mt-6 p-5"
+          >
+            <div className="label">1. Service responsibilities</div>
+            <h2 className="mt-1 font-black">Who performs each service</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              These assignments determine which work appears in our queues and
+              which work remains an external dependency. Saved separately.
+            </p>
+            <Link
+              className="btn btn-primary mt-4"
+              href={`/systems/${id}/edit?section=responsibilities&returnTo=${encodeURIComponent(`/systems/${id}?view=settings`)}`}
+            >
+              Edit service responsibilities
+            </Link>
+          </section>
+        )}
         <div className={view === "settings" ? "panel p-5" : "hidden"}>
+          <div className="label">2. Operating schedule</div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-black">Tower operation pattern</h2>
@@ -1678,6 +1722,7 @@ export default async function SystemPage({
           />
         </div>
         <div className={view === "settings" ? "panel p-5" : "hidden"}>
+          <div className="label">3. Recommended service dates</div>
           <h2 className="font-black">
             Recommended monthly sample collection dates
           </h2>
@@ -1739,9 +1784,15 @@ export default async function SystemPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <section className={view === "settings" ? "panel p-5" : "hidden"}>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="font-black">Jurisdiction & rules</h2>
-            <Link className="btn" href={`/systems/${id}/edit`}>
-              Edit customer & tower
+            <div>
+              <div className="label">4. Jurisdiction and compliance rules</div>
+              <h2 className="mt-1 font-black">Current rule assignment</h2>
+            </div>
+            <Link
+              className="btn"
+              href={`/systems/${id}/edit?section=rules&returnTo=${encodeURIComponent(`/systems/${id}?view=settings`)}`}
+            >
+              Change compliance rules
             </Link>
           </div>
           <dl className="mt-4 space-y-4 text-sm">
@@ -1866,7 +1917,8 @@ export default async function SystemPage({
             {mostRecentActiveEvent && (
               <details className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-left text-sm text-amber-950">
                 <summary className="cursor-pointer font-black">
-                  Void most recent record
+                  Mark {plainEnumLabel(mostRecentActiveEvent.eventType)} from{" "}
+                  {formatDate(mostRecentActiveEvent.eventDate)} invalid
                 </summary>
                 <p className="mt-2 max-w-sm">
                   This voids {plainEnumLabel(mostRecentActiveEvent.eventType)}
@@ -1897,9 +1949,12 @@ export default async function SystemPage({
                       recalculates dependent requirements and deadlines.
                     </span>
                   </label>
-                  <button className={buttonClass("destructive")}>
-                    Void most recent record
-                  </button>
+                  <SubmitButton
+                    variant="destructive"
+                    pendingLabel="Marking record invalid…"
+                  >
+                    Mark this record invalid
+                  </SubmitButton>
                 </form>
               </details>
             )}

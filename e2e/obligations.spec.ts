@@ -39,7 +39,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL(/\/systems\//);
   await page.getByRole("link", { name: "Required work", exact: true }).click();
   await page
-    .getByText("Rule details and completion tools", { exact: true })
+    .getByText("Reporting and advanced requirement details", { exact: true })
     .click();
   await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(

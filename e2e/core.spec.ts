@@ -92,7 +92,7 @@ test("system view shows authority and separate target and hard due", async ({
   await expect(page.getByText("Next hard due")).toHaveCount(0);
   await page.getByRole("link", { name: "Required work", exact: true }).click();
   await page
-    .getByText("Rule details and completion tools", { exact: true })
+    .getByText("Reporting and advanced requirement details", { exact: true })
     .click();
   await expect(
     page.getByText(/Regulatory|Company policy|Guidance only/).first(),
@@ -433,25 +433,18 @@ test("customer onboarding continues from address to cooling tower details", asyn
   await expect(page.getByText("SERIAL-100")).toBeVisible();
   await expect(page.getByText("450 tons")).toBeVisible();
   await page
-    .getByRole("link", { name: "Settings", exact: true })
-    .last()
+    .getByRole("link", { name: "Edit customer and tower information" })
     .click();
-  await page.getByRole("link", { name: "Edit customer & tower" }).click();
   await expect(
     page.getByRole("heading", { name: new RegExp(`Edit ${customerName}`) }),
   ).toBeVisible();
-  await expect(page.getByLabel("Jurisdiction", { exact: true })).toHaveValue(
-    /.+/,
-  );
-  await expect(
-    page.getByText("NYC Chapter 8 + New York State").first(),
-  ).toBeVisible();
+  await expect(page.getByLabel("Jurisdiction", { exact: true })).toHaveCount(0);
   await page.getByLabel("Tower location").fill("Roof, east side");
   await page
     .getByRole("button", { name: "Save customer and tower changes" })
     .click();
   await expect(
-    page.getByText(/customer, tower, jurisdiction, and rule settings updated/i),
+    page.getByText(/customer, address, and tower equipment saved/i),
   ).toBeVisible();
   await page.getByRole("link", { name: "Tower Information" }).click();
   await expect(page.getByText("Roof, east side")).toBeVisible();

@@ -20,15 +20,17 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
     name: "All cooling tower required work",
   });
   await table.getByRole("row").nth(1).getByRole("link").first().click();
-  await expect(page.getByText("Compliance rules").first()).toBeVisible();
-  await expect(
-    page.getByText("NYC Chapter 8 + New York State").first(),
-  ).toBeVisible();
   await page
+    .getByLabel("Tower workspace")
     .getByRole("link", { name: "Settings", exact: true })
-    .last()
     .click();
-  await page.getByRole("link", { name: "Edit customer & tower" }).click();
+  await expect(
+    page.getByText("4. Jurisdiction and compliance rules"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Current rule assignment" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Change compliance rules" }).click();
   await expect(
     page.getByText("Compliance rules", { exact: true }).first(),
   ).toBeVisible();
@@ -38,7 +40,9 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
     .click();
   await expect(page.getByLabel("Rule configuration")).toBeVisible();
   await expect(page.getByLabel("Assigned profile version")).toBeVisible();
-  await expect(page.getByLabel("Effective date")).toBeVisible();
+  await expect(
+    page.getByLabel("Effective date", { exact: true }),
+  ).toBeVisible();
 });
 
 test("deadline hyperhalogenation action opens the date-only focused form", async ({

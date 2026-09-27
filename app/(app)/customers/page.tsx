@@ -92,7 +92,7 @@ export default async function CustomersPage() {
                   ? `/systems/${system.id}`
                   : building
                     ? `/customers/${customer.id}/towers/new?buildingId=${building.id}`
-                    : null;
+                    : `/customers/${customer.id}/address/new`;
                 return (
                   <ClickableTableRow
                     key={system?.id || building?.id || customer.id}
@@ -102,7 +102,7 @@ export default async function CustomersPage() {
                         ? `Open ${system.systemName}`
                         : building
                           ? `Continue tower setup for ${customer.name}`
-                          : undefined
+                          : `Add customer address for ${customer.name}`
                     }
                   >
                     <td>
@@ -157,7 +157,14 @@ export default async function CustomersPage() {
                         >
                           Continue tower setup
                         </Link>
-                      ) : null}
+                      ) : (
+                        <Link
+                          className="btn btn-primary"
+                          href={`/customers/${customer.id}/address/new`}
+                        >
+                          Add customer address
+                        </Link>
+                      )}
                     </td>
                   </ClickableTableRow>
                 );

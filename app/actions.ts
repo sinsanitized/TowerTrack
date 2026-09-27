@@ -2747,6 +2747,68 @@ export async function createCustomerAction(formData: FormData) {
   );
 }
 
+export async function addCustomerAddressAction(formData: FormData) {
+  const user = await requireRole([
+    UserRole.ADMIN,
+    UserRole.OPERATIONS_MANAGER,
+    UserRole.SCHEDULER,
+  ]);
+  const data = z
+    .object({
+      customerId: z.string().min(1),
+      streetAddress: z.string().trim().min(3),
+      addressLine2: z.string().trim().optional(),
+      city: z.string().trim().min(2),
+      state: z.string().trim().length(2),
+      postalCode: z.string().trim().min(5).max(10),
+    })
+    .parse(Object.fromEntries(formData));
+  const customer = await db.customer.findFirstOrThrow({
+    where: {
+      id: data.customerId,
+      organizationId: user.organizationId,
+      active: true,
+      buildings: { none: {} },
+    },
+    select: { id: true, name: true },
+  });
+  const state = data.state.toUpperCase();
+  const building = await db.$transaction(async (tx) => {
+    const created = await tx.building.create({
+      data: {
+        customerId: customer.id,
+        buildingName: customer.name,
+        streetAddress: data.streetAddress,
+        addressLine2: data.addressLine2 || null,
+        city: data.city,
+        state,
+        postalCode: data.postalCode,
+        routeZone: `${data.city}, ${state}`,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        entityType: "Building",
+        entityId: created.id,
+        action: "CREATED",
+        reason: "Added missing customer address",
+        changedById: user.id,
+        newValue: {
+          customerId: customer.id,
+          streetAddress: data.streetAddress,
+          addressLine2: data.addressLine2 || null,
+          city: data.city,
+          state,
+          postalCode: data.postalCode,
+        },
+      },
+    });
+    return created;
+  });
+  revalidatePath("/customers");
+  redirect(`/customers/${customer.id}/towers/new?buildingId=${building.id}`);
+}
+
 export async function createCoolingTowerSystemAction(formData: FormData) {
   const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const parsed = z

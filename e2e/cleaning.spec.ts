@@ -21,7 +21,7 @@ test("operations manager can record cleaning without creating or resetting a sam
   await page.getByRole("option").first().click();
   await page.getByRole("link", { name: "Required work", exact: true }).click();
   await page
-    .getByText("Rule details and completion tools", { exact: true })
+    .getByText("Reporting and advanced requirement details", { exact: true })
     .click();
 
   const samplingHeading = page.getByRole("heading", {
