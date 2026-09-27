@@ -76,7 +76,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
     Boolean(filters.search);
 
   return (
-    <section className="mb-5 rounded-xl border border-slate-200 bg-white p-4">
+    <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
       <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_190px_220px_auto] xl:items-end">
         <form
           action="/deadlines"
@@ -170,7 +170,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
           <summary
             className={buttonClass(
               "secondary",
-              "w-full cursor-pointer justify-center whitespace-nowrap",
+              "w-full cursor-pointer justify-center whitespace-nowrap border-transparent bg-slate-50",
             )}
             aria-label="More deadline filters"
             role="button"
@@ -182,7 +182,7 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
               </span>
             )}
           </summary>
-          <div className="mt-2 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-[34rem]">
+          <div className="mt-2 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-[30rem]">
             <label>
               <span className="label">Operating schedule</span>
               <select

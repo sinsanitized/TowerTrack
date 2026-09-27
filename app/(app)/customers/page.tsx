@@ -61,7 +61,83 @@ export default async function CustomersPage() {
         title="Customers"
         description="Create the customer and address first, then add the cooling tower equipment details."
       />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+      <details className="panel mb-6 overflow-hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 p-4 font-black text-emerald-900">
+          <span className="grid size-9 place-items-center rounded-lg bg-emerald-50">
+            <Plus size={18} />
+          </span>
+          <span>
+            Add a new customer
+            <span className="mt-0.5 block text-sm font-medium text-slate-600">
+              Step 1 of 2 · Customer and address
+            </span>
+          </span>
+        </summary>
+        <form
+          action={createCustomerAction}
+          className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          <p className="text-sm font-bold text-slate-700 sm:col-span-2 lg:col-span-3">
+            Fields marked Required must be completed. Tower equipment is added
+            on the next screen.
+          </p>
+          <label className="block">
+            <span className="label">Customer name · Required</span>
+            <input className="field mt-1" name="name" required />
+          </label>
+          <label className="block sm:col-span-1 lg:col-span-2">
+            <span className="label">Street address · Required</span>
+            <input
+              className="field mt-1"
+              name="streetAddress"
+              autoComplete="street-address"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="label">Suite / unit (optional)</span>
+            <input className="field mt-1" name="addressLine2" />
+          </label>
+          <label className="block">
+            <span className="label">City · Required</span>
+            <input className="field mt-1" name="city" required />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="label">State · Required</span>
+              <input
+                className="field mt-1 uppercase"
+                name="state"
+                maxLength={2}
+                placeholder="NY"
+                required
+              />
+            </label>
+            <label className="block">
+              <span className="label">ZIP code · Required</span>
+              <input
+                className="field mt-1"
+                name="postalCode"
+                autoComplete="postal-code"
+                required
+              />
+            </label>
+          </div>
+          <div className="flex flex-col justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950 sm:col-span-2 lg:col-span-3 sm:flex-row sm:items-center">
+            <span>
+              Saving continues to cooling tower details. You can also resume
+              later from this directory.
+            </span>
+            <SubmitButton
+              className="shrink-0"
+              pendingLabel="Saving customer and address…"
+            >
+              Continue to cooling tower details
+            </SubmitButton>
+          </div>
+        </form>
+      </details>
+      <div>
         <section
           className="panel table-wrap"
           aria-labelledby="customer-directory-heading"
@@ -181,78 +257,6 @@ export default async function CustomersPage() {
             </div>
           )}
         </section>
-        <aside className="panel p-5 xl:sticky xl:top-6">
-          <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
-            <span className="rounded-full bg-emerald-800 px-2 py-1 text-white">
-              Step 1 of 2
-            </span>
-            Customer and address
-          </div>
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-4">
-            <Plus size={18} />
-            <h2 className="font-black">Add customer</h2>
-          </div>
-          <form action={createCustomerAction} className="mt-5 space-y-4">
-            <p className="text-sm font-bold text-slate-700">
-              Fields marked Required must be completed.
-            </p>
-            <label className="block">
-              <span className="label">Customer name · Required</span>
-              <input className="field mt-1" name="name" required />
-            </label>
-            <label className="block">
-              <span className="label">Street address · Required</span>
-              <input
-                className="field mt-1"
-                name="streetAddress"
-                autoComplete="street-address"
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="label">Suite / unit (optional)</span>
-              <input className="field mt-1" name="addressLine2" />
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="label">City · Required</span>
-                <input className="field mt-1" name="city" required />
-              </label>
-              <label className="block">
-                <span className="label">State · Required</span>
-                <input
-                  className="field mt-1 uppercase"
-                  name="state"
-                  maxLength={2}
-                  placeholder="NY"
-                  required
-                />
-              </label>
-            </div>
-            <label className="block">
-              <span className="label">ZIP code · Required</span>
-              <input
-                className="field mt-1"
-                name="postalCode"
-                autoComplete="postal-code"
-                required
-              />
-            </label>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
-              This saves the customer and address now. You will enter cooling
-              tower equipment on the next screen, and you can resume later.
-            </div>
-            <SubmitButton
-              className="w-full"
-              pendingLabel="Saving customer and address…"
-            >
-              Continue to cooling tower details
-            </SubmitButton>
-          </form>
-          <p className="mt-4 text-xs text-slate-500">
-            The internal account number is generated automatically.
-          </p>
-        </aside>
       </div>
     </>
   );

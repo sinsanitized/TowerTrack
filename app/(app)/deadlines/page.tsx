@@ -133,7 +133,7 @@ export default async function DeadlinesPage({
       />
 
       <section
-        className="panel mb-5 grid gap-5 p-4 lg:grid-cols-[auto_1fr] lg:items-end"
+        className="panel mb-4 grid gap-4 p-3 lg:grid-cols-[auto_1fr] lg:items-end"
         aria-labelledby="deadline-overview-heading"
       >
         <div>
@@ -146,7 +146,7 @@ export default async function DeadlinesPage({
           <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold text-slate-700">
             <Link
               aria-current={period === "ALL" ? "page" : undefined}
-              className={`flex items-center gap-2 rounded-xl border bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm ${period === "ALL" ? "border-emerald-700 ring-2 ring-emerald-100" : "border-slate-300"}`}
+              className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 transition hover:border-emerald-600 hover:text-emerald-900 ${period === "ALL" ? "border-emerald-700 ring-2 ring-emerald-100" : "border-slate-300"}`}
               href={deadlinePeriodHref("ALL")}
             >
               <CalendarRange size={18} className="text-emerald-800" />
@@ -154,7 +154,7 @@ export default async function DeadlinesPage({
               <span aria-hidden>→</span>
             </Link>
             <Link
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-emerald-600 hover:text-emerald-900 hover:shadow-sm"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 transition hover:border-emerald-600 hover:text-emerald-900"
               href="/towers"
             >
               {towerCount} cooling tower{towerCount === 1 ? "" : "s"}{" "}
@@ -168,7 +168,7 @@ export default async function DeadlinesPage({
             {statusCounts.overdue > 0 && (
               <Link
                 aria-current={period === "OVERDUE" ? "page" : undefined}
-                className={`rounded-xl border bg-white px-4 py-3 text-red-800 transition hover:border-red-600 hover:bg-red-50 hover:shadow-sm ${period === "OVERDUE" ? "border-red-600 ring-2 ring-red-100" : "border-red-300"}`}
+                className={`rounded-lg border bg-white px-3 py-2 text-red-800 transition hover:border-red-600 hover:bg-red-50 ${period === "OVERDUE" ? "border-red-600 ring-2 ring-red-100" : "border-red-300"}`}
                 href={deadlinePeriodHref("OVERDUE")}
               >
                 {statusCounts.overdue} overdue <span aria-hidden>→</span>
@@ -177,7 +177,7 @@ export default async function DeadlinesPage({
             {statusCounts.thisWeek > 0 && (
               <Link
                 aria-current={period === "THIS_WEEK" ? "page" : undefined}
-                className={`rounded-xl border bg-white px-4 py-3 text-amber-900 transition hover:border-amber-600 hover:bg-amber-50 hover:shadow-sm ${period === "THIS_WEEK" ? "border-amber-600 ring-2 ring-amber-100" : "border-amber-300"}`}
+                className={`rounded-lg border bg-white px-3 py-2 text-amber-900 transition hover:border-amber-600 hover:bg-amber-50 ${period === "THIS_WEEK" ? "border-amber-600 ring-2 ring-amber-100" : "border-amber-300"}`}
                 href={deadlinePeriodHref("THIS_WEEK")}
               >
                 {statusCounts.thisWeek} due this week <span aria-hidden>→</span>
@@ -186,7 +186,7 @@ export default async function DeadlinesPage({
             {statusCounts.nextWeek > 0 && (
               <Link
                 aria-current={period === "NEXT_WEEK" ? "page" : undefined}
-                className={`rounded-xl border bg-white px-4 py-3 text-blue-800 transition hover:border-blue-600 hover:bg-blue-50 hover:shadow-sm ${period === "NEXT_WEEK" ? "border-blue-600 ring-2 ring-blue-100" : "border-blue-300"}`}
+                className={`rounded-lg border bg-white px-3 py-2 text-blue-800 transition hover:border-blue-600 hover:bg-blue-50 ${period === "NEXT_WEEK" ? "border-blue-600 ring-2 ring-blue-100" : "border-blue-300"}`}
                 href={deadlinePeriodHref("NEXT_WEEK")}
               >
                 {statusCounts.nextWeek} due next week <span aria-hidden>→</span>

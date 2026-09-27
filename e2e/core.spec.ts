@@ -389,6 +389,7 @@ test("customer onboarding continues from address to cooling tower details", asyn
 }) => {
   const customerName = `Workflow Test Customer ${Date.now()}`;
   await page.getByRole("link", { name: "Customers" }).click();
+  await page.getByText("Add a new customer", { exact: true }).click();
   const addCustomer = page.locator("form").filter({
     has: page.getByRole("button", {
       name: "Continue to cooling tower details",

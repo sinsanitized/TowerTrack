@@ -224,13 +224,13 @@ export default async function AdminPage({
         className="panel mb-6 flex flex-wrap gap-2 p-3"
         aria-label="Settings sections"
       >
-        <a className="btn" href="#users">
+        <a className="btn btn-ghost min-h-10" href="#users">
           Users
         </a>
-        <a className="btn" href="#compliance-rules">
+        <a className="btn btn-ghost min-h-10" href="#compliance-rules">
           Compliance rules
         </a>
-        <a className="btn" href="#data-exchange">
+        <a className="btn btn-ghost min-h-10" href="#data-exchange">
           Imports and exports
         </a>
       </nav>
@@ -356,7 +356,7 @@ export default async function AdminPage({
               ))}
             </select>
           </label>
-          <div className="lg:col-span-4">
+          <div className="flex justify-end lg:col-span-4">
             <SubmitButton pendingLabel="Creating user…">
               Create user
             </SubmitButton>

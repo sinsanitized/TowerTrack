@@ -166,16 +166,16 @@ export default async function SamplesPage({
               key={item}
               href={`/samples?status=${item}${search ? `&q=${encodeURIComponent(search)}` : ""}`}
               aria-current={selected ? "page" : undefined}
-              className={`rounded-xl border p-4 transition-colors ${color} ${selected ? "ring-2 ring-emerald-800 ring-offset-2" : "hover:border-emerald-500"}`}
+              className={`flex min-h-16 items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${color} ${selected ? "ring-2 ring-emerald-800 ring-offset-2" : "hover:border-emerald-500"}`}
             >
               <div className="text-sm font-black">{filterLabels[item]}</div>
-              <div className="mt-1 text-2xl font-black">{counts[item]}</div>
+              <div className="text-xl font-black">{counts[item]}</div>
             </Link>
           );
         })}
       </section>
       <form
-        className="panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-end"
+        className="panel mb-5 flex flex-col gap-3 p-3 sm:flex-row sm:items-end"
         method="get"
       >
         <input type="hidden" name="status" value={filter} />

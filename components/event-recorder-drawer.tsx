@@ -132,7 +132,7 @@ export function EventRecorderDrawer({
           />
           <aside
             ref={drawerRef}
-            className="relative flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-[min(60rem,calc(100vh-2rem))] sm:max-w-5xl sm:rounded-2xl sm:border sm:border-slate-300"
+            className="relative flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-[min(54rem,calc(100vh-2rem))] sm:max-w-4xl sm:rounded-2xl sm:border sm:border-slate-300"
             role="dialog"
             aria-modal="true"
             aria-labelledby="event-drawer-title"
@@ -204,23 +204,25 @@ export function EventRecorderDrawer({
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6">
-              <EventRecorder
-                key={initialSampleEventId ?? initialEventType ?? "default"}
-                systemId={systemId}
-                defaultDate={defaultDate}
-                ruleConfig={ruleConfig}
-                samplesAwaitingResults={samplesAwaitingResults}
-                initialSampleEventId={initialSampleEventId}
-                initialEventType={initialEventType}
-                canConfirmOwnerManaged={canConfirmOwnerManaged}
-                openSampleObligations={openSampleObligations}
-                legionellaResponsibility={legionellaResponsibility}
-                bacteriologicalResponsibility={bacteriologicalResponsibility}
-                legionellaVendorName={legionellaVendorName}
-                returnTo={returnTo}
-                intentContext={intentContext}
-                onCancel={requestClose}
-              />
+              <div className="mx-auto w-full max-w-3xl">
+                <EventRecorder
+                  key={initialSampleEventId ?? initialEventType ?? "default"}
+                  systemId={systemId}
+                  defaultDate={defaultDate}
+                  ruleConfig={ruleConfig}
+                  samplesAwaitingResults={samplesAwaitingResults}
+                  initialSampleEventId={initialSampleEventId}
+                  initialEventType={initialEventType}
+                  canConfirmOwnerManaged={canConfirmOwnerManaged}
+                  openSampleObligations={openSampleObligations}
+                  legionellaResponsibility={legionellaResponsibility}
+                  bacteriologicalResponsibility={bacteriologicalResponsibility}
+                  legionellaVendorName={legionellaVendorName}
+                  returnTo={returnTo}
+                  intentContext={intentContext}
+                  onCancel={requestClose}
+                />
+              </div>
             </div>
           </aside>
         </div>

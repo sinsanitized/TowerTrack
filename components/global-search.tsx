@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import { buttonClass } from "@/lib/button-variants";
 
@@ -17,6 +18,7 @@ function normalize(value: string) {
 }
 
 export function GlobalSearch() {
+  const pathname = usePathname();
   const [hydrated, setHydrated] = useState(false);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -25,6 +27,11 @@ export function GlobalSearch() {
   const normalizedQuery = normalize(query);
 
   useEffect(() => setHydrated(true), []);
+  useEffect(() => {
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+  }, [pathname]);
   useEffect(() => {
     if (normalizedQuery.length < 2) {
       setResults([]);

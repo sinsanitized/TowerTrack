@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
@@ -53,7 +54,7 @@ export default async function HistoryPage() {
                   color={event.status === "ACTIVE" ? "GREEN" : "GRAY"}
                   label={plainEnumLabel(event.status)}
                 />
-                <span className="font-black text-emerald-800">Open →</span>
+                <ChevronRight className="text-emerald-800" aria-hidden />
               </div>
             </Link>
           </li>

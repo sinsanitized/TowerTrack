@@ -23,13 +23,12 @@ export default async function TowersPage() {
         description="Current condition, next action, deadline, and unresolved issues for every cooling tower."
       />
       <div className="panel overflow-hidden">
-        <div className="hidden grid-cols-[1.1fr_.7fr_1.2fr_.8fr_.35fr_auto] gap-4 border-b bg-slate-50 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-500 lg:grid">
+        <div className="hidden grid-cols-[1.1fr_.55fr_1.3fr_.75fr_.4fr] gap-4 border-b bg-slate-50 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-500 lg:grid">
           <div>Tower</div>
           <div>Status</div>
           <div>Next required action</div>
           <div>Deadline</div>
           <div>Unresolved issues</div>
-          <span />
         </div>
         {rows.map((row) => {
           const next = row.openObligations.find(
@@ -51,7 +50,7 @@ export default async function TowersPage() {
               key={row.id}
               href={`/systems/${row.id}`}
               label={`Open ${row.systemName}`}
-              className={`record-row grid gap-4 border-l-4 p-5 lg:grid-cols-[1.1fr_.7fr_1.2fr_.8fr_.35fr_auto] lg:items-center ${issues ? "urgency-red" : row.complianceHealth.color === "YELLOW" ? "urgency-amber" : "border-l-slate-300"}`}
+              className={`record-row grid gap-4 border-l-4 p-5 lg:grid-cols-[1.1fr_.55fr_1.3fr_.75fr_.4fr] lg:items-center ${issues ? "urgency-red" : row.complianceHealth.color === "YELLOW" ? "urgency-amber" : "border-l-slate-300"}`}
             >
               <div className="identity-block">
                 <Link
@@ -94,12 +93,6 @@ export default async function TowersPage() {
                   ? "No issues"
                   : `${issues} unresolved ${issues === 1 ? "issue" : "issues"}`}
               </div>
-              <Link
-                className="btn btn-ghost min-h-11 justify-center"
-                href={`/systems/${row.id}`}
-              >
-                Open tower
-              </Link>
             </ClickableRow>
           );
         })}
