@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RotateCcw } from "lucide-react";
 
 export default function OperationalError({
   error,
@@ -19,19 +19,29 @@ export default function OperationalError({
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-1 shrink-0 text-red-700" size={24} />
         <div>
-          <h1 className="text-xl font-black">This screen could not load</h1>
+          <h1 className="text-xl font-black">
+            TowerTrack could not save or load this screen
+          </h1>
           <p className="mt-2 text-sm text-slate-600">
-            No compliance record was changed. Try again; if it keeps failing,
-            give support the reference below.
+            No changes were saved. Go back, review the required fields, and try
+            again. Your browser may preserve what you entered.
           </p>
           {error.digest && (
             <p className="mt-3 font-mono text-xs text-slate-500">
               Reference: {error.digest}
             </p>
           )}
-          <button className="btn btn-primary mt-5" onClick={reset}>
-            <RotateCcw size={16} /> Retry
-          </button>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              className="btn btn-primary"
+              onClick={() => window.history.back()}
+            >
+              <ArrowLeft size={16} /> Go back to the form
+            </button>
+            <button className="btn" onClick={reset}>
+              <RotateCcw size={16} /> Retry this screen
+            </button>
+          </div>
         </div>
       </div>
     </section>

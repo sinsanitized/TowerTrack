@@ -38,11 +38,13 @@ test("tower settings expose explicit effective-dated compliance rules", async ({
     .locator("summary")
     .filter({ hasText: "Change compliance rules" })
     .click();
-  await expect(page.getByLabel("Rule configuration")).toBeVisible();
-  await expect(page.getByLabel("Assigned profile version")).toBeVisible();
   await expect(
-    page.getByLabel("Effective date", { exact: true }),
+    page.getByRole("group", { name: "Rule configuration" }),
   ).toBeVisible();
+  await expect(
+    page.getByLabel("Profile version", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel(/^Effective date/)).toBeVisible();
 });
 
 test("deadline hyperhalogenation action opens the date-only focused form", async ({

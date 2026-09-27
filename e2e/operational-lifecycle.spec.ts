@@ -43,14 +43,16 @@ async function createNycTower(
   await page.getByLabel("Cooling Tower Tonnage").fill("500");
   await page.getByLabel("Year-round").check();
   await page
-    .getByLabel("Legionella Responsibility")
-    .selectOption(legionellaResponsibility);
+    .getByLabel(
+      legionellaResponsibility === "OUR_COMPANY"
+        ? "Our company manages Legionella"
+        : "Customer manages Legionella",
+    )
+    .check();
   await page
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
-  await page
-    .getByLabel("Compliance rules", { exact: true })
-    .selectOption("NYC_AND_NYS");
+  await page.getByLabel("NYC Chapter 8 and NYS Part 4").check();
   await page
     .getByLabel("Profile version", { exact: true })
     .selectOption("nyc-2026");
@@ -211,9 +213,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     "2026-07-01",
     "Initial cleaning and disinfection before first operation",
     async (form) => {
-      await form
-        .getByLabel("Cleaning type")
-        .selectOption("STARTUP_CLEANING_DISINFECTION");
+      await form.getByLabel("Startup cleaning and disinfection").check();
     },
   );
   await expect(page.getByText("Baseline required").first()).toBeVisible();
@@ -414,9 +414,7 @@ test("a year-round tower keeps one rolling sample clock and closes historical po
     "2026-01-20",
     "Startup cleaning before continuous year-round operation",
     async (form) => {
-      await form
-        .getByLabel("Cleaning type")
-        .selectOption("STARTUP_CLEANING_DISINFECTION");
+      await form.getByLabel("Startup cleaning and disinfection").check();
     },
   );
   await recordEvent(
@@ -519,9 +517,7 @@ test("a seasonal tower preserves its history but stops the routine clock after s
     "2025-12-20",
     "Pre-startup seasonal cleaning and disinfection",
     async (form) => {
-      await form
-        .getByLabel("Cleaning type")
-        .selectOption("STARTUP_CLEANING_DISINFECTION");
+      await form.getByLabel("Startup cleaning and disinfection").check();
     },
   );
   await recordEvent(page, "Record startup", "2026-01-01", "Seasonal startup");

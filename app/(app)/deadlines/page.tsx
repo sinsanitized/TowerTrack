@@ -33,6 +33,7 @@ export default async function DeadlinesPage({
     schedule?: string;
     responsibility?: string;
     q?: string;
+    page?: string;
     workflowNotice?: string;
   }>;
 }) {
@@ -78,6 +79,13 @@ export default async function DeadlinesPage({
     responsibility,
     search,
   });
+  const pageSize = 50;
+  const requestedPage = Number.parseInt(requested.page ?? "1", 10);
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const page = Number.isFinite(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), pageCount)
+    : 1;
+  const visibleRows = rows.slice((page - 1) * pageSize, page * pageSize);
   const towerCount = new Set(rows.map((row) => row.towerId)).size;
   const statusCounts = {
     overdue: rows.filter((row) => row.status === "Overdue").length,
@@ -98,6 +106,11 @@ export default async function DeadlinesPage({
     const query = new URLSearchParams(returnQuery);
     if (nextPeriod === "ALL") query.delete("period");
     else query.set("period", nextPeriod);
+    return query.size ? `/deadlines?${query}` : "/deadlines";
+  };
+  const pageHref = (nextPage: number) => {
+    const query = new URLSearchParams(returnQuery);
+    if (nextPage > 1) query.set("page", String(nextPage));
     return query.size ? `/deadlines?${query}` : "/deadlines";
   };
   return (
@@ -200,7 +213,8 @@ export default async function DeadlinesPage({
               </p>
             </div>
             <div className="text-sm font-black text-slate-700">
-              {rows.length} result{rows.length === 1 ? "" : "s"}
+              Showing {(page - 1) * pageSize + 1}–
+              {Math.min(page * pageSize, rows.length)} of {rows.length}
             </div>
           </div>
           <div className="overflow-x-auto" data-testid="deadline-table-scroll">
@@ -227,7 +241,7 @@ export default async function DeadlinesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {rows.map((row) => {
+                {visibleRows.map((row) => {
                   const primaryHref =
                     row.primaryActionHref.includes("#record-event") ||
                     row.primaryActionHref.includes("#service-responsibilities")
@@ -339,6 +353,30 @@ export default async function DeadlinesPage({
               </tbody>
             </table>
           </div>
+          {pageCount > 1 && (
+            <nav
+              className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4"
+              aria-label="Deadline register pages"
+            >
+              {page > 1 ? (
+                <Link className="btn" href={pageHref(page - 1)}>
+                  ← Previous 50
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="text-sm font-bold text-slate-700">
+                Page {page} of {pageCount}
+              </span>
+              {page < pageCount ? (
+                <Link className="btn" href={pageHref(page + 1)}>
+                  Next 50 →
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          )}
         </div>
       )}
     </>

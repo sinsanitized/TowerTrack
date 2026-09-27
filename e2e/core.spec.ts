@@ -411,17 +411,13 @@ test("customer onboarding continues from address to cooling tower details", asyn
   await page.getByLabel("Tower location").fill("Roof, west side");
   await page.getByLabel("Cooling Tower Tonnage").fill("450");
   await page.getByLabel("Year-round").check();
-  await page
-    .getByLabel("Legionella Responsibility")
-    .selectOption("OUR_COMPANY");
+  await page.getByLabel("Our company manages Legionella").check();
   await page
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
-  await page
-    .getByLabel("Compliance rules", { exact: true })
-    .selectOption("NYC_AND_NYS");
+  await page.getByLabel("NYC Chapter 8 and NYS Part 4").check();
   await page.getByLabel("Profile version", { exact: true }).selectOption({
-    label: "NYC Chapter 8 + New York State — NYC Chapter 8 2026 + NYS Part 4",
+    label: "NYC Chapter 8 2026 + NYS Part 4",
   });
   await page.getByRole("button", { name: "Create cooling tower" }).click();
   await expect(page.getByText("Cooling tower created")).toBeVisible();
@@ -528,7 +524,9 @@ test("operations manager records cleaning in the tower event workflow", async ({
   const addCleaning = page.getByRole("button", { name: "Cleaning" });
   await expect(addCleaning).toBeVisible();
   await addCleaning.click();
-  await expect(page.getByLabel("Cleaning type")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: /Cleaning type/ }),
+  ).toBeVisible();
   const eventForm = page.locator("#record-event form");
   const completionDate = eventForm.getByLabel(/date.*Required/);
   await expect(completionDate).toBeFocused();

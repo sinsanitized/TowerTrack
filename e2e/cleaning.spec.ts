@@ -40,7 +40,9 @@ test("operations manager can record cleaning without creating or resetting a sam
 
   await page.getByRole("button", { name: "Add compliance record" }).click();
   await page.getByRole("button", { name: "Cleaning" }).click();
-  await expect(page.getByLabel("Cleaning type")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: /Cleaning type/ }),
+  ).toBeVisible();
   const cleaningForm = page.locator("#record-event form");
   await cleaningForm.getByLabel(/Cleaning completion date/).fill("2026-07-14");
   await cleaningForm.getByText("Add notes (optional)", { exact: true }).click();

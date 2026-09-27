@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Beaker,
+  CheckCircle2,
   ClipboardCheck,
   BrushCleaning,
   Droplets,
@@ -222,7 +223,7 @@ export function EventRecorder({
   };
   return (
     <div id="record-event" className="scroll-mt-6">
-      {!intentContext && (
+      {!intentContext && !eventSelected && (
         <section className="panel p-5 sm:p-6">
           <div>
             <div className="label">Step 1 of 2 · Choose completed work</div>
@@ -365,6 +366,21 @@ export function EventRecorder({
               result must be linked to the sample that produced it.
             </p>
           )}
+        </section>
+      )}
+      {!intentContext && eventSelected && (
+        <section className="panel flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <div className="label">Selected work</div>
+            <p className="mt-1 font-black">{plainEnumLabel(eventType)}</p>
+          </div>
+          <button
+            className={buttonClass("secondary")}
+            type="button"
+            onClick={() => setEventSelected(false)}
+          >
+            Change work
+          </button>
         </section>
       )}
       {eventSelected && (
@@ -610,10 +626,18 @@ export function EventRecorder({
                     "min-h-16 justify-start whitespace-normal text-left",
                   )}
                   type="button"
+                  aria-pressed={eventType === "HIGH_LEGIONELLA_DISINFECTION"}
                   onClick={() => setEventType("HIGH_LEGIONELLA_DISINFECTION")}
                 >
-                  Biocide was adjusted or changed; tower was not fully drained,
-                  cleaned, and flushed
+                  <span>
+                    Biocide was adjusted or changed; tower was not fully
+                    drained, cleaned, and flushed
+                    {eventType === "HIGH_LEGIONELLA_DISINFECTION" && (
+                      <span className="mt-2 flex items-center gap-2 font-black">
+                        <CheckCircle2 size={18} aria-hidden /> Selected
+                      </span>
+                    )}
+                  </span>
                 </button>
                 <button
                   className={buttonClass(
@@ -621,9 +645,17 @@ export function EventRecorder({
                     "min-h-16 justify-start whitespace-normal text-left",
                   )}
                   type="button"
+                  aria-pressed={eventType === "FULL_REMEDIATION"}
                   onClick={() => setEventType("FULL_REMEDIATION")}
                 >
-                  Tower was drained, physically cleaned, and flushed
+                  <span>
+                    Tower was drained, physically cleaned, and flushed
+                    {eventType === "FULL_REMEDIATION" && (
+                      <span className="mt-2 flex items-center gap-2 font-black">
+                        <CheckCircle2 size={18} aria-hidden /> Selected
+                      </span>
+                    )}
+                  </span>
                 </button>
               </div>
             </fieldset>
@@ -702,19 +734,52 @@ export function EventRecorder({
             </div>
           )}
           {isCleaning && (
-            <label>
-              <span className="label">Cleaning type</span>
-              <select
-                className="field mt-1"
-                value={eventType}
-                onChange={(event) => setEventType(event.target.value)}
-              >
-                <option value="CLEANING_COMPLETED">Routine cleaning</option>
-                <option value="STARTUP_CLEANING_DISINFECTION">
-                  Startup cleaning and disinfection
-                </option>
-              </select>
-            </label>
+            <fieldset className="sm:col-span-2">
+              <legend className="label">Cleaning type · Required</legend>
+              <p className="mt-1 text-sm text-slate-600">
+                Choose the description that matches the service record.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {[
+                  [
+                    "CLEANING_COMPLETED",
+                    "Routine cleaning",
+                    "Scheduled cleaning during normal operation.",
+                  ],
+                  [
+                    "STARTUP_CLEANING_DISINFECTION",
+                    "Startup cleaning and disinfection",
+                    "Cleaning completed before the tower starts operating.",
+                  ],
+                ].map(([value, label, description]) => (
+                  <label
+                    key={value}
+                    className={`cursor-pointer rounded-xl border-2 p-4 ${
+                      eventType === value
+                        ? "border-emerald-800 bg-emerald-50"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <span className="flex items-start gap-3">
+                      <input
+                        className="mt-1 size-5 accent-emerald-800"
+                        type="radio"
+                        name="cleaningTypeChoice"
+                        value={value}
+                        checked={eventType === value}
+                        onChange={() => setEventType(value)}
+                      />
+                      <span>
+                        <span className="block font-black">{label}</span>
+                        <span className="mt-1 block text-sm text-slate-600">
+                          {description}
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           )}
           {!isHyper && (
             <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">

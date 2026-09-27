@@ -10,9 +10,9 @@ import { ObligationIntelligenceCard } from "@/components/obligation-intelligence
 import { ComplianceTimeline } from "@/components/compliance-timeline";
 import { OperationPatternForm } from "@/components/operation-pattern-form";
 import { CleaningPlanForm } from "@/components/cleaning-plan-form";
+import { MonthlyTargetWindowForm } from "@/components/monthly-target-window-form";
 import {
   recordServiceEventAction,
-  updateMonthlyTargetWindowAction,
   voidServiceEventAction,
 } from "@/app/actions";
 import { complianceDashboardRows } from "@/lib/queries";
@@ -1427,15 +1427,23 @@ export default async function SystemPage({
                             name="eventType"
                             value="REPORT_SUBMITTED"
                           />
-                          <input
-                            className="field mt-1"
-                            name="eventDate"
-                            type="date"
-                            max={today}
-                            aria-label="Submission date"
-                            defaultValue={today}
-                            required
-                          />
+                          <label className="block">
+                            <span className="label">
+                              Actual submission date · Required
+                            </span>
+                            <input
+                              className="field mt-1"
+                              name="eventDate"
+                              type="date"
+                              max={today}
+                              required
+                            />
+                            <span className="mt-1 block text-xs font-bold text-slate-600">
+                              Use the date on the portal or agency
+                              confirmation—not today unless it was actually
+                              submitted today.
+                            </span>
+                          </label>
                           <input
                             type="hidden"
                             name="reportType"
@@ -1730,55 +1738,11 @@ export default async function SystemPage({
             This recommended service date stays stable; the compliance deadline
             still comes from the last qualifying sample.
           </p>
-          <form
-            action={updateMonthlyTargetWindowAction}
-            className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_2fr_auto]"
-          >
-            <input type="hidden" name="systemId" value={id} />
-            <label>
-              <span className="label">Start day</span>
-              <input
-                className="field mt-1"
-                name="startDay"
-                type="number"
-                min="1"
-                max="28"
-                required
-                defaultValue={system.monthlyTargetStartDay}
-              />
-            </label>
-            <label>
-              <span className="label">End day</span>
-              <input
-                className="field mt-1"
-                name="endDay"
-                type="number"
-                min="1"
-                max="28"
-                required
-                defaultValue={system.monthlyTargetEndDay}
-              />
-            </label>
-            <label>
-              <span className="label">
-                Why are you changing these dates? · Required
-              </span>
-              <input
-                className="field mt-1"
-                name="reason"
-                aria-label="Reason"
-                minLength={8}
-                required
-                placeholder="Example: Align collection dates with the service route"
-              />
-            </label>
-            <SubmitButton
-              className="self-end"
-              pendingLabel="Saving recommended dates…"
-            >
-              Save recommended dates
-            </SubmitButton>
-          </form>
+          <MonthlyTargetWindowForm
+            systemId={id}
+            startDay={system.monthlyTargetStartDay}
+            endDay={system.monthlyTargetEndDay}
+          />
         </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">

@@ -19,6 +19,10 @@ const months = [
 
 export function OperatingScheduleFields() {
   const [schedule, setSchedule] = useState<"YEAR_ROUND" | "SEASONAL" | "">("");
+  const [startMonth, setStartMonth] = useState(5);
+  const [startDay, setStartDay] = useState(1);
+  const [endMonth, setEndMonth] = useState(10);
+  const [endDay, setEndDay] = useState(31);
 
   return (
     <fieldset className="rounded-xl border border-slate-200 p-4 sm:col-span-2">
@@ -60,8 +64,14 @@ export function OperatingScheduleFields() {
       {schedule === "SEASONAL" && (
         <div className="mt-4 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
           {[
-            ["Start", "seasonStartMonth", "seasonStartDay", 5, 1],
-            ["End", "seasonEndMonth", "seasonEndDay", 10, 31],
+            [
+              "Start",
+              "seasonStartMonth",
+              "seasonStartDay",
+              startMonth,
+              startDay,
+            ],
+            ["End", "seasonEndMonth", "seasonEndDay", endMonth, endDay],
           ].map(([label, monthName, dayName, month, day]) => (
             <fieldset
               key={String(label)}
@@ -74,6 +84,11 @@ export function OperatingScheduleFields() {
                   className="field mt-1"
                   name={String(monthName)}
                   defaultValue={String(month)}
+                  onChange={(event) =>
+                    label === "Start"
+                      ? setStartMonth(Number(event.target.value))
+                      : setEndMonth(Number(event.target.value))
+                  }
                   required
                 >
                   {months.map((name, index) => (
@@ -92,11 +107,20 @@ export function OperatingScheduleFields() {
                   min="1"
                   max="31"
                   defaultValue={Number(day)}
+                  onChange={(event) =>
+                    label === "Start"
+                      ? setStartDay(Number(event.target.value))
+                      : setEndDay(Number(event.target.value))
+                  }
                   required
                 />
               </label>
             </fieldset>
           ))}
+          <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950 sm:col-span-2">
+            Seasonal schedule: {months[startMonth - 1]} {startDay} through{" "}
+            {months[endMonth - 1]} {endDay} each year.
+          </p>
         </div>
       )}
     </fieldset>

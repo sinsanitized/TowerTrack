@@ -7,10 +7,8 @@ import { UserRole } from "@prisma/client";
 import { todayDateOnly } from "@/lib/date";
 import { OperatingScheduleFields } from "@/components/operating-schedule-fields";
 import { SubmitButton } from "@/components/submit-button";
-import {
-  towerRuleConfigurationForMode,
-  towerRuleConfigurationLabel,
-} from "@/lib/tower-rule-configuration";
+import { LegionellaResponsibilityFields } from "@/components/legionella-responsibility-fields";
+import { ComplianceRuleProfileFields } from "@/components/compliance-rule-profile-fields";
 
 function jurisdictionLabel(jurisdiction: {
   city: string | null;
@@ -134,38 +132,7 @@ export default async function NewCoolingTowerPage({
               Choose who manages Legionella sampling and laboratory follow-up.
             </p>
           </div>
-          <label>
-            <span className="label">Legionella responsibility · Required</span>
-            <select
-              className="field mt-1"
-              name="legionellaResponsibility"
-              defaultValue=""
-              required
-            >
-              <option value="" disabled>
-                Choose responsibility
-              </option>
-              <option value="OUR_COMPANY">
-                Our company manages Legionella
-              </option>
-              <option value="CUSTOMER">Customer manages Legionella</option>
-              <option value="OTHER_VENDOR">
-                Another vendor manages Legionella
-              </option>
-              <option value="NOT_TRACKED">
-                Do not track Legionella in TowerTrack
-              </option>
-            </select>
-          </label>
-          <label>
-            <span className="label">
-              Legionella vendor name (when applicable)
-            </span>
-            <input className="field mt-1" name="legionellaVendorName" />
-            <span className="mt-1 block text-xs text-slate-600">
-              Required when another vendor manages Legionella.
-            </span>
-          </label>
+          <LegionellaResponsibilityFields />
           <div className="border-t border-slate-200 pt-5 sm:col-span-2">
             <h2 className="text-lg font-black">
               3. Compliance rules · Administrator review
@@ -197,51 +164,7 @@ export default async function NewCoolingTowerPage({
               ))}
             </select>
           </div>
-          <div>
-            <label className="label" htmlFor="new-tower-rule-configuration">
-              Compliance rules · Required
-            </label>
-            <select
-              id="new-tower-rule-configuration"
-              aria-label="Compliance rules"
-              className="field mt-1"
-              name="ruleConfiguration"
-              defaultValue=""
-              required
-            >
-              <option value="" disabled>
-                Choose configuration
-              </option>
-              <option value="NYC_AND_NYS">NYC Chapter 8 and NYS Part 4</option>
-              <option value="NYS_ONLY">NYS Part 4 only</option>
-              <option value="CUSTOM">Custom or out-of-state</option>
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="new-tower-rule-profile">
-              Assigned rule profile · Required
-            </label>
-            <select
-              id="new-tower-rule-profile"
-              aria-label="Profile version"
-              className="field mt-1"
-              name="ruleProfileId"
-              defaultValue=""
-              required
-            >
-              <option value="" disabled>
-                Choose rule profile
-              </option>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {towerRuleConfigurationLabel(
-                    towerRuleConfigurationForMode(profile.jurisdictionMode),
-                  )}{" "}
-                  — {profile.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ComplianceRuleProfileFields profiles={profiles} />
           <label>
             <span className="label">Rules effective date · Required</span>
             <input
@@ -251,6 +174,9 @@ export default async function NewCoolingTowerPage({
               defaultValue={todayDateOnly()}
               required
             />
+            <span className="mt-1 block text-xs text-slate-600">
+              Enter the date as month, day, and year.
+            </span>
           </label>
           <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2">
             <p className="mt-2 text-xs text-slate-500">

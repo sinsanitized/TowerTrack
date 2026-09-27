@@ -163,7 +163,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
 
   await page.getByRole("button", { name: /More deadline filters/ }).click();
 
-  const scheduleFilter = page.getByRole("navigation", {
+  const scheduleFilter = page.getByRole("combobox", {
     name: "Filter deadlines by operating schedule",
   });
   for (const label of [
@@ -173,15 +173,15 @@ test("due-date and work-type filters narrow displayed rows", async ({
     "Schedule not set",
   ])
     await expect(
-      scheduleFilter.getByRole("link", { name: label }),
-    ).toBeVisible();
-  await scheduleFilter.getByRole("link", { name: "Seasonal" }).click();
+      scheduleFilter.getByRole("option", { name: label }),
+    ).toHaveCount(1);
+  await scheduleFilter.selectOption("SEASONAL");
   await expect(page).toHaveURL(
     "/deadlines?period=NEXT_WEEK&action=SAMPLE&schedule=SEASONAL",
   );
 
-  const responsibility = page.getByRole("navigation", {
-    name: "Filter deadlines by responsibility",
+  const responsibility = page.getByRole("combobox", {
+    name: "Filter deadlines by responsible party",
   });
   for (const label of [
     "Our company",
@@ -191,11 +191,9 @@ test("due-date and work-type filters narrow displayed rows", async ({
     "All responsibilities",
   ])
     await expect(
-      responsibility.getByRole("link", { name: label, exact: true }),
-    ).toBeVisible();
-  await responsibility
-    .getByRole("link", { name: "Customer", exact: true })
-    .click();
+      responsibility.getByRole("option", { name: label, exact: true }),
+    ).toHaveCount(1);
+  await responsibility.selectOption("CUSTOMER");
   await expect(page).toHaveURL(
     "/deadlines?period=NEXT_WEEK&action=SAMPLE&schedule=SEASONAL&responsibility=CUSTOMER",
   );

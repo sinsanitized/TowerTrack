@@ -9,16 +9,15 @@ import {
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
-import {
-  towerRuleConfigurationForMode,
-  towerRuleConfigurationLabel,
-} from "@/lib/tower-rule-configuration";
+import { towerRuleConfigurationLabel } from "@/lib/tower-rule-configuration";
 import { formatDate, todayDateOnly } from "@/lib/date";
 import {
   serviceResponsibilityFamilies,
-  serviceResponsibilityLabel,
+  type TowerServiceResponsibilities,
 } from "@/lib/service-responsibility";
 import { SubmitButton } from "@/components/submit-button";
+import { ServiceResponsibilityFields } from "@/components/service-responsibility-fields";
+import { ComplianceRuleProfileFields } from "@/components/compliance-rule-profile-fields";
 
 function jurisdictionLabel(jurisdiction: {
   city: string | null;
@@ -58,11 +57,9 @@ export default async function EditCustomerTowerPage({
     requestedReturnTo?.startsWith("/") && !requestedReturnTo.startsWith("//")
       ? requestedReturnTo
       : null;
-  const focusedResponsibility = serviceResponsibilityFamilies.some(
+  const focusedResponsibility = serviceResponsibilityFamilies.find(
     ([key]) => key === focus,
-  )
-    ? focus
-    : null;
+  )?.[0];
   const section = focusedResponsibility
     ? "responsibilities"
     : requestedSection === "responsibilities" || requestedSection === "rules"
@@ -309,43 +306,11 @@ export default async function EditCustomerTowerPage({
             {returnTo && (
               <input type="hidden" name="returnTo" value={returnTo} />
             )}
-            {serviceResponsibilityFamilies.map(([key, label]) => (
-              <label
-                key={key}
-                className={
-                  focusedResponsibility === key
-                    ? "rounded-lg border-2 border-blue-400 bg-blue-50 p-3"
-                    : undefined
-                }
-              >
-                <span className="label">{label}</span>
-                <select
-                  className="field mt-1"
-                  name={key}
-                  defaultValue={system[key] ?? ""}
-                  autoFocus={focusedResponsibility === key}
-                  required
-                >
-                  <option value="" disabled>
-                    Select responsible party
-                  </option>
-                  <option value="OUR_COMPANY">Our company</option>
-                  <option value="CUSTOMER">Customer</option>
-                  <option value="OTHER_VENDOR">Another vendor</option>
-                  <option value="NOT_TRACKED">Reference only</option>
-                </select>
-              </label>
-            ))}
-            <label>
-              <span className="label">
-                Legionella vendor name (required for Another vendor)
-              </span>
-              <input
-                className="field mt-1"
-                name="legionellaVendorName"
-                defaultValue={system.legionellaVendorName ?? ""}
-              />
-            </label>
+            <ServiceResponsibilityFields
+              responsibilities={system as TowerServiceResponsibilities}
+              focusedResponsibility={focusedResponsibility}
+              legionellaVendorName={system.legionellaVendorName}
+            />
             <label className="sm:col-span-2">
               <span className="label">
                 Why are you changing responsibility? · Required
@@ -359,14 +324,6 @@ export default async function EditCustomerTowerPage({
                 required
               />
             </label>
-            <div className="grid gap-1 text-sm text-slate-600 sm:col-span-2 sm:grid-cols-2">
-              {serviceResponsibilityFamilies.map(([key, label]) => (
-                <div key={key}>
-                  <span className="font-bold">{label}:</span>{" "}
-                  {serviceResponsibilityLabel(system[key])}
-                </div>
-              ))}
-            </div>
             <SubmitButton
               className="sm:col-span-2"
               pendingLabel="Saving service responsibilities…"
@@ -404,21 +361,12 @@ export default async function EditCustomerTowerPage({
               className="mt-4 grid gap-4 sm:grid-cols-2"
             >
               <input type="hidden" name="systemId" value={system.id} />
-              <label>
-                <span className="label">Rule configuration</span>
-                <select
-                  className="field mt-1"
-                  name="ruleConfiguration"
-                  defaultValue={system.ruleConfiguration}
-                  required
-                >
-                  <option value="NYC_AND_NYS">
-                    NYC Chapter 8 and NYS Part 4
-                  </option>
-                  <option value="NYS_ONLY">NYS Part 4 only</option>
-                  <option value="CUSTOM">Custom or out-of-state</option>
-                </select>
-              </label>
+              <ComplianceRuleProfileFields
+                profiles={profiles}
+                initialConfiguration={system.ruleConfiguration}
+                initialProfileId={system.ruleProfileId}
+                legend="Rule configuration"
+              />
               <label>
                 <span className="label">Jurisdiction</span>
                 <select
@@ -435,24 +383,6 @@ export default async function EditCustomerTowerPage({
                 </select>
               </label>
               <label>
-                <span className="label">Assigned profile version</span>
-                <select
-                  className="field mt-1"
-                  name="ruleProfileId"
-                  defaultValue={system.ruleProfileId}
-                  required
-                >
-                  {profiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {towerRuleConfigurationLabel(
-                        towerRuleConfigurationForMode(profile.jurisdictionMode),
-                      )}{" "}
-                      — {profile.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
                 <span className="label">Effective date</span>
                 <input
                   className="field mt-1"
@@ -463,6 +393,9 @@ export default async function EditCustomerTowerPage({
                   defaultValue={todayDateOnly()}
                   required
                 />
+                <span className="mt-1 block text-xs text-slate-600">
+                  Enter the date as month, day, and year.
+                </span>
               </label>
               <label>
                 <span className="label">

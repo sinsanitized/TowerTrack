@@ -460,6 +460,16 @@ export default async function AdminPage({
         className="scroll-mt-6 grid gap-6 xl:grid-cols-[1fr_300px]"
       >
         <div className="space-y-5">
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-amber-950">
+            <div className="label text-amber-900">
+              Advanced · Administrators only
+            </div>
+            <p className="mt-1 text-sm font-bold">
+              Changing a verified rule recalculates affected tower deadlines.
+              Open a profile only when you have the governing source in front of
+              you.
+            </p>
+          </div>
           {profiles.map((profile) => {
             const routineRule = profile.rules.find(
               (rule) => rule.requirementType === "ROUTINE_LEGIONELLA_SAMPLE",
@@ -703,8 +713,14 @@ export default async function AdminPage({
                     ) && (
                       <details className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50">
                         <summary className="cursor-pointer list-none p-4 font-black text-emerald-900">
-                          Add jurisdiction rule
+                          Add jurisdiction rule · Advanced
                         </summary>
+                        <div className="border-t border-emerald-200 bg-white px-4 py-3 text-sm text-slate-700">
+                          Use a hard interval for repeating work (for example,
+                          31 means no later than 31 days). Use minimum and
+                          maximum days together for a window after a trigger
+                          (for example, 3–7 means day 3 through day 7).
+                        </div>
                         <form
                           action={createRuleDefinitionAction}
                           className="grid gap-4 border-t border-emerald-200 p-4 sm:grid-cols-2 xl:grid-cols-3"
@@ -863,6 +879,11 @@ export default async function AdminPage({
                             />
                           </label>
                           <div className="sm:col-span-2 xl:col-span-3">
+                            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
+                              Final check: verify the authority, citation, and
+                              timing above. Saving adds the rule immediately and
+                              recalculates affected towers.
+                            </div>
                             <SubmitButton pendingLabel="Adding rule…">
                               Add rule and recalculate towers
                             </SubmitButton>

@@ -82,7 +82,19 @@ export function VisitCompletionForm({
         {activities.map((activity) => (
           <div
             key={activity.id}
-            className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4"
+            className={`flex items-start gap-3 rounded-xl border-2 p-4 ${
+              readOnly
+                ? "border-slate-200"
+                : selected.has(activity.id)
+                  ? "cursor-pointer border-emerald-700 bg-emerald-50/40"
+                  : "cursor-pointer border-slate-200 hover:border-emerald-400"
+            }`}
+            onClick={(event) => {
+              if (readOnly) return;
+              const target = event.target as HTMLElement;
+              if (target.closest("input, select, textarea, button, a")) return;
+              toggle(activity.id, !selected.has(activity.id));
+            }}
           >
             <input
               name={`activity_${activity.id}`}
@@ -97,6 +109,13 @@ export function VisitCompletionForm({
               <div className="font-black">
                 {activityLabel(activity.activityType)}
               </div>
+              {!readOnly && (
+                <div className="mt-1 text-xs font-bold text-slate-600">
+                  {selected.has(activity.id)
+                    ? "Selected — click anywhere on this card to remove"
+                    : "Not selected — click anywhere on this card to add"}
+                </div>
+              )}
               <div className="text-sm text-slate-500">
                 {activity.systemName}
               </div>

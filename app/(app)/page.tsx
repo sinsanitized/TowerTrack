@@ -302,6 +302,7 @@ export default async function ActionCenterPage({
     0,
   );
   const periodBounds = deadlinePeriodBounds(today);
+  const actionPreviewLimit = 8;
 
   return (
     <>
@@ -401,18 +402,31 @@ export default async function ActionCenterPage({
           </Link>
         </div>
         {thisWeekItems.length ? (
-          thisWeekItems.map(({ row, obligation }) => (
-            <ActionRow
-              key={obligation.id}
-              row={row}
-              obligation={obligation}
-              today={today}
-            />
-          ))
+          thisWeekItems
+            .slice(0, actionPreviewLimit)
+            .map(({ row, obligation }) => (
+              <ActionRow
+                key={obligation.id}
+                row={row}
+                obligation={obligation}
+                today={today}
+              />
+            ))
         ) : (
           <p className="p-5 text-sm font-bold text-slate-600">
             Nothing else is due before the end of this week.
           </p>
+        )}
+        {thisWeekItems.length > actionPreviewLimit && (
+          <div className="border-t border-amber-200 bg-amber-50/50 p-4 text-center">
+            <Link
+              className="font-black text-amber-900 underline underline-offset-4"
+              href="/deadlines?period=THIS_WEEK"
+            >
+              Showing {actionPreviewLimit} of {thisWeekItems.length} · View all
+              due this week →
+            </Link>
+          </div>
         )}
       </section>
 
@@ -442,19 +456,32 @@ export default async function ActionCenterPage({
           </Link>
         </div>
         {nextWeekItems.length ? (
-          nextWeekItems.map(({ row, obligation }) => (
-            <ActionRow
-              key={obligation.id}
-              row={row}
-              obligation={obligation}
-              today={today}
-              tone="next"
-            />
-          ))
+          nextWeekItems
+            .slice(0, actionPreviewLimit)
+            .map(({ row, obligation }) => (
+              <ActionRow
+                key={obligation.id}
+                row={row}
+                obligation={obligation}
+                today={today}
+                tone="next"
+              />
+            ))
         ) : (
           <p className="p-5 text-sm font-bold text-blue-900">
             Nothing is currently due next week.
           </p>
+        )}
+        {nextWeekItems.length > actionPreviewLimit && (
+          <div className="border-t border-blue-200 bg-blue-50/50 p-4 text-center">
+            <Link
+              className="font-black text-blue-800 underline underline-offset-4"
+              href="/deadlines?period=NEXT_WEEK"
+            >
+              Showing {actionPreviewLimit} of {nextWeekItems.length} · View all
+              due next week →
+            </Link>
+          </div>
         )}
       </section>
 
