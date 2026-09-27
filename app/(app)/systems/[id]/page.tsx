@@ -759,7 +759,7 @@ export default async function SystemPage({
             : view === "obligations"
               ? "Required work"
               : view === "history"
-                ? "Completed records"
+                ? "Compliance records"
                 : view === "information"
                   ? "Tower information"
                   : "Tower settings"}

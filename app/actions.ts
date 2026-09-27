@@ -953,7 +953,7 @@ export async function correctServiceEventAction(formData: FormData) {
   revalidatePath("/customers");
   revalidatePath(`/systems/${existing.coolingTowerSystemId}`);
   redirect(
-    `/systems/${existing.coolingTowerSystemId}?correctedEvent=${replacement.id}`,
+    `/systems/${existing.coolingTowerSystemId}?view=history&correctedEvent=${replacement.id}`,
   );
 }
 
@@ -1039,7 +1039,9 @@ export async function voidServiceEventAction(formData: FormData) {
   });
   revalidatePath("/");
   revalidatePath(`/systems/${existing.coolingTowerSystemId}`);
-  redirect(`/systems/${existing.coolingTowerSystemId}?voidedEvent=1`);
+  redirect(
+    `/systems/${existing.coolingTowerSystemId}?view=history&voidedEvent=1`,
+  );
 }
 
 export async function updateMonthlyTargetWindowAction(formData: FormData) {
@@ -1091,7 +1093,7 @@ export async function updateMonthlyTargetWindowAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/deadlines");
   revalidatePath(`/systems/${parsed.systemId}`);
-  redirect(`/systems/${parsed.systemId}?targetWindow=1`);
+  redirect(`/systems/${parsed.systemId}?view=settings&targetWindow=1`);
 }
 
 export async function logoutAction() {
@@ -1266,7 +1268,7 @@ export async function updateSeasonalSettingsAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/deadlines");
   revalidatePath(`/systems/${parsed.systemId}`);
-  redirect(`/systems/${parsed.systemId}?operationPattern=1`);
+  redirect(`/systems/${parsed.systemId}?view=settings&operationPattern=1`);
 }
 
 export async function createAnnualCleaningPlanAction(formData: FormData) {
@@ -3053,7 +3055,7 @@ export async function updateCustomerTowerAction(formData: FormData) {
   revalidatePath("/deadlines");
   revalidatePath("/customers");
   revalidatePath(`/systems/${existing.id}`);
-  redirect(`/systems/${existing.id}?updated=1`);
+  redirect(`/systems/${existing.id}?view=information&updated=1`);
 }
 
 export async function changeTowerRuleConfigurationAction(formData: FormData) {

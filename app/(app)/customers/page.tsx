@@ -62,7 +62,22 @@ export default async function CustomersPage() {
         description="Create the customer and address first, then add the cooling tower equipment details."
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <div className="panel table-wrap">
+        <section
+          className="panel table-wrap"
+          aria-labelledby="customer-directory-heading"
+        >
+          <div className="border-b border-slate-200 p-5">
+            <div className="label">Customer and site directory</div>
+            <h2
+              id="customer-directory-heading"
+              className="mt-1 text-xl font-black"
+            >
+              Find a customer or cooling tower
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Open an existing tower or continue an unfinished setup.
+            </p>
+          </div>
           <table>
             <thead>
               <tr>
@@ -86,7 +101,7 @@ export default async function CustomersPage() {
                       system
                         ? `Open ${system.systemName}`
                         : building
-                          ? `Add tower details for ${customer.name}`
+                          ? `Continue tower setup for ${customer.name}`
                           : undefined
                     }
                   >
@@ -112,7 +127,7 @@ export default async function CustomersPage() {
                           <div className="text-xs text-slate-500">
                             {system
                               ? `${system.systemName} · `
-                              : "Cooling tower details not added · "}
+                              : "Customer saved—tower details needed · "}
                             {building.city}, {building.state}
                           </div>
                         </>
@@ -140,7 +155,7 @@ export default async function CustomersPage() {
                           className="btn btn-primary"
                           href={`/customers/${customer.id}/towers/new?buildingId=${building.id}`}
                         >
-                          Add tower details
+                          Continue tower setup
                         </Link>
                       ) : null}
                     </td>
@@ -158,7 +173,7 @@ export default async function CustomersPage() {
               </p>
             </div>
           )}
-        </div>
+        </section>
         <aside className="panel p-5 xl:sticky xl:top-6">
           <div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
             <span className="rounded-full bg-emerald-800 px-2 py-1 text-white">
