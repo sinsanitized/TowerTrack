@@ -107,7 +107,7 @@ describe("central compliance urgency", () => {
         priority: "ROUTINE",
         latestDueDate: "2026-07-31",
       }).explanation,
-    ).toContain("remains open until completion");
+    ).toContain("remains open until actual completion is recorded");
   });
 
   it("does not let a scheduled visit hide an urgent deadline", () => {

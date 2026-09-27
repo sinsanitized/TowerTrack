@@ -37,7 +37,7 @@ export type DeadlineStatus =
   | "Due later"
   | "Review required";
 export type DeadlineExecutionState =
-  "Unscheduled" | "Scheduled (not completed)" | "Waiting" | "Completed";
+  "Completion not recorded" | "Waiting" | "Completed";
 
 export const deadlinePeriodValues = [
   "ALL",
@@ -377,8 +377,6 @@ export function executionStateFor(
 } {
   if (obligation.status === "COMPLETED")
     return { label: "Completed", color: "GREEN" };
-  if (obligation.status === "SCHEDULED")
-    return { label: "Scheduled (not completed)", color: "BLUE" };
   if (
     responsibility == null ||
     responsibility === "CUSTOMER" ||
@@ -386,7 +384,7 @@ export function executionStateFor(
     responsibility === "NOT_TRACKED"
   )
     return { label: "Waiting", color: "PURPLE" };
-  return { label: "Unscheduled", color: "GRAY" };
+  return { label: "Completion not recorded", color: "GRAY" };
 }
 
 function executionDetails(

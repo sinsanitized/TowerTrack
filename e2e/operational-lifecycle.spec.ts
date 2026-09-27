@@ -386,7 +386,9 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await page.goto("/work/visit-opportunities");
   const opportunity = page.locator("article").filter({ hasText: name });
   await expect(
-    opportunity.getByText(/One visit can complete [2-9] requirements/),
+    opportunity.getByText(
+      /Completed work on one valid date can satisfy [2-9] requirements/,
+    ),
   ).toBeVisible();
   await expect(opportunity.getByText("Schedule this visit")).toHaveCount(0);
   await opportunity.getByRole("link", { name: "Open tower" }).last().click();
@@ -450,39 +452,14 @@ test("a year-round tower keeps one rolling sample clock and closes historical po
   await expect(page.getByText("NYC portal follow-up")).toHaveCount(0);
   await expect(page.getByText("Overdue requirement")).toHaveCount(0);
 
-  await page
-    .getByLabel("Tower workspace")
-    .getByRole("link", { name: "Settings", exact: true })
-    .click();
-  const cleaningPlanForm = page.locator("#cleaning-plan form");
-  await expect(
-    cleaningPlanForm.getByRole("button", {
-      name: "Create two-day cleaning plan",
-    }),
-  ).toBeVisible();
-  await expect(
-    cleaningPlanForm.locator('input[name="chemicalAddDate"]'),
-  ).toHaveValue("2026-07-20");
-  await expect(
-    cleaningPlanForm.locator('input[name="cleaningDate"]'),
-  ).toHaveValue("2026-07-21");
-  await cleaningPlanForm
-    .locator('select[name="technicianId"]')
-    .selectOption({ label: "Mike Torres" });
-  await cleaningPlanForm
-    .getByRole("button", { name: "Create two-day cleaning plan" })
-    .click();
-  await expect(page).toHaveURL(/\/visits\/[a-z0-9]+\?planned=1$/);
-  await expect(page.getByText("Two-day cleaning plan created")).toBeVisible();
-  await expect(page.getByText("Monday 07/20/2026")).toBeVisible();
-  await expect(page.getByText("Tuesday 07/21/2026")).toBeVisible();
-  await expect(page.getByText("Annual cleaning").first()).toBeVisible();
-
   await page.goto(systemUrl);
-  await expect(page.getByText("Active cleaning plan")).toBeVisible();
-  await expect(
-    page.getByText(/annual cleaning obligation remains open/i),
-  ).toBeVisible();
+  await recordEvent(
+    page,
+    "Cleaning",
+    "2026-07-21",
+    "Completed the required physical cleaning",
+  );
+  await expect(page.getByText("Compliance updated")).toBeVisible();
 });
 
 test("a seasonal tower preserves its history but stops the routine clock after shutdown", async ({

@@ -235,9 +235,9 @@ test("action center separates this week from next week", async ({ page }) => {
   await expect(page.getByText("Work requiring action now")).toBeVisible();
   await expect(page.getByText("Near-term planning")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Combine work into one visit" }),
+    page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
-  await expect(page.getByText("Route and requirement planning")).toBeVisible();
+  await expect(page.getByText("Shared valid completion dates")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "View all due this week" }),
   ).toHaveAttribute("href", "/deadlines?period=THIS_WEEK");

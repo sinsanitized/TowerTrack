@@ -22,12 +22,12 @@ const views = {
     Icon: AlertTriangle,
   },
   "visit-opportunities": {
-    title: "Combined visits",
+    title: "Work that can be completed together",
     description:
-      "Recommended dates for one field visit, including every compatible requirement the work can satisfy.",
+      "Shared valid dates when one set of completed field work can satisfy multiple requirements.",
     empty:
       "No on-site requirement currently has dates when the required work can still be completed.",
-    unit: "combined visits",
+    unit: "compatible work groups",
     Icon: Layers3,
   },
 } as const;
@@ -161,14 +161,12 @@ export default async function WorkViewPage({
               </ClickableRow>
               {view === "visit-opportunities" && row.visitOpportunity && (
                 <div className="mx-5 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
-                  <div className="label">
-                    Recommended combined service dates
-                  </div>
+                  <div className="label">Shared valid completion dates</div>
                   <div className="mt-3 grid gap-4 lg:grid-cols-2">
                     <ComplianceWindow
                       start={row.visitOpportunity.start}
                       end={row.visitOpportunity.end}
-                      label="Recommended dates to perform all listed actions"
+                      label="Dates when all listed actions can be completed"
                     />
                     <ComplianceDate
                       value={row.visitOpportunity.controllingDeadline}
@@ -181,19 +179,20 @@ export default async function WorkViewPage({
                   </p>
                   <p className="mt-2 text-sm font-black">
                     {row.visitOpportunity.obligations.length > 1
-                      ? `One visit can complete ${row.visitOpportunity.obligations.length} requirements.`
-                      : "Only one field requirement can be completed on these dates; no combined visit is available yet."}
+                      ? `Completed work on one valid date can satisfy ${row.visitOpportunity.obligations.length} requirements.`
+                      : "Only one field requirement can be completed within this date window."}
                   </p>
                   <div className="mt-4 border-t border-emerald-200 pt-3">
                     <p className="text-sm font-bold">
-                      This is field guidance, not a booked visit. Record the
-                      actual sample or completed work from the tower.
+                      These dates are guidance, not an appointment. After the
+                      work happens, record its actual completion date from the
+                      tower.
                     </p>
                     <Link
                       className="btn btn-primary mt-3"
                       href={`/systems/${row.id}#record-event`}
                     >
-                      Open tower
+                      Record completed work
                     </Link>
                   </div>
                 </div>

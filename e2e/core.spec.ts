@@ -16,7 +16,7 @@ test("home leads directly into tower event entry", async ({ page }) => {
     page.getByRole("heading", { name: "Action Center" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Combine work into one visit" }),
+    page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
   await expect(page.getByText("Tower directory")).toHaveCount(0);
   await expect(
@@ -177,7 +177,7 @@ test("secondary workflow destinations are removed from primary navigation", asyn
 
   await page.goto("/work/visit-opportunities");
   await expect(
-    page.getByRole("heading", { name: "Combined visits" }),
+    page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
@@ -193,7 +193,7 @@ test("home presents mutually exclusive Action Center sections", async ({
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Combined Visit Recommendations" }),
+    page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Upcoming and currently actionable" }),
@@ -216,10 +216,10 @@ test("home presents mutually exclusive Action Center sections", async ({
   expect(homeText).not.toContain("Missed or overdue obligations");
   expect(homeText).not.toContain("Recently completed");
   expect(homeText).not.toContain("Annual and recurring requirements");
-  await page.getByRole("link", { name: "View all recommendations" }).click();
+  await page.getByRole("link", { name: "View all compatible work" }).click();
   await expect(page).toHaveURL("/work/visit-opportunities");
   await expect(
-    page.getByRole("heading", { name: "Combined visits" }),
+    page.getByRole("heading", { name: "Work that can be completed together" }),
   ).toBeVisible();
 });
 
@@ -282,19 +282,16 @@ test("top search finds towers by building and job number", async ({ page }) => {
   await expect(page).toHaveURL(/\/systems\/[a-z0-9]+$/);
 });
 
-test("visit opportunities guide technicians to record actual work without booking samples", async ({
+test("compatible work guides users to record actual work without scheduling", async ({
   page,
 }) => {
   await page.goto("/work/visit-opportunities");
   await expect(page.getByText("Schedule this visit")).toHaveCount(0);
   await expect(page.getByText("Create this visit")).toHaveCount(0);
   await expect(
-    page.getByText(/This is field guidance, not a booked visit/).first(),
+    page.getByText(/These dates are guidance, not an appointment/).first(),
   ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Open tower & record work" })
-    .first()
-    .click();
+  await page.getByRole("link", { name: "Open tower" }).first().click();
   await expect(page).toHaveURL(/\/systems\/[a-z0-9]+#record-event$/);
   await expect(
     page.getByRole("heading", { name: "Record what happened" }),

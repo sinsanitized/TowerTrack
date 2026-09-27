@@ -62,17 +62,15 @@ function ActionRow({
   });
   const responsibility = operationalResponsibility(row, obligation);
   const executionLabel =
-    obligation.status === "SCHEDULED"
-      ? "Scheduled (not completed)"
-      : responsibility == null
-        ? "Waiting on review"
-        : responsibility === "CUSTOMER"
-          ? "Waiting on customer"
-          : responsibility === "OTHER_VENDOR"
-            ? "Waiting on vendor"
-            : responsibility === "NOT_TRACKED"
-              ? "Reference only"
-              : "Unscheduled";
+    responsibility == null
+      ? "Waiting on review"
+      : responsibility === "CUSTOMER"
+        ? "Waiting on customer"
+        : responsibility === "OTHER_VENDOR"
+          ? "Waiting on vendor"
+          : responsibility === "NOT_TRACKED"
+            ? "Reference only"
+            : "Completion not recorded";
   const primaryHref =
     responsibility == null
       ? withReturnPath(
@@ -138,9 +136,9 @@ function ActionRow({
                   {row.visitOpportunity.obligations.length === 2 ? "" : "s"}
                 </summary>
                 <p className="mt-2 font-bold">
-                  This is a route-saving suggestion, not another required task.
-                  One visit can complete all listed field work from{" "}
-                  {row.visitOpportunity.start} through{" "}
+                  This is a work-saving suggestion, not another required task.
+                  Work completed on one valid date can satisfy every listed
+                  requirement from {row.visitOpportunity.start} through{" "}
                   {row.visitOpportunity.end}.
                 </p>
                 <ul className="mt-2 list-disc pl-5">
@@ -174,18 +172,18 @@ function ActionRow({
           <div className="mt-2">
             <StatusBadge color={urgency.color} label={urgency.label} />
           </div>
-          {executionLabel === "Unscheduled" ? (
-            <p className="mt-2 text-sm font-bold text-slate-600">Unscheduled</p>
+          {executionLabel === "Completion not recorded" ? (
+            <p className="mt-2 text-sm font-bold text-slate-600">
+              Completion not recorded
+            </p>
           ) : (
             <div className="mt-2">
               <StatusBadge
                 color={
-                  obligation.status === "SCHEDULED"
-                    ? "BLUE"
-                    : executionLabel.startsWith("Waiting") ||
-                        executionLabel === "Reference only"
-                      ? "PURPLE"
-                      : "GRAY"
+                  executionLabel.startsWith("Waiting") ||
+                  executionLabel === "Reference only"
+                    ? "PURPLE"
+                    : "GRAY"
                 }
                 label={executionLabel}
               />
@@ -491,10 +489,10 @@ export default async function ActionCenterPage({
             <Layers3 className="mt-1" size={20} />
             <div>
               <h2 className="mt-1 text-xl font-black">
-                Combine work into one visit
+                Work that can be completed together
               </h2>
               <p className="mt-1 text-sm font-bold text-emerald-800">
-                Route and requirement planning
+                Shared valid completion dates
               </p>
             </div>
           </div>
@@ -502,7 +500,7 @@ export default async function ActionCenterPage({
             className="text-sm font-black text-emerald-800"
             href="/work/visit-opportunities"
           >
-            View all recommendations →
+            View all compatible work →
           </Link>
         </div>
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -517,8 +515,8 @@ export default async function ActionCenterPage({
                   <div className="font-black">{row.systemName}</div>
                   <div className="text-sm text-emerald-950">{row.building}</div>
                   <h3 className="mt-3 text-lg font-black">
-                    One visit can satisfy {opportunity.obligations.length}{" "}
-                    requirements
+                    One completion date can satisfy{" "}
+                    {opportunity.obligations.length} requirements
                   </h3>
                   <ul className="mt-2 list-disc pl-5 text-sm">
                     {opportunity.obligations.map((item) => (
@@ -529,7 +527,7 @@ export default async function ActionCenterPage({
                     <ComplianceWindow
                       start={opportunity.start}
                       end={opportunity.end}
-                      label="Recommended combined service dates"
+                      label="Dates when all listed work can be completed"
                       compact
                     />
                     <ComplianceDate

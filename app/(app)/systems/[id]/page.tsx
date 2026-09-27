@@ -9,7 +9,6 @@ import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
 import { ComplianceTimeline } from "@/components/compliance-timeline";
 import { OperationPatternForm } from "@/components/operation-pattern-form";
-import { CleaningPlanForm } from "@/components/cleaning-plan-form";
 import { MonthlyTargetWindowForm } from "@/components/monthly-target-window-form";
 import {
   recordServiceEventAction,
@@ -19,10 +18,7 @@ import { complianceDashboardRows } from "@/lib/queries";
 import { db } from "@/lib/db";
 import {
   formatDate,
-  addDays,
   dateOnly,
-  isWorkingDay,
-  nextWorkingDate,
   todayDateOnly,
   workingDaysRemaining,
 } from "@/lib/date";
@@ -110,7 +106,6 @@ export default async function SystemPage({
     system,
     dashboardRow,
     recordedEvent,
-    technicians,
     profileAudit,
     availableRuleProfiles,
   ] = await Promise.all([
@@ -214,17 +209,6 @@ export default async function SystemPage({
           },
         })
       : Promise.resolve(null),
-    ["ADMIN", "OPERATIONS_MANAGER", "SCHEDULER"].includes(user.role)
-      ? db.user.findMany({
-          where: {
-            organizationId: user.organizationId,
-            role: "TECHNICIAN",
-            active: true,
-          },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
     db.auditLog.findFirst({
       where: {
         entityType: "CoolingTowerSystem",
@@ -335,12 +319,6 @@ export default async function SystemPage({
   const cleaningObligation = dashboardRow.openObligations.find(
     (item) => item.type === "ANNUAL_CLEANING",
   );
-  let cleaningPlanEarliest = [todayDateOnly(), cleaningObligation?.earliest]
-    .filter((value): value is string => Boolean(value))
-    .sort()
-    .at(-1)!;
-  while (!isWorkingDay(cleaningPlanEarliest))
-    cleaningPlanEarliest = addDays(cleaningPlanEarliest, 1);
   const latestMonthlySample = system.serviceEvents
     .filter(
       (event) =>
@@ -768,7 +746,7 @@ export default async function SystemPage({
           {view === "overview"
             ? "See what needs attention now, the next upcoming work, and the latest compliance dates."
             : view === "obligations"
-              ? "Review unfinished work, dependencies, deadlines, and visit planning."
+              ? "Review unfinished work, dependencies, deadlines, and compatible completion dates."
               : view === "history"
                 ? "Review completed samples, results, inspections, cleaning, submissions, corrections, and audit history."
                 : view === "information"
@@ -817,7 +795,7 @@ export default async function SystemPage({
             </li>
             {dashboardRow.visitOpportunity && (
               <li>
-                ✓ Best future visit covers{" "}
+                ✓ One completion date can cover{" "}
                 {dashboardRow.visitOpportunity.obligations.length} requirement
                 {dashboardRow.visitOpportunity.obligations.length === 1
                   ? ""
@@ -1487,63 +1465,65 @@ export default async function SystemPage({
           id="cleaning-plan"
           className={`${view === "obligations" ? "panel" : "hidden"} scroll-mt-6 p-5`}
         >
-          <div className="label">Annual cleaning coordination</div>
-          <h2 className="mt-1 font-black">Two-day cleaning plan</h2>
+          <div className="label">Annual cleaning</div>
+          <h2 className="mt-1 font-black">Record completed cleaning</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Coordinate chemical addition and the following physical cleaning.
-            The plan remains separate from compliance completion.
+            Enter the date the physical cleaning actually happened. Only a
+            completed-work date fulfills the requirement.
           </p>
           {!dashboardRow.cleaning.applicable ? (
             <p className="mt-4 text-sm font-bold text-slate-600">
               The NYC twice-yearly cleaning requirement is not enabled for this
               tower.
             </p>
-          ) : activeCleaningPlan ? (
-            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950">
-              <div className="font-black">Active cleaning plan</div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <ComplianceDate
-                  value={cleaningPlanDetails?.chemicalAddDate}
-                  label="Day 1 · Chemical addition"
-                  operational
-                />
-                <ComplianceDate
-                  value={
-                    cleaningPlanDetails?.cleaningDate ??
-                    activeCleaningPlan.scheduledDate
-                  }
-                  label="Day 2 · Physical cleaning"
-                  operational
-                />
-              </div>
-              <p className="mt-3 text-sm font-bold">
-                The annual cleaning requirement remains open until physical
-                cleaning is recorded as completed.
-              </p>
-              <Link
-                className="btn mt-3"
-                href={`/visits/${activeCleaningPlan.visitId}`}
-              >
-                Open cleaning plan
-              </Link>
-            </div>
-          ) : cleaningObligation &&
-            cleaningObligation.latest &&
-            nextWorkingDate(cleaningPlanEarliest) <=
-              cleaningObligation.latest &&
-            ["ADMIN", "OPERATIONS_MANAGER", "SCHEDULER"].includes(user.role) ? (
-            <CleaningPlanForm
-              systemId={system.id}
-              earliestDate={cleaningPlanEarliest}
-              latestDate={cleaningObligation.latest}
-              technicians={technicians}
-            />
           ) : (
-            <p className="mt-4 text-sm font-bold text-slate-600">
-              {dashboardRow.cleaning.remaining === 0
-                ? "Both required cleanings are recorded for this calendar year."
-                : "No valid two-working-day planning window is currently available."}
-            </p>
+            <div className="mt-4 space-y-4">
+              {activeCleaningPlan && (
+                <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-slate-800">
+                  <div className="font-black">Legacy planning reference</div>
+                  <p className="mt-1 text-sm">
+                    These dates were saved by the retired scheduling workflow.
+                    They do not fulfill the cleaning requirement.
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <ComplianceDate
+                      value={cleaningPlanDetails?.chemicalAddDate}
+                      label="Day 1 · Chemical addition"
+                      operational
+                    />
+                    <ComplianceDate
+                      value={
+                        cleaningPlanDetails?.cleaningDate ??
+                        activeCleaningPlan.scheduledDate
+                      }
+                      label="Day 2 · Physical cleaning"
+                      operational
+                    />
+                  </div>
+                </div>
+              )}
+              {cleaningObligation ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+                  <div className="font-black">
+                    Cleaning still needs a completion date
+                  </div>
+                  <p className="mt-1 text-sm">
+                    Record the actual date after the work is finished.
+                    TowerTrack will validate it and recalculate the requirement.
+                  </p>
+                  <Link
+                    className={buttonClass("primary", "mt-3")}
+                    href={completionHrefForObligation(id, cleaningObligation)}
+                  >
+                    Record actual cleaning date
+                  </Link>
+                </div>
+              ) : (
+                <p className="text-sm font-bold text-slate-600">
+                  Both required cleanings are recorded for this calendar year.
+                </p>
+              )}
+            </div>
           )}
         </div>
         {view === "information" && (

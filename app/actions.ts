@@ -1271,7 +1271,7 @@ export async function updateSeasonalSettingsAction(formData: FormData) {
   redirect(`/systems/${parsed.systemId}?view=settings&operationPattern=1`);
 }
 
-export async function createAnnualCleaningPlanAction(formData: FormData) {
+async function createAnnualCleaningPlanAction(formData: FormData) {
   const user = await requireRole([
     UserRole.ADMIN,
     UserRole.OPERATIONS_MANAGER,
@@ -1470,7 +1470,7 @@ export async function createAnnualCleaningPlanAction(formData: FormData) {
   redirect(`/visits/${visit.id}?planned=1`);
 }
 
-export async function createVisitOpportunityAction(formData: FormData) {
+async function createVisitOpportunityAction(formData: FormData) {
   const user = await requireRole([
     UserRole.ADMIN,
     UserRole.OPERATIONS_MANAGER,
@@ -1722,7 +1722,7 @@ export async function createVisitOpportunityAction(formData: FormData) {
   redirect(`/visits/${visit.id}`);
 }
 
-export async function completeVisitAction(formData: FormData) {
+async function completeVisitAction(formData: FormData) {
   const user = await requireRole([
     UserRole.ADMIN,
     UserRole.OPERATIONS_MANAGER,
@@ -1897,7 +1897,7 @@ export async function completeVisitAction(formData: FormData) {
   redirect(`/visits/${parsed.visitId}?completed=1`);
 }
 
-export async function cancelVisitAction(formData: FormData) {
+async function cancelVisitAction(formData: FormData) {
   const user = await requireRole([
     UserRole.ADMIN,
     UserRole.OPERATIONS_MANAGER,
@@ -1958,7 +1958,7 @@ export async function cancelVisitAction(formData: FormData) {
   redirect(`/visits/${visit.id}?cancelled=1`);
 }
 
-export async function rescheduleVisitAction(formData: FormData) {
+async function rescheduleVisitAction(formData: FormData) {
   const user = await requireRole([
     UserRole.ADMIN,
     UserRole.OPERATIONS_MANAGER,
@@ -3279,3 +3279,11 @@ export async function changeTowerRuleConfigurationAction(formData: FormData) {
   revalidatePath(`/systems/${system.id}`);
   redirect(`/systems/${system.id}?view=settings&rulesChanged=1`);
 }
+
+// Retained only to read and migrate existing visit data. These are deliberately
+// not exported as server actions now that completion dates replace scheduling.
+void createAnnualCleaningPlanAction;
+void createVisitOpportunityAction;
+void completeVisitAction;
+void cancelVisitAction;
+void rescheduleVisitAction;

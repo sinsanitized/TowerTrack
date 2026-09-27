@@ -92,8 +92,8 @@ describe("all tower deadline rows", () => {
   });
 
   it.each([
-    ["PENDING", "Unscheduled"],
-    ["SCHEDULED", "Scheduled (not completed)"],
+    ["PENDING", "Completion not recorded"],
+    ["SCHEDULED", "Completion not recorded"],
     ["COMPLETED", "Completed"],
   ])("shows %s as %s", (status, executionState) => {
     const [row] = buildTowerDeadlineRows(

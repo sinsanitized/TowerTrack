@@ -117,10 +117,10 @@ export function getUrgency(input: {
   if (input.status === "SCHEDULED")
     return {
       urgency: "SCHEDULED",
-      label: "Scheduled (not completed)",
-      color: "BLUE",
+      label: "Completion not recorded",
+      color: "YELLOW",
       explanation:
-        "Work is scheduled, but the compliance clock remains open until completion is recorded.",
+        "A legacy plan exists, but the compliance clock remains open until actual completion is recorded.",
       calendarDaysRemaining: dateInfo?.calendarDays ?? null,
       workingDaysRemaining: dateInfo?.workingDays ?? null,
     };
@@ -532,7 +532,7 @@ export function bestVisitOpportunity(
     additionalObligationsCovered: Math.max(0, best.obligations.length - 1),
     explanation:
       best.obligations.length > 1
-        ? `One visit from ${best.start} through ${best.end} can complete ${best.obligations.length} overlapping requirements. The earliest compliance deadline controls the recommendation.`
+        ? `Work completed from ${best.start} through ${best.end} can satisfy ${best.obligations.length} overlapping requirements. The earliest compliance deadline controls the shared window.`
         : `The best current service window is ${best.start} through ${best.end}. No other on-site requirement overlaps yet.`,
   };
 }

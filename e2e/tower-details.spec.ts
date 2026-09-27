@@ -27,7 +27,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "Compliance snapshot" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Two-day cleaning plan" }),
+    page.getByRole("heading", { name: "Record completed cleaning" }),
   ).toHaveCount(0);
 
   const recordButton = page.getByRole("button", {
@@ -68,7 +68,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "All required work" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Two-day cleaning plan" }),
+    page.getByRole("heading", { name: "Record completed cleaning" }),
   ).toBeVisible();
 
   await page.getByRole("link", { name: "Records", exact: true }).click();

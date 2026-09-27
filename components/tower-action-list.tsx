@@ -117,8 +117,8 @@ export function TowerActionList({
                 )}
                 {combinedObligationIds.has(item.id) && (
                   <p className="mt-2 flex items-center gap-2 text-sm font-black text-emerald-900">
-                    <Layers3 size={17} /> Can share a visit with another open
-                    requirement
+                    <Layers3 size={17} /> Can be completed with another open
+                    requirement on the same valid date
                   </p>
                 )}
               </div>

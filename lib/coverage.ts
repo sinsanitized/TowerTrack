@@ -235,7 +235,7 @@ function serviceRecommendations(row: CoverageRow): WorkRecommendation[] {
           : "Recommended visit",
       detail:
         covered.length > 1
-          ? `One visit can satisfy ${covered.length} requirements.`
+          ? `One completion date can satisfy ${covered.length} requirements.`
           : covered[0]?.explanation || row.status.nextAction,
       activityLabels,
       coveredRequirements: covered,
