@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: cp .env.docker.example .env
-      - run: docker compose up --build -d
+      - run: E2E_TEST_MODE=true docker compose up --build -d
       - name: Wait for TowerTrack
         run: |
           for attempt in {1..60}; do

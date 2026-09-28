@@ -25,6 +25,7 @@ services:
       INITIAL_ORGANIZATION_NAME: ${INITIAL_ORGANIZATION_NAME:-TowerTrack}
       SEED_ON_EMPTY: "true"
       DEMO_MODE: ${DEMO_MODE:-false}
+      E2E_TEST_MODE: ${E2E_TEST_MODE:-false}
       TZ: America/New_York
     volumes:
       - uploads:/app/uploads

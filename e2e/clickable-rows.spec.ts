@@ -33,3 +33,38 @@ test("operational list rows open their primary action from row space", async ({
   await customerRow.locator("td").nth(1).click();
   await expect(page).toHaveURL(/\/systems\/.+|\/customers\/.+\/towers\/new/);
 });
+
+test("operational rows can be opened with the keyboard", async ({ page }) => {
+  await page.goto("/deadlines");
+  const deadlineRow = page.locator("tbody tr[data-action-label]").first();
+  await deadlineRow.focus();
+  await deadlineRow.press("Enter");
+  await expect(page).toHaveURL(/\/systems\/.+/);
+});
+
+test("large operational directories are paginated and searchable", async ({
+  page,
+}) => {
+  await page.goto("/samples");
+  expect(
+    await page.locator("article[data-action-label]").count(),
+  ).toBeLessThanOrEqual(50);
+
+  await page.goto("/towers");
+  expect(
+    await page.locator("article[data-action-label]").count(),
+  ).toBeLessThanOrEqual(25);
+  const towerName = (
+    await page.locator("article[data-action-label] a").first().innerText()
+  ).trim();
+  await page.getByPlaceholder("Search the tower directory").fill(towerName);
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(
+    page.locator("article[data-action-label]").first(),
+  ).toBeVisible();
+
+  await page.goto("/customers");
+  await page.getByPlaceholder("Search the customer directory").fill(towerName);
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.locator("tbody tr[data-action-label]")).not.toHaveCount(0);
+});

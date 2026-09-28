@@ -7,10 +7,80 @@ import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { SubmitButton } from "@/components/submit-button";
 
-export default async function CustomersPage() {
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
   const user = await requireUser();
+  const query = await searchParams;
+  const search = query.q?.trim() ?? "";
+  const requestedPage = Number.parseInt(query.page ?? "1", 10);
+  const pageSize = 25;
+  const where = {
+    organizationId: user.organizationId,
+    active: true,
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" as const } },
+            {
+              accountNumber: {
+                contains: search,
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              buildings: {
+                some: {
+                  OR: [
+                    {
+                      buildingName: {
+                        contains: search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                    {
+                      streetAddress: {
+                        contains: search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                    {
+                      systems: {
+                        some: {
+                          OR: [
+                            {
+                              systemName: {
+                                contains: search,
+                                mode: "insensitive" as const,
+                              },
+                            },
+                            {
+                              internalJobNumber: {
+                                contains: search,
+                                mode: "insensitive" as const,
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+  const customerCount = await db.customer.count({ where });
+  const pageCount = Math.max(1, Math.ceil(customerCount / pageSize));
+  const page = Number.isFinite(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), pageCount)
+    : 1;
   const customers = await db.customer.findMany({
-    where: { organizationId: user.organizationId, active: true },
+    where,
     include: {
       buildings: {
         include: {
@@ -20,6 +90,8 @@ export default async function CustomersPage() {
       },
     },
     orderBy: { name: "asc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
   });
   type CustomerRow = {
     customer: (typeof customers)[number];
@@ -137,6 +209,24 @@ export default async function CustomersPage() {
           </div>
         </form>
       </details>
+      <form className="panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+        <label className="grow">
+          <span className="label">Find a customer, address, tower, or job</span>
+          <input
+            className="field mt-1"
+            type="search"
+            name="q"
+            defaultValue={search}
+            placeholder="Search the customer directory"
+          />
+        </label>
+        <button className="btn min-h-11 justify-center">Search</button>
+        {search && (
+          <Link className="btn min-h-11 justify-center" href="/customers">
+            Clear
+          </Link>
+        )}
+      </form>
       <div>
         <section
           className="panel table-wrap"
@@ -255,6 +345,36 @@ export default async function CustomersPage() {
                 towers from Settings.
               </p>
             </div>
+          )}
+          {pageCount > 1 && (
+            <nav
+              className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4"
+              aria-label="Customer directory pages"
+            >
+              {page > 1 ? (
+                <Link
+                  className="btn"
+                  href={`/customers?${new URLSearchParams({ ...(search ? { q: search } : {}), ...(page > 2 ? { page: String(page - 1) } : {}) })}`}
+                >
+                  ← Previous 25
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="text-sm font-bold text-slate-700">
+                Page {page} of {pageCount} · {customerCount} customers
+              </span>
+              {page < pageCount ? (
+                <Link
+                  className="btn"
+                  href={`/customers?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(page + 1) })}`}
+                >
+                  Next 25 →
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
           )}
         </section>
       </div>

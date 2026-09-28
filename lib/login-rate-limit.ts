@@ -7,6 +7,25 @@ type Attempt = {
   blockedUntil: number;
 };
 const attempts = new Map<string, Attempt>();
+const MAX_TRACKED_ATTEMPTS = 10_000;
+
+function removeExpiredAttempts(now: number) {
+  for (const [key, attempt] of attempts) {
+    if (
+      attempt.blockedUntil <= now &&
+      now - attempt.windowStartedAt >= WINDOW_MS
+    )
+      attempts.delete(key);
+  }
+}
+
+function keepAttemptStoreBounded(now: number) {
+  if (attempts.size < MAX_TRACKED_ATTEMPTS) return;
+  removeExpiredAttempts(now);
+  if (attempts.size < MAX_TRACKED_ATTEMPTS) return;
+  const oldestKey = attempts.keys().next().value as string | undefined;
+  if (oldestKey) attempts.delete(oldestKey);
+}
 
 export function loginAttemptKey(email: string, ip: string) {
   return `${email.trim().toLowerCase()}|${ip}`;
@@ -21,6 +40,7 @@ export function loginBlocked(key: string, now = Date.now()) {
 }
 
 export function recordLoginFailure(key: string, now = Date.now()) {
+  keepAttemptStoreBounded(now);
   const previous = attempts.get(key);
   const attempt =
     !previous || now - previous.windowStartedAt >= WINDOW_MS

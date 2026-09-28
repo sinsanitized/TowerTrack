@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { PageHeader } from "@/components/page-header";
 import { ComplianceDate } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
@@ -82,18 +83,85 @@ export default async function SamplesPage({
     typeof query.q === "string" ? query.q.trim().toLowerCase() : "";
   const workflowNotice =
     typeof query.workflowNotice === "string" ? query.workflowNotice : null;
+  const requestedPage = Number.parseInt(
+    typeof query.page === "string" ? query.page : "1",
+    10,
+  );
+  const pageSize = 50;
   const sampleReturnTo = `/samples?status=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
-  const samples = await db.serviceEvent.findMany({
-    where: {
-      eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
-      status: "ACTIVE",
-      coolingTowerSystem: {
-        legionellaResponsibility: { not: "CUSTOMER" },
-        building: { customer: { organizationId: user.organizationId } },
-      },
+  const baseSystemWhere: Prisma.CoolingTowerSystemWhereInput = {
+    legionellaResponsibility: { not: "CUSTOMER" },
+    building: { customer: { organizationId: user.organizationId } },
+    ...(search
+      ? {
+          OR: [
+            { systemName: { contains: search, mode: "insensitive" } },
+            {
+              internalJobNumber: { contains: search, mode: "insensitive" },
+            },
+            {
+              building: {
+                buildingName: { contains: search, mode: "insensitive" },
+              },
+            },
+            {
+              building: {
+                customer: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+  const stateWhere = (
+    requestedFilter: SampleQueueFilter,
+  ): Prisma.ServiceEventWhereInput => ({
+    eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+    status: "ACTIVE",
+    labResultsForSample:
+      requestedFilter === "COMPLETED" ? { some: {} } : { none: {} },
+    coolingTowerSystem: {
+      AND: [
+        baseSystemWhere,
+        requestedFilter === "ACTION_NEEDED"
+          ? {
+              OR: [
+                { laboratoryResultResponsibility: null },
+                { laboratoryResultResponsibility: "OUR_COMPANY" },
+              ],
+            }
+          : requestedFilter === "WAITING"
+            ? {
+                laboratoryResultResponsibility: {
+                  in: ["CUSTOMER", "OTHER_VENDOR", "NOT_TRACKED"],
+                },
+              }
+            : {},
+      ],
     },
-    orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-    take: 250,
+  });
+  const [filterCounts, selectedCount] = await Promise.all([
+    Promise.all(
+      sampleQueueFilters.map((item) =>
+        db.serviceEvent.count({ where: stateWhere(item) }),
+      ),
+    ),
+    db.serviceEvent.count({ where: stateWhere(filter) }),
+  ]);
+  const pageCount = Math.max(1, Math.ceil(selectedCount / pageSize));
+  const page = Number.isFinite(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), pageCount)
+    : 1;
+  const samples = await db.serviceEvent.findMany({
+    where: stateWhere(filter),
+    orderBy:
+      filter === "COMPLETED"
+        ? [{ eventDate: "desc" }, { createdAt: "desc" }]
+        : [{ eventDate: "asc" }, { createdAt: "asc" }],
+    skip: (page - 1) * pageSize,
+    take: pageSize,
     include: {
       coolingTowerSystem: {
         include: { building: { include: { customer: true } } },
@@ -110,27 +178,20 @@ export default async function SamplesPage({
       resultEntered: sample.labResultsForSample.length > 0,
     })),
   );
-  const counts = {
-    ACTION_NEEDED: queue.filter((item) =>
-      matchesSampleQueueFilter(item, "ACTION_NEEDED"),
-    ).length,
-    WAITING: queue.filter((item) => matchesSampleQueueFilter(item, "WAITING"))
-      .length,
-    COMPLETED: queue.filter((item) =>
-      matchesSampleQueueFilter(item, "COMPLETED"),
-    ).length,
+  const counts: Record<SampleQueueFilter, number> = {
+    ACTION_NEEDED: filterCounts[0],
+    WAITING: filterCounts[1],
+    COMPLETED: filterCounts[2],
   };
-  const visibleSamples = queue.filter((item) => {
-    if (!matchesSampleQueueFilter(item, filter)) return false;
-    if (!search) return true;
-    const tower = item.coolingTowerSystem;
-    return [
-      tower.systemName,
-      tower.internalJobNumber,
-      tower.building.buildingName,
-      tower.building.customer.name,
-    ].some((value) => value.toLowerCase().includes(search));
-  });
+  const visibleSamples = queue.filter((item) =>
+    matchesSampleQueueFilter(item, filter),
+  );
+  const pageHref = (nextPage: number) => {
+    const params = new URLSearchParams({ status: filter });
+    if (search) params.set("q", search);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    return `/samples?${params}`;
+  };
 
   return (
     <>
@@ -318,6 +379,30 @@ export default async function SamplesPage({
               Choose another status or clear the search.
             </p>
           </div>
+        )}
+        {pageCount > 1 && (
+          <nav
+            className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4"
+            aria-label="Sample queue pages"
+          >
+            {page > 1 ? (
+              <Link className="btn" href={pageHref(page - 1)}>
+                ← Previous 50
+              </Link>
+            ) : (
+              <span />
+            )}
+            <span className="text-sm font-bold text-slate-700">
+              Page {page} of {pageCount} · {selectedCount} samples
+            </span>
+            {page < pageCount ? (
+              <Link className="btn" href={pageHref(page + 1)}>
+                Next 50 →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </nav>
         )}
       </div>
     </>

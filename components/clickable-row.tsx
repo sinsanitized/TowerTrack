@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ElementType, MouseEvent, ReactNode } from "react";
+import type { ElementType, KeyboardEvent, MouseEvent, ReactNode } from "react";
 
 const interactiveSelector =
   'a, button, input, select, textarea, summary, details, label, [role="button"]';
@@ -38,8 +38,21 @@ export function ClickableRow({
       className={`${href ? "cursor-pointer transition hover:bg-emerald-50/40" : ""} ${className}`}
       data-action-label={href ? label : undefined}
       data-testid={testId}
+      role={href ? "link" : undefined}
+      tabIndex={href ? 0 : undefined}
+      aria-label={href ? label : undefined}
       onClick={(event: MouseEvent<HTMLElement>) => {
         if (href && !cameFromInteractiveControl(event.target)) open();
+      }}
+      onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
+        if (
+          href &&
+          !cameFromInteractiveControl(event.target) &&
+          (event.key === "Enter" || event.key === " ")
+        ) {
+          event.preventDefault();
+          open();
+        }
       }}
     >
       {children}

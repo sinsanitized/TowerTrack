@@ -36,6 +36,7 @@ export type OperationalQueryScope = {
   organizationId: string;
   today?: string;
   systemId?: string;
+  systemIds?: string[];
   includeMissed?: boolean;
 };
 
@@ -345,6 +346,7 @@ export async function complianceDashboardRows({
   organizationId,
   today = todayDateOnly(),
   systemId,
+  systemIds,
   includeMissed = false,
 }: OperationalQueryScope) {
   const obligationStatuses: ObligationStatus[] = includeMissed
@@ -354,6 +356,7 @@ export async function complianceDashboardRows({
     where: {
       active: true,
       ...(systemId ? { id: systemId } : {}),
+      ...(systemIds ? { id: { in: systemIds } } : {}),
       building: { customer: { organizationId } },
     },
     include: {
