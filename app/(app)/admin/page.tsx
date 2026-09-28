@@ -5,6 +5,7 @@ import { SourceBadge } from "@/components/source-badge";
 import {
   createRuleDefinitionAction,
   createCustomRuleProfileAction,
+  cloneSharedRuleProfileAction,
   createUserAction,
   setUserActiveAction,
   updateUserRoleAction,
@@ -170,6 +171,7 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{
     savedProfile?: string;
+    profileAction?: string;
     savedRule?: string;
     ruleAction?: string;
     userSaved?: string;
@@ -195,7 +197,16 @@ export default async function AdminPage({
       include: {
         jurisdiction: true,
         rules: { orderBy: [{ requirementType: "asc" }, { ruleName: "asc" }] },
-        _count: { select: { systems: true, rules: true } },
+        _count: {
+          select: {
+            systems: {
+              where: {
+                building: { customer: { organizationId: user.organizationId } },
+              },
+            },
+            rules: true,
+          },
+        },
       },
       orderBy: { name: "asc" },
     }),
@@ -291,7 +302,9 @@ export default async function AdminPage({
             ? saved.ruleAction === "created"
               ? "Jurisdiction rule added and affected towers recalculated."
               : `Rule ${saved.savedRule} revised and affected towers recalculated.`
-            : `Routine timing for ${saved.savedProfile} updated and affected towers recalculated.`}
+            : saved.profileAction === "cloned"
+              ? "Organization-owned rule copy created, tower assignments updated, and deadlines recalculated."
+              : `Routine timing for ${saved.savedProfile} updated and affected towers recalculated.`}
         </div>
       )}
       {saved.userSaved && (
@@ -500,6 +513,11 @@ export default async function AdminPage({
                             profile.jurisdictionMode,
                           )}
                         />
+                        {profile.organizationId == null && (
+                          <span className="rounded-full border border-slate-300 bg-slate-100 px-2 py-1 text-xs font-black text-slate-700">
+                            Shared · read-only
+                          </span>
+                        )}
                       </div>
                       <p className="mt-2 text-sm text-slate-600">
                         {profile.jurisdiction
@@ -533,594 +551,652 @@ export default async function AdminPage({
                 </summary>
 
                 <div className="space-y-5 border-t border-slate-200 p-5">
-                  <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="label">Routine Legionella timing</div>
-                    <h3 className="mt-1 text-lg font-black">
-                      Compliance deadline and recommended service date
-                    </h3>
-                    <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                      The hard interval is the maximum permitted gap between
-                      qualifying samples. The internal target should be earlier
-                      so a late or missed completion does not immediately create
-                      a compliance risk.
-                    </p>
-                    <form
-                      action={updateRuleProfileAction}
-                      className="mt-4 grid gap-4 sm:grid-cols-2"
-                    >
-                      <input
-                        type="hidden"
-                        name="profileId"
-                        value={profile.id}
-                      />
-                      <label>
-                        <span className="label">Hard interval (days)</span>
-                        <input
-                          className="field mt-1"
-                          name="hardIntervalDays"
-                          type="number"
-                          min="1"
-                          max="3650"
-                          defaultValue={hardInterval ?? undefined}
-                          placeholder="Needs verified rule"
-                        />
-                        <span className="mt-1 block text-xs text-slate-500">
-                          Legal latest: day {hardInterval ?? "not set"} after
-                          the last qualifying sample
-                        </span>
-                      </label>
-                      <label>
-                        <span className="label">
-                          Internal target interval (days)
-                        </span>
-                        <input
-                          className="field mt-1"
-                          name="internalTargetIntervalDays"
-                          type="number"
-                          min="1"
-                          max="3650"
-                          defaultValue={
-                            profile.internalTargetIntervalDays ?? undefined
-                          }
-                          placeholder="Optional earlier target"
-                        />
-                        <span className="mt-1 block text-xs text-slate-500">
-                          Operational goal; this never replaces the hard
-                          deadline
-                        </span>
-                      </label>
-                      <label className="sm:col-span-2">
-                        <span className="label">Reason for timing change</span>
-                        <input
-                          className="field mt-1"
-                          name="reason"
-                          minLength={8}
-                          defaultValue="Update verified Legionella timing rule"
-                          required
-                        />
-                      </label>
-                      <div className="sm:col-span-2">
-                        <SubmitButton pendingLabel="Saving routine timing…">
-                          Save routine timing
-                        </SubmitButton>
+                  {profile.organizationId == null && (
+                    <section className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 text-blue-950">
+                      <div className="label text-blue-900">
+                        Protected regulatory baseline
                       </div>
-                    </form>
-                  </section>
-
-                  {isNyc && (
-                    <section className="rounded-xl border border-sky-200 bg-sky-50 p-4">
-                      <div className="label">Legionella sample date ranges</div>
                       <h3 className="mt-1 text-lg font-black">
-                        Records that create a sampling requirement
+                        Create your organization copy before making changes
                       </h3>
-                      <div className="mt-4 overflow-x-auto">
-                        <table className="w-full min-w-[620px] text-left text-sm">
-                          <thead>
-                            <tr className="border-b border-sky-200 text-xs uppercase tracking-wide text-slate-500">
-                              <th className="pb-2 pr-4">Trigger</th>
-                              <th className="pb-2 pr-4">
-                                Legionella sample range
-                              </th>
-                              <th className="pb-2">What the rule means</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-sky-200">
-                            <tr>
-                              <th className="py-3 pr-4">Routine operation</th>
-                              <td className="py-3 pr-4 font-bold">
-                                No later than day {hardInterval ?? "not set"}
-                              </td>
-                              <td className="py-3">
-                                Measured from the last qualifying culture sample
-                              </td>
-                            </tr>
-                            <tr>
-                              <th className="py-3 pr-4">Tower startup</th>
-                              <td className="py-3 pr-4 font-bold">
-                                Day {nycRuleDisplay.startupSampleMinimumDays}–
-                                {nycRuleDisplay.startupSampleMaximumDays}
-                              </td>
-                              <td className="py-3">
-                                Measured from startup, not from the cleaning
-                                date
-                              </td>
-                            </tr>
-                            <tr>
-                              <th className="py-3 pr-4">
-                                Summertime hyperhalogenation
-                              </th>
-                              <td className="py-3 pr-4 font-bold">
-                                Day{" "}
-                                {hyperRule?.minimumDaysAfterTrigger ??
-                                  nycRuleDisplay.hyperSampleMinimumDays}
-                                –
-                                {hyperRule?.maximumDaysAfterTrigger ??
-                                  nycRuleDisplay.hyperSampleMaximumDays}
-                              </td>
-                              <td className="py-3">
-                                Measured from completed hyperhalogenation
-                              </td>
-                            </tr>
-                            <tr>
-                              <th className="py-3 pr-4">
-                                Legionella Level 2, 3, or 4 result
-                              </th>
-                              <td className="py-3 pr-4 font-bold">
-                                Retest day {nycRuleDisplay.retestMinimumDays}–
-                                {nycRuleDisplay.retestMaximumDays}
-                              </td>
-                              <td className="py-3">
-                                Continue the retest chain until a Level 1 result
-                              </td>
-                            </tr>
-                            <tr>
-                              <th className="py-3 pr-4">Emergency condition</th>
-                              <td className="py-3 pr-4 font-bold">
-                                Collect immediately
-                              </td>
-                              <td className="py-3">
-                                No invented fixed legal date range
-                              </td>
-                            </tr>
-                            <tr>
-                              <th className="py-3 pr-4">
-                                Twice-yearly cleaning or inspection
-                              </th>
-                              <td className="py-3 pr-4 font-bold">
-                                No separate sample
-                              </td>
-                              <td className="py-3">
-                                Bundle with a routine sample only when its
-                                window is open
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                      <p className="mt-2 max-w-3xl text-sm">
+                        This shared profile cannot be edited. Creating a copy
+                        preserves the baseline, moves only your organization’s
+                        towers to the copy, records an effective-dated
+                        assignment, recalculates deadlines, and writes an audit
+                        record.
+                      </p>
+                      <form
+                        action={cloneSharedRuleProfileAction}
+                        className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
+                      >
+                        <input
+                          type="hidden"
+                          name="profileId"
+                          value={profile.id}
+                        />
+                        <label>
+                          <span className="label">
+                            Reason for customization
+                          </span>
+                          <input
+                            className="field mt-1"
+                            name="reason"
+                            minLength={8}
+                            defaultValue="Create organization-owned rule revision"
+                            required
+                          />
+                        </label>
+                        <SubmitButton pendingLabel="Creating organization copy…">
+                          Create editable copy
+                        </SubmitButton>
+                      </form>
                     </section>
                   )}
-
-                  <section>
-                    <div className="label">Requirement rules</div>
-                    <h3 className="mt-1 text-lg font-black">
-                      What is required and when
-                    </h3>
-                    {requirementTypes.some(
-                      (type) =>
-                        !profile.rules.some(
-                          (rule) => rule.requirementType === type,
-                        ),
-                    ) && (
-                      <details className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50">
-                        <summary className="cursor-pointer list-none p-4 font-black text-emerald-900">
-                          Add jurisdiction rule · Advanced
-                        </summary>
-                        <div className="border-t border-emerald-200 bg-white px-4 py-3 text-sm text-slate-700">
-                          Use a hard interval for repeating work (for example,
-                          31 means no later than 31 days). Use minimum and
-                          maximum days together for a window after a trigger
-                          (for example, 3–7 means day 3 through day 7).
-                        </div>
-                        <form
-                          action={createRuleDefinitionAction}
-                          className="grid gap-4 border-t border-emerald-200 p-4 sm:grid-cols-2 xl:grid-cols-3"
-                        >
+                  <fieldset
+                    className="contents disabled:opacity-60"
+                    disabled={profile.organizationId == null}
+                  >
+                    <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="label">Routine Legionella timing</div>
+                      <h3 className="mt-1 text-lg font-black">
+                        Compliance deadline and recommended service date
+                      </h3>
+                      <p className="mt-2 max-w-3xl text-sm text-slate-600">
+                        The hard interval is the maximum permitted gap between
+                        qualifying samples. The internal target should be
+                        earlier so a late or missed completion does not
+                        immediately create a compliance risk.
+                      </p>
+                      <form
+                        action={updateRuleProfileAction}
+                        className="mt-4 grid gap-4 sm:grid-cols-2"
+                      >
+                        <input
+                          type="hidden"
+                          name="profileId"
+                          value={profile.id}
+                        />
+                        <label>
+                          <span className="label">Hard interval (days)</span>
                           <input
-                            type="hidden"
-                            name="profileId"
-                            value={profile.id}
+                            className="field mt-1"
+                            name="hardIntervalDays"
+                            type="number"
+                            min="1"
+                            max="3650"
+                            defaultValue={hardInterval ?? undefined}
+                            placeholder="Needs verified rule"
                           />
-                          <label>
-                            <span className="label">Requirement type</span>
-                            <select
-                              className="field mt-1"
-                              name="requirementType"
-                              required
-                            >
-                              {requirementTypes
-                                .filter(
-                                  (type) =>
-                                    !profile.rules.some(
-                                      (rule) => rule.requirementType === type,
-                                    ),
-                                )
-                                .map((type) => (
-                                  <option key={type} value={type}>
-                                    {obligationName(type)}
-                                  </option>
-                                ))}
-                            </select>
-                          </label>
-                          <label className="sm:col-span-1 xl:col-span-2">
-                            <span className="label">Rule name</span>
+                          <span className="mt-1 block text-xs text-slate-500">
+                            Legal latest: day {hardInterval ?? "not set"} after
+                            the last qualifying sample
+                          </span>
+                        </label>
+                        <label>
+                          <span className="label">
+                            Internal target interval (days)
+                          </span>
+                          <input
+                            className="field mt-1"
+                            name="internalTargetIntervalDays"
+                            type="number"
+                            min="1"
+                            max="3650"
+                            defaultValue={
+                              profile.internalTargetIntervalDays ?? undefined
+                            }
+                            placeholder="Optional earlier target"
+                          />
+                          <span className="mt-1 block text-xs text-slate-500">
+                            Operational goal; this never replaces the hard
+                            deadline
+                          </span>
+                        </label>
+                        <label className="sm:col-span-2">
+                          <span className="label">
+                            Reason for timing change
+                          </span>
+                          <input
+                            className="field mt-1"
+                            name="reason"
+                            minLength={8}
+                            defaultValue="Update verified Legionella timing rule"
+                            required
+                          />
+                        </label>
+                        <div className="sm:col-span-2">
+                          <SubmitButton pendingLabel="Saving routine timing…">
+                            Save routine timing
+                          </SubmitButton>
+                        </div>
+                      </form>
+                    </section>
+
+                    {isNyc && (
+                      <section className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                        <div className="label">
+                          Legionella sample date ranges
+                        </div>
+                        <h3 className="mt-1 text-lg font-black">
+                          Records that create a sampling requirement
+                        </h3>
+                        <div className="mt-4 overflow-x-auto">
+                          <table className="w-full min-w-[620px] text-left text-sm">
+                            <thead>
+                              <tr className="border-b border-sky-200 text-xs uppercase tracking-wide text-slate-500">
+                                <th className="pb-2 pr-4">Trigger</th>
+                                <th className="pb-2 pr-4">
+                                  Legionella sample range
+                                </th>
+                                <th className="pb-2">What the rule means</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-sky-200">
+                              <tr>
+                                <th className="py-3 pr-4">Routine operation</th>
+                                <td className="py-3 pr-4 font-bold">
+                                  No later than day {hardInterval ?? "not set"}
+                                </td>
+                                <td className="py-3">
+                                  Measured from the last qualifying culture
+                                  sample
+                                </td>
+                              </tr>
+                              <tr>
+                                <th className="py-3 pr-4">Tower startup</th>
+                                <td className="py-3 pr-4 font-bold">
+                                  Day {nycRuleDisplay.startupSampleMinimumDays}–
+                                  {nycRuleDisplay.startupSampleMaximumDays}
+                                </td>
+                                <td className="py-3">
+                                  Measured from startup, not from the cleaning
+                                  date
+                                </td>
+                              </tr>
+                              <tr>
+                                <th className="py-3 pr-4">
+                                  Summertime hyperhalogenation
+                                </th>
+                                <td className="py-3 pr-4 font-bold">
+                                  Day{" "}
+                                  {hyperRule?.minimumDaysAfterTrigger ??
+                                    nycRuleDisplay.hyperSampleMinimumDays}
+                                  –
+                                  {hyperRule?.maximumDaysAfterTrigger ??
+                                    nycRuleDisplay.hyperSampleMaximumDays}
+                                </td>
+                                <td className="py-3">
+                                  Measured from completed hyperhalogenation
+                                </td>
+                              </tr>
+                              <tr>
+                                <th className="py-3 pr-4">
+                                  Legionella Level 2, 3, or 4 result
+                                </th>
+                                <td className="py-3 pr-4 font-bold">
+                                  Retest day {nycRuleDisplay.retestMinimumDays}–
+                                  {nycRuleDisplay.retestMaximumDays}
+                                </td>
+                                <td className="py-3">
+                                  Continue the retest chain until a Level 1
+                                  result
+                                </td>
+                              </tr>
+                              <tr>
+                                <th className="py-3 pr-4">
+                                  Emergency condition
+                                </th>
+                                <td className="py-3 pr-4 font-bold">
+                                  Collect immediately
+                                </td>
+                                <td className="py-3">
+                                  No invented fixed legal date range
+                                </td>
+                              </tr>
+                              <tr>
+                                <th className="py-3 pr-4">
+                                  Twice-yearly cleaning or inspection
+                                </th>
+                                <td className="py-3 pr-4 font-bold">
+                                  No separate sample
+                                </td>
+                                <td className="py-3">
+                                  Bundle with a routine sample only when its
+                                  window is open
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+                    )}
+
+                    <section>
+                      <div className="label">Requirement rules</div>
+                      <h3 className="mt-1 text-lg font-black">
+                        What is required and when
+                      </h3>
+                      {requirementTypes.some(
+                        (type) =>
+                          !profile.rules.some(
+                            (rule) => rule.requirementType === type,
+                          ),
+                      ) && (
+                        <details className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50">
+                          <summary className="cursor-pointer list-none p-4 font-black text-emerald-900">
+                            Add jurisdiction rule · Advanced
+                          </summary>
+                          <div className="border-t border-emerald-200 bg-white px-4 py-3 text-sm text-slate-700">
+                            Use a hard interval for repeating work (for example,
+                            31 means no later than 31 days). Use minimum and
+                            maximum days together for a window after a trigger
+                            (for example, 3–7 means day 3 through day 7).
+                          </div>
+                          <form
+                            action={createRuleDefinitionAction}
+                            className="grid gap-4 border-t border-emerald-200 p-4 sm:grid-cols-2 xl:grid-cols-3"
+                          >
                             <input
-                              className="field mt-1"
-                              name="ruleName"
-                              minLength={3}
-                              required
+                              type="hidden"
+                              name="profileId"
+                              value={profile.id}
                             />
-                          </label>
-                          {profile.jurisdictionMode ===
-                            "CUSTOM_JURISDICTION" && (
                             <label>
-                              <span className="label">Trigger activity</span>
+                              <span className="label">Requirement type</span>
                               <select
                                 className="field mt-1"
-                                name="triggerActivityType"
-                                defaultValue=""
+                                name="requirementType"
+                                required
                               >
-                                <option value="">
-                                  Not created by a record
-                                </option>
-                                {customTriggerActivities.map((activity) => (
-                                  <option key={activity} value={activity}>
-                                    {plainEnumLabel(activity)}
-                                  </option>
-                                ))}
+                                {requirementTypes
+                                  .filter(
+                                    (type) =>
+                                      !profile.rules.some(
+                                        (rule) => rule.requirementType === type,
+                                      ),
+                                  )
+                                  .map((type) => (
+                                    <option key={type} value={type}>
+                                      {obligationName(type)}
+                                    </option>
+                                  ))}
                               </select>
                             </label>
-                          )}
-                          <label>
-                            <span className="label">Authority</span>
-                            <select
-                              className="field mt-1"
-                              name="sourceAuthority"
-                              defaultValue={
-                                profile.jurisdictionMode ===
-                                "CUSTOM_JURISDICTION"
-                                  ? "COMPANY_POLICY"
-                                  : undefined
-                              }
-                              required
-                            >
-                              {authorities.map((authority) => (
-                                <option key={authority} value={authority}>
-                                  {plainEnumLabel(authority)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="sm:col-span-1 xl:col-span-2">
-                            <span className="label">Source citation</span>
-                            <input
-                              className="field mt-1"
-                              name="sourceCitation"
-                              minLength={3}
-                              required
-                            />
-                          </label>
-                          <label>
-                            <span className="label">Hard interval (days)</span>
-                            <input
-                              className="field mt-1"
-                              name="frequencyDays"
-                              type="number"
-                              min="1"
-                              max="3650"
-                            />
-                            <span className="mt-1 block text-xs text-slate-600">
-                              Required for recurring sample, inspection, and
-                              reporting rules
-                            </span>
-                          </label>
-                          <label>
-                            <span className="label">
-                              Minimum days after trigger
-                            </span>
-                            <input
-                              className="field mt-1"
-                              name="minimumDaysAfterTrigger"
-                              type="number"
-                              min="0"
-                              max="3650"
-                            />
-                          </label>
-                          <label>
-                            <span className="label">
-                              Maximum days after trigger
-                            </span>
-                            <input
-                              className="field mt-1"
-                              name="maximumDaysAfterTrigger"
-                              type="number"
-                              min="0"
-                              max="3650"
-                            />
-                            <span className="mt-1 block text-xs text-slate-600">
-                              Both trigger offsets are required for
-                              hyperhalogenation rules
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 rounded-lg bg-white p-3 text-sm font-bold">
-                            <input
-                              name="enabled"
-                              type="checkbox"
-                              defaultChecked
-                            />
-                            Enable immediately
-                          </label>
-                          <label className="sm:col-span-2 xl:col-span-3">
-                            <span className="label">Notes</span>
-                            <textarea
-                              className="field mt-1 min-h-20"
-                              name="notes"
-                            />
-                          </label>
-                          <label className="sm:col-span-2 xl:col-span-3">
-                            <span className="label">
-                              Reason for adding rule
-                            </span>
-                            <input
-                              className="field mt-1"
-                              name="reason"
-                              minLength={8}
-                              defaultValue="Add rule from verified source"
-                              required
-                            />
-                          </label>
-                          <div className="sm:col-span-2 xl:col-span-3">
-                            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
-                              Final check: verify the authority, citation, and
-                              timing above. Saving adds the rule immediately and
-                              recalculates affected towers.
-                            </div>
-                            <SubmitButton pendingLabel="Adding rule…">
-                              Add rule and recalculate towers
-                            </SubmitButton>
-                          </div>
-                        </form>
-                      </details>
-                    )}
-                    <div className="mt-3 space-y-4">
-                      {profile.rules.map((rule) => (
-                        <article
-                          key={rule.id}
-                          className="rounded-xl border border-slate-200 p-4"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <h4 className="font-black">
-                                {obligationName(rule.requirementType)}
-                              </h4>
-                              <p className="mt-1 text-sm text-slate-600">
-                                {rule.ruleName}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <SourceBadge authority={rule.sourceAuthority} />
-                              <span className="text-sm font-bold">
-                                {rule.enabled ? "Enabled" : "Disabled"}
-                              </span>
-                            </div>
-                          </div>
-                          <dl className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-                            <div className="rounded-lg bg-slate-50 p-3">
-                              <dt className="label">Hard timing rule</dt>
-                              <dd className="mt-1 font-bold">
-                                {hardTiming(rule)}
-                              </dd>
-                            </div>
-                            <div className="rounded-lg bg-slate-50 p-3 md:col-span-2">
-                              <dt className="label">
-                                Associated Legionella sample
-                              </dt>
-                              <dd className="mt-1 font-bold">
-                                {sampleTiming(
-                                  rule,
-                                  profile.internalTargetIntervalDays,
-                                )}
-                              </dd>
-                            </div>
-                            <div className="rounded-lg bg-slate-50 p-3">
-                              <dt className="label">Applies while</dt>
-                              <dd className="mt-1 font-bold">
-                                {appliesWhen(rule)}
-                              </dd>
-                            </div>
-                            <div className="rounded-lg bg-slate-50 p-3 md:col-span-2">
-                              <dt className="label">Source</dt>
-                              <dd className="mt-1 font-bold">
-                                {rule.sourceCitation}
-                              </dd>
-                            </div>
-                          </dl>
-
-                          <details
-                            className="mt-4 rounded-lg border border-slate-200"
-                            open={saved.savedRule === rule.id}
-                          >
-                            <summary className="cursor-pointer list-none p-3 text-sm font-black text-emerald-800">
-                              Edit rule details · Revision {rule.revision}
-                            </summary>
-                            <form
-                              action={updateRuleDefinitionAction}
-                              className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-3"
-                            >
+                            <label className="sm:col-span-1 xl:col-span-2">
+                              <span className="label">Rule name</span>
                               <input
-                                type="hidden"
-                                name="ruleId"
-                                value={rule.id}
+                                className="field mt-1"
+                                name="ruleName"
+                                minLength={3}
+                                required
                               />
-                              {profile.jurisdictionMode ===
-                                "CUSTOM_JURISDICTION" &&
-                                profile._count.systems > 0 && (
-                                  <label>
-                                    <span className="label">
-                                      New version effective date
-                                    </span>
-                                    <input
-                                      className="field mt-1"
-                                      name="effectiveDate"
-                                      type="date"
-                                      defaultValue={todayDateOnly()}
-                                      required
-                                    />
-                                  </label>
-                                )}
-                              <label className="sm:col-span-2 xl:col-span-2">
-                                <span className="label">Rule name</span>
-                                <input
-                                  className="field mt-1"
-                                  name="ruleName"
-                                  defaultValue={rule.ruleName}
-                                  required
-                                />
-                              </label>
+                            </label>
+                            {profile.jurisdictionMode ===
+                              "CUSTOM_JURISDICTION" && (
                               <label>
-                                <span className="label">Authority</span>
+                                <span className="label">Trigger activity</span>
                                 <select
                                   className="field mt-1"
-                                  name="sourceAuthority"
-                                  defaultValue={rule.sourceAuthority}
-                                  required
+                                  name="triggerActivityType"
+                                  defaultValue=""
                                 >
-                                  {authorities.map((authority) => (
-                                    <option key={authority} value={authority}>
-                                      {plainEnumLabel(authority)}
+                                  <option value="">
+                                    Not created by a record
+                                  </option>
+                                  {customTriggerActivities.map((activity) => (
+                                    <option key={activity} value={activity}>
+                                      {plainEnumLabel(activity)}
                                     </option>
                                   ))}
                                 </select>
                               </label>
-                              <label className="sm:col-span-2 xl:col-span-3">
-                                <span className="label">Source citation</span>
+                            )}
+                            <label>
+                              <span className="label">Authority</span>
+                              <select
+                                className="field mt-1"
+                                name="sourceAuthority"
+                                defaultValue={
+                                  profile.jurisdictionMode ===
+                                  "CUSTOM_JURISDICTION"
+                                    ? "COMPANY_POLICY"
+                                    : undefined
+                                }
+                                required
+                              >
+                                {authorities.map((authority) => (
+                                  <option key={authority} value={authority}>
+                                    {plainEnumLabel(authority)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="sm:col-span-1 xl:col-span-2">
+                              <span className="label">Source citation</span>
+                              <input
+                                className="field mt-1"
+                                name="sourceCitation"
+                                minLength={3}
+                                required
+                              />
+                            </label>
+                            <label>
+                              <span className="label">
+                                Hard interval (days)
+                              </span>
+                              <input
+                                className="field mt-1"
+                                name="frequencyDays"
+                                type="number"
+                                min="1"
+                                max="3650"
+                              />
+                              <span className="mt-1 block text-xs text-slate-600">
+                                Required for recurring sample, inspection, and
+                                reporting rules
+                              </span>
+                            </label>
+                            <label>
+                              <span className="label">
+                                Minimum days after trigger
+                              </span>
+                              <input
+                                className="field mt-1"
+                                name="minimumDaysAfterTrigger"
+                                type="number"
+                                min="0"
+                                max="3650"
+                              />
+                            </label>
+                            <label>
+                              <span className="label">
+                                Maximum days after trigger
+                              </span>
+                              <input
+                                className="field mt-1"
+                                name="maximumDaysAfterTrigger"
+                                type="number"
+                                min="0"
+                                max="3650"
+                              />
+                              <span className="mt-1 block text-xs text-slate-600">
+                                Both trigger offsets are required for
+                                hyperhalogenation rules
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-2 rounded-lg bg-white p-3 text-sm font-bold">
+                              <input
+                                name="enabled"
+                                type="checkbox"
+                                defaultChecked
+                              />
+                              Enable immediately
+                            </label>
+                            <label className="sm:col-span-2 xl:col-span-3">
+                              <span className="label">Notes</span>
+                              <textarea
+                                className="field mt-1 min-h-20"
+                                name="notes"
+                              />
+                            </label>
+                            <label className="sm:col-span-2 xl:col-span-3">
+                              <span className="label">
+                                Reason for adding rule
+                              </span>
+                              <input
+                                className="field mt-1"
+                                name="reason"
+                                minLength={8}
+                                defaultValue="Add rule from verified source"
+                                required
+                              />
+                            </label>
+                            <div className="sm:col-span-2 xl:col-span-3">
+                              <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-950">
+                                Final check: verify the authority, citation, and
+                                timing above. Saving adds the rule immediately
+                                and recalculates affected towers.
+                              </div>
+                              <SubmitButton pendingLabel="Adding rule…">
+                                Add rule and recalculate towers
+                              </SubmitButton>
+                            </div>
+                          </form>
+                        </details>
+                      )}
+                      <div className="mt-3 space-y-4">
+                        {profile.rules.map((rule) => (
+                          <article
+                            key={rule.id}
+                            className="rounded-xl border border-slate-200 p-4"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <h4 className="font-black">
+                                  {obligationName(rule.requirementType)}
+                                </h4>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  {rule.ruleName}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <SourceBadge authority={rule.sourceAuthority} />
+                                <span className="text-sm font-bold">
+                                  {rule.enabled ? "Enabled" : "Disabled"}
+                                </span>
+                              </div>
+                            </div>
+                            <dl className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+                              <div className="rounded-lg bg-slate-50 p-3">
+                                <dt className="label">Hard timing rule</dt>
+                                <dd className="mt-1 font-bold">
+                                  {hardTiming(rule)}
+                                </dd>
+                              </div>
+                              <div className="rounded-lg bg-slate-50 p-3 md:col-span-2">
+                                <dt className="label">
+                                  Associated Legionella sample
+                                </dt>
+                                <dd className="mt-1 font-bold">
+                                  {sampleTiming(
+                                    rule,
+                                    profile.internalTargetIntervalDays,
+                                  )}
+                                </dd>
+                              </div>
+                              <div className="rounded-lg bg-slate-50 p-3">
+                                <dt className="label">Applies while</dt>
+                                <dd className="mt-1 font-bold">
+                                  {appliesWhen(rule)}
+                                </dd>
+                              </div>
+                              <div className="rounded-lg bg-slate-50 p-3 md:col-span-2">
+                                <dt className="label">Source</dt>
+                                <dd className="mt-1 font-bold">
+                                  {rule.sourceCitation}
+                                </dd>
+                              </div>
+                            </dl>
+
+                            <details
+                              className="mt-4 rounded-lg border border-slate-200"
+                              open={saved.savedRule === rule.id}
+                            >
+                              <summary className="cursor-pointer list-none p-3 text-sm font-black text-emerald-800">
+                                Edit rule details · Revision {rule.revision}
+                              </summary>
+                              <form
+                                action={updateRuleDefinitionAction}
+                                className="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2 xl:grid-cols-3"
+                              >
                                 <input
-                                  className="field mt-1"
-                                  name="sourceCitation"
-                                  defaultValue={rule.sourceCitation}
-                                  required
+                                  type="hidden"
+                                  name="ruleId"
+                                  value={rule.id}
                                 />
-                              </label>
-                              {[
-                                "ROUTINE_LEGIONELLA_SAMPLE",
-                                "ROUTINE_BACTERIOLOGICAL_SAMPLE",
-                                "PORTAL_SAMPLE_DATE",
-                                "NYS_REGISTRY_REPORTING",
-                                "COMPLIANCE_INSPECTION",
-                              ].includes(rule.requirementType) && (
+                                {profile.jurisdictionMode ===
+                                  "CUSTOM_JURISDICTION" &&
+                                  profile._count.systems > 0 && (
+                                    <label>
+                                      <span className="label">
+                                        New version effective date
+                                      </span>
+                                      <input
+                                        className="field mt-1"
+                                        name="effectiveDate"
+                                        type="date"
+                                        defaultValue={todayDateOnly()}
+                                        required
+                                      />
+                                    </label>
+                                  )}
+                                <label className="sm:col-span-2 xl:col-span-2">
+                                  <span className="label">Rule name</span>
+                                  <input
+                                    className="field mt-1"
+                                    name="ruleName"
+                                    defaultValue={rule.ruleName}
+                                    required
+                                  />
+                                </label>
                                 <label>
+                                  <span className="label">Authority</span>
+                                  <select
+                                    className="field mt-1"
+                                    name="sourceAuthority"
+                                    defaultValue={rule.sourceAuthority}
+                                    required
+                                  >
+                                    {authorities.map((authority) => (
+                                      <option key={authority} value={authority}>
+                                        {plainEnumLabel(authority)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label className="sm:col-span-2 xl:col-span-3">
+                                  <span className="label">Source citation</span>
+                                  <input
+                                    className="field mt-1"
+                                    name="sourceCitation"
+                                    defaultValue={rule.sourceCitation}
+                                    required
+                                  />
+                                </label>
+                                {[
+                                  "ROUTINE_LEGIONELLA_SAMPLE",
+                                  "ROUTINE_BACTERIOLOGICAL_SAMPLE",
+                                  "PORTAL_SAMPLE_DATE",
+                                  "NYS_REGISTRY_REPORTING",
+                                  "COMPLIANCE_INSPECTION",
+                                ].includes(rule.requirementType) && (
+                                  <label>
+                                    <span className="label">
+                                      Hard interval (days)
+                                    </span>
+                                    <input
+                                      className="field mt-1"
+                                      name="frequencyDays"
+                                      type="number"
+                                      min="0"
+                                      max="3650"
+                                      defaultValue={
+                                        rule.frequencyDays ?? undefined
+                                      }
+                                    />
+                                  </label>
+                                )}
+                                {rule.requirementType ===
+                                  "SUMMERTIME_HYPERHALOGENATION" && (
+                                  <>
+                                    <label>
+                                      <span className="label">
+                                        Minimum days after trigger before
+                                        sampling
+                                      </span>
+                                      <input
+                                        className="field mt-1"
+                                        name="minimumDaysAfterTrigger"
+                                        type="number"
+                                        min="0"
+                                        max="3650"
+                                        defaultValue={
+                                          rule.minimumDaysAfterTrigger ??
+                                          undefined
+                                        }
+                                      />
+                                    </label>
+                                    <label>
+                                      <span className="label">
+                                        Maximum days after trigger to collect
+                                        sample
+                                      </span>
+                                      <input
+                                        className="field mt-1"
+                                        name="maximumDaysAfterTrigger"
+                                        type="number"
+                                        min="0"
+                                        max="3650"
+                                        defaultValue={
+                                          rule.maximumDaysAfterTrigger ??
+                                          undefined
+                                        }
+                                      />
+                                    </label>
+                                  </>
+                                )}
+                                <div className="rounded-lg bg-slate-50 p-3 text-sm sm:col-span-2 xl:col-span-2">
+                                  <div className="label">Operating scope</div>
+                                  <div className="mt-1 font-bold">
+                                    {appliesWhen(rule)}
+                                  </div>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    Scope is displayed for audit clarity; only
+                                    rule timing supported by TowerTrack is
+                                    editable here.
+                                  </p>
+                                </div>
+                                <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm font-bold">
+                                  <input
+                                    name="enabled"
+                                    type="checkbox"
+                                    defaultChecked={rule.enabled}
+                                  />
+                                  Enabled
+                                </label>
+                                <label className="sm:col-span-2 xl:col-span-3">
+                                  <span className="label">Notes</span>
+                                  <textarea
+                                    className="field mt-1 min-h-20"
+                                    name="notes"
+                                    defaultValue={rule.notes || ""}
+                                  />
+                                </label>
+                                <label className="sm:col-span-2 xl:col-span-3">
                                   <span className="label">
-                                    Hard interval (days)
+                                    Reason for revision
                                   </span>
                                   <input
                                     className="field mt-1"
-                                    name="frequencyDays"
-                                    type="number"
-                                    min="0"
-                                    max="3650"
-                                    defaultValue={
-                                      rule.frequencyDays ?? undefined
-                                    }
+                                    name="reason"
+                                    minLength={8}
+                                    defaultValue="Update rule from verified source"
+                                    required
                                   />
                                 </label>
-                              )}
-                              {rule.requirementType ===
-                                "SUMMERTIME_HYPERHALOGENATION" && (
-                                <>
-                                  <label>
-                                    <span className="label">
-                                      Minimum days after trigger before sampling
-                                    </span>
-                                    <input
-                                      className="field mt-1"
-                                      name="minimumDaysAfterTrigger"
-                                      type="number"
-                                      min="0"
-                                      max="3650"
-                                      defaultValue={
-                                        rule.minimumDaysAfterTrigger ??
-                                        undefined
-                                      }
-                                    />
-                                  </label>
-                                  <label>
-                                    <span className="label">
-                                      Maximum days after trigger to collect
-                                      sample
-                                    </span>
-                                    <input
-                                      className="field mt-1"
-                                      name="maximumDaysAfterTrigger"
-                                      type="number"
-                                      min="0"
-                                      max="3650"
-                                      defaultValue={
-                                        rule.maximumDaysAfterTrigger ??
-                                        undefined
-                                      }
-                                    />
-                                  </label>
-                                </>
-                              )}
-                              <div className="rounded-lg bg-slate-50 p-3 text-sm sm:col-span-2 xl:col-span-2">
-                                <div className="label">Operating scope</div>
-                                <div className="mt-1 font-bold">
-                                  {appliesWhen(rule)}
+                                <div className="sm:col-span-2 xl:col-span-3">
+                                  <SubmitButton pendingLabel="Saving rule revision…">
+                                    Save as revision {rule.revision + 1}
+                                  </SubmitButton>
                                 </div>
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Scope is displayed for audit clarity; only
-                                  rule timing supported by TowerTrack is
-                                  editable here.
-                                </p>
-                              </div>
-                              <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm font-bold">
-                                <input
-                                  name="enabled"
-                                  type="checkbox"
-                                  defaultChecked={rule.enabled}
-                                />
-                                Enabled
-                              </label>
-                              <label className="sm:col-span-2 xl:col-span-3">
-                                <span className="label">Notes</span>
-                                <textarea
-                                  className="field mt-1 min-h-20"
-                                  name="notes"
-                                  defaultValue={rule.notes || ""}
-                                />
-                              </label>
-                              <label className="sm:col-span-2 xl:col-span-3">
-                                <span className="label">
-                                  Reason for revision
-                                </span>
-                                <input
-                                  className="field mt-1"
-                                  name="reason"
-                                  minLength={8}
-                                  defaultValue="Update rule from verified source"
-                                  required
-                                />
-                              </label>
-                              <div className="sm:col-span-2 xl:col-span-3">
-                                <SubmitButton pendingLabel="Saving rule revision…">
-                                  Save as revision {rule.revision + 1}
-                                </SubmitButton>
-                              </div>
-                            </form>
-                          </details>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
+                              </form>
+                            </details>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  </fieldset>
                 </div>
               </details>
             );

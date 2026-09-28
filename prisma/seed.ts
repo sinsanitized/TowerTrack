@@ -723,7 +723,11 @@ async function main() {
           data: {
             coolingTowerSystemId: system.id,
             eventType: "QUARTERLY_INSPECTION_COMPLETED",
-            eventDate: D(addDays(sample, -40)),
+            eventDate: D(
+              addDays(sample, -40) < "2026-05-08"
+                ? "2026-05-08"
+                : addDays(sample, -40),
+            ),
             notes: "Fictional qualified-person inspection",
             recordedById: admin.id,
           },

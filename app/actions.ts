@@ -129,6 +129,148 @@ export async function createCustomRuleProfileAction(formData: FormData) {
   redirect(`/admin?savedProfile=${id}&profileAction=created`);
 }
 
+export async function cloneSharedRuleProfileAction(formData: FormData) {
+  const user = await requireRole([UserRole.ADMIN]);
+  const parsed = z
+    .object({
+      profileId: z.string().min(1),
+      reason: z.string().trim().min(8).max(2000),
+    })
+    .parse(Object.fromEntries(formData));
+  const today = todayInTimeZone();
+  const source = await db.ruleProfile.findFirstOrThrow({
+    where: {
+      id: parsed.profileId,
+      organizationId: null,
+      systems: {
+        some: {
+          building: { customer: { organizationId: user.organizationId } },
+        },
+      },
+    },
+    include: {
+      rules: true,
+      systems: {
+        where: {
+          building: { customer: { organizationId: user.organizationId } },
+        },
+        select: {
+          id: true,
+          jurisdictionId: true,
+          ruleConfiguration: true,
+          ruleAssignments: {
+            where: { effectiveEndDate: null },
+            orderBy: { effectiveStartDate: "desc" },
+            take: 1,
+            select: { effectiveStartDate: true },
+          },
+        },
+      },
+    },
+  });
+  const clonedProfileId = `org-${user.organizationId}-${crypto.randomUUID()}`;
+  await db.$transaction(async (tx) => {
+    await tx.ruleProfile.create({
+      data: {
+        id: clonedProfileId,
+        organizationId: user.organizationId,
+        name: `${source.name} — Organization copy`,
+        jurisdictionMode: source.jurisdictionMode,
+        jurisdictionId: source.jurisdictionId,
+        effectiveStartDate: asUtc(today),
+        description: source.description,
+        isDefault: false,
+        active: true,
+        legionellaIntervalDays: source.legionellaIntervalDays,
+        internalTargetIntervalDays: source.internalTargetIntervalDays,
+        appliesToPartialOperation: source.appliesToPartialOperation,
+      },
+    });
+    await tx.ruleDefinition.createMany({
+      data: source.rules.map((rule) => ({
+        id: `${clonedProfileId}-${rule.requirementType.toLowerCase().replaceAll("_", "-")}-${crypto.randomUUID().slice(0, 8)}`,
+        revision: rule.revision,
+        ruleProfileId: clonedProfileId,
+        requirementType: rule.requirementType,
+        ruleName: rule.ruleName,
+        sourceAuthority: rule.sourceAuthority,
+        sourceCitation: rule.sourceCitation,
+        isRegulatoryRequirement: rule.isRegulatoryRequirement,
+        isGuidanceRequirement: rule.isGuidanceRequirement,
+        isCompanyPolicy: rule.isCompanyPolicy,
+        isContractRequirement: rule.isContractRequirement,
+        isPendingRegulation: rule.isPendingRegulation,
+        frequencyDays: rule.frequencyDays,
+        minimumDaysAfterTrigger: rule.minimumDaysAfterTrigger,
+        maximumDaysAfterTrigger: rule.maximumDaysAfterTrigger,
+        dueDateCalculation: rule.dueDateCalculation,
+        appliesWhenOperating: rule.appliesWhenOperating,
+        appliesWhenPartiallyOperating: rule.appliesWhenPartiallyOperating,
+        appliesWhenSeasonal: rule.appliesWhenSeasonal,
+        appliesWhenShutdown: rule.appliesWhenShutdown,
+        triggerActivityType: rule.triggerActivityType,
+        createsFollowUpRequirement: rule.createsFollowUpRequirement,
+        followUpRequirementType: rule.followUpRequirementType,
+        warningDays: rule.warningDays,
+        criticalDays: rule.criticalDays,
+        enabled: rule.enabled,
+        notes: rule.notes,
+      })),
+    });
+    for (const system of source.systems) {
+      await tx.towerRuleAssignment.updateMany({
+        where: {
+          coolingTowerSystemId: system.id,
+          effectiveEndDate: null,
+        },
+        data: {
+          effectiveEndDate: asUtc(
+            system.ruleAssignments[0] &&
+              dateOnly(system.ruleAssignments[0].effectiveStartDate) < today
+              ? addDays(today, -1)
+              : today,
+          ),
+        },
+      });
+      await tx.towerRuleAssignment.create({
+        data: {
+          coolingTowerSystemId: system.id,
+          configuration: system.ruleConfiguration,
+          ruleProfileId: clonedProfileId,
+          effectiveStartDate: asUtc(today),
+          changedById: user.id,
+          reason: parsed.reason,
+        },
+      });
+      await tx.coolingTowerSystem.update({
+        where: { id: system.id },
+        data: { ruleProfileId: clonedProfileId },
+      });
+      await rebuildSystemComplianceProjections(tx, system.id);
+    }
+    await tx.auditLog.create({
+      data: {
+        entityType: "RuleProfile",
+        entityId: clonedProfileId,
+        action: "CLONED_FOR_ORGANIZATION",
+        reason: parsed.reason,
+        changedById: user.id,
+        previousValue: { sourceProfileId: source.id },
+        newValue: {
+          organizationId: user.organizationId,
+          assignedSystemIds: source.systems.map(({ id }) => id),
+          effectiveDate: today,
+        },
+      },
+    });
+  });
+  revalidatePath("/");
+  revalidatePath("/admin");
+  redirect(
+    `/admin?savedProfile=${clonedProfileId}&profileAction=cloned#compliance-rules`,
+  );
+}
+
 const manageableUserRoles = [
   UserRole.ADMIN,
   UserRole.OPERATIONS_MANAGER,
@@ -2185,13 +2327,9 @@ export async function updateRuleProfileAction(formData: FormData) {
       _count: { select: { systems: true } },
     },
   });
-  if (
-    existing.organizationId !== user.organizationId &&
-    (existing.systems.length === 0 ||
-      existing._count.systems !== existing.systems.length)
-  )
+  if (existing.organizationId !== user.organizationId)
     throw new Error(
-      "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
+      "Shared regulatory profiles are read-only. Create an organization copy before revising this profile.",
     );
   const routineRule = existing.rules[0] ?? null;
   await db.$transaction(async (tx) => {
@@ -2309,14 +2447,9 @@ export async function updateRuleDefinitionAction(formData: FormData) {
       },
     },
   });
-  if (
-    existing.ruleProfile.organizationId !== user.organizationId &&
-    (existing.ruleProfile.systems.length === 0 ||
-      existing.ruleProfile._count.systems !==
-        existing.ruleProfile.systems.length)
-  )
+  if (existing.ruleProfile.organizationId !== user.organizationId)
     throw new Error(
-      "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
+      "Shared regulatory profiles are read-only. Create an organization copy before revising this profile.",
     );
   if (
     existing.ruleProfile.jurisdictionMode === "CUSTOM_JURISDICTION" &&
@@ -2587,13 +2720,9 @@ export async function createRuleDefinitionAction(formData: FormData) {
       _count: { select: { systems: true } },
     },
   });
-  if (
-    profile.organizationId !== user.organizationId &&
-    (profile.systems.length === 0 ||
-      profile._count.systems !== profile.systems.length)
-  )
+  if (profile.organizationId !== user.organizationId)
     throw new Error(
-      "This rule profile is shared by another organization and cannot be revised from an organization admin account.",
+      "Shared regulatory profiles are read-only. Create an organization copy before revising this profile.",
     );
   if (
     profile.jurisdictionMode === "CUSTOM_JURISDICTION" &&

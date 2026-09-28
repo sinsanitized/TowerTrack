@@ -61,12 +61,15 @@ export function EventRecorderDrawer({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [hydrated, setHydrated] = useState(false);
   const [open, setOpen] = useState(initialOpen);
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => setHydrated(true), []);
 
   const requestClose = useCallback(() => {
     if (
@@ -114,6 +117,7 @@ export function EventRecorderDrawer({
         ref={triggerRef}
         className={buttonClass("primary", "min-h-11")}
         type="button"
+        disabled={!hydrated}
         onClick={() => {
           dirtyRef.current = false;
           setDirty(false);

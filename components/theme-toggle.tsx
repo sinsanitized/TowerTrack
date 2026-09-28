@@ -36,6 +36,7 @@ export function ThemeToggle() {
     <button
       type="button"
       className="theme-toggle ml-4"
+      disabled={theme === null}
       onClick={toggleTheme}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={dark}

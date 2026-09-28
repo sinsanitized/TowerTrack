@@ -39,12 +39,17 @@ test("operations manager can record cleaning without creating or resetting a sam
     );
 
   await page.getByRole("button", { name: "Add compliance record" }).click();
-  await page.getByRole("button", { name: "Cleaning" }).click();
+  const recorder = page.getByRole("dialog");
+  await expect(recorder).toBeVisible();
+  await recorder
+    .getByText("Other work and special conditions", { exact: true })
+    .click();
+  await recorder.getByRole("button", { name: "Cleaning" }).click();
   await expect(
     page.getByRole("group", { name: /Cleaning type/ }),
   ).toBeVisible();
   const cleaningForm = page.locator("#record-event form");
-  await cleaningForm.getByLabel(/Cleaning completion date/).fill("2026-07-14");
+  await cleaningForm.getByLabel(/Cleaning completion date/).fill("2026-07-13");
   await cleaningForm.getByText("Add notes (optional)", { exact: true }).click();
   await cleaningForm
     .getByLabel("Notes")
@@ -52,7 +57,7 @@ test("operations manager can record cleaning without creating or resetting a sam
   await cleaningForm.getByRole("button", { name: "Save record" }).click();
 
   await expect(page).toHaveURL(/event=/);
-  await expect(page.getByText("Cleaning completed").last()).toBeVisible();
+  await expect(page.getByText(/Cleaning completed ·/)).toBeVisible();
   await expect(page.getByText(/Cleaning is tracked separately/)).toBeVisible();
   expect(
     await samplingSection.locator("time").evaluateAll((dates) =>

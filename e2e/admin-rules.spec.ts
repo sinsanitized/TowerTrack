@@ -11,12 +11,31 @@ test("administrator adds a supported jurisdiction rule", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.goto("/admin");
 
-  const addSummary = page
-    .getByText("Add jurisdiction rule", { exact: true })
-    .first();
+  const sharedProfile = page
+    .getByRole("heading", { name: "Out-of-State Company Policy" })
+    .locator("xpath=ancestor::details[1]");
+  await sharedProfile.locator("summary").first().click();
+  await expect(
+    sharedProfile.getByText("Protected regulatory baseline"),
+  ).toBeVisible();
+  await sharedProfile
+    .getByRole("button", { name: "Create editable copy" })
+    .click();
+  await expect(
+    page.getByText(
+      "Organization-owned rule copy created, tower assignments updated, and deadlines recalculated.",
+    ),
+  ).toBeVisible();
+
+  const editableProfile = page
+    .getByRole("heading", {
+      name: "Out-of-State Company Policy — Organization copy",
+    })
+    .locator("xpath=ancestor::details[1]");
+  const addSummary = editableProfile
+    .locator("summary")
+    .filter({ hasText: "Add jurisdiction rule" });
   const addRule = addSummary.locator("xpath=ancestor::details[1]");
-  const profile = addSummary.locator("xpath=ancestor::details[2]");
-  await profile.locator("summary").first().click();
   await addSummary.click();
   const form = addRule.locator("form");
   const requirementType = await form

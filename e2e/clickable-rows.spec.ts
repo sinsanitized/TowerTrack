@@ -21,11 +21,11 @@ test("operational list rows open their primary action from row space", async ({
   await deadlineRow.locator('td[data-label="Target window"]').click();
   await expect(page).toHaveURL(/\/systems\/.+/);
 
-  await page.goto("/samples");
-  const sampleRow = page.locator("article[data-action-label]").first();
-  await expect(sampleRow).toBeVisible();
-  await sampleRow.getByText("Laboratory result", { exact: true }).click();
-  await expect(page).toHaveURL(/\/systems\/.+/);
+  await page.goto("/history");
+  const historyRow = page.getByTestId("history-record-row").first();
+  await expect(historyRow).toBeVisible();
+  await historyRow.click();
+  await expect(page).toHaveURL(/\/systems\/.+\/events\/.+/);
 
   await page.goto("/customers");
   const customerRow = page.locator("tbody tr[data-action-label]").first();

@@ -22,6 +22,31 @@ jobs:
 
   browser-workflows:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: towertrack_e2e
+          POSTGRES_USER: towertrack
+          POSTGRES_PASSWORD: towertrack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U towertrack -d towertrack_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://towertrack:towertrack@127.0.0.1:5432/towertrack_e2e?schema=public
+      E2E_DATABASE_URL: postgresql://towertrack:towertrack@127.0.0.1:5432/towertrack_e2e?schema=public
+      E2E_TEST_MODE: "true"
+      DEMO_MODE: "true"
+      AUTH_SECRET: isolated-e2e-secret-used-only-in-github-actions
+      INITIAL_ADMIN_EMAIL: admin@towertrack.local
+      INITIAL_ADMIN_PASSWORD: ChangeMe123!
+      INITIAL_ORGANIZATION_NAME: TowerTrack E2E
+      TOWERTRACK_TEST_CLOCK: enabled
+      TOWERTRACK_TEST_DATE: 2026-07-13
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,24 +55,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: cp .env.docker.example .env
-      - run: E2E_TEST_MODE=true docker compose up --build -d
-      - name: Wait for TowerTrack
-        run: |
-          for attempt in {1..60}; do
-            if curl --fail --silent http://localhost/api/health > /dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker compose logs web
-          exit 1
-      - name: Run browser workflows
-        run: npm run test:e2e
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost
-          PLAYWRIGHT_SKIP_WEBSERVER: "1"
-          INITIAL_ADMIN_EMAIL: admin@towertrack.local
-          INITIAL_ADMIN_PASSWORD: ChangeMe123!
-      - if: always()
-        run: docker compose down
+      - run: npm run test:e2e:prepare
+      - run: npm run test:e2e
