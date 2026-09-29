@@ -8,12 +8,7 @@ import { TowerActionList } from "@/components/tower-action-list";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
 import { ComplianceTimeline } from "@/components/compliance-timeline";
-import { OperationPatternForm } from "@/components/operation-pattern-form";
-import { MonthlyTargetWindowForm } from "@/components/monthly-target-window-form";
-import {
-  recordServiceEventAction,
-  voidServiceEventAction,
-} from "@/app/actions";
+import { recordServiceEventAction } from "@/app/actions";
 import { complianceDashboardRows } from "@/lib/queries";
 import { db } from "@/lib/db";
 import {
@@ -27,7 +22,7 @@ import {
   plainEnumLabel,
   requiredActionLabel,
 } from "@/lib/labels";
-import { seasonLabel, seasonalStatus } from "@/lib/season";
+import { seasonalStatus } from "@/lib/season";
 import { requireUser } from "@/lib/auth";
 import {
   compileTowerRuleConfig,
@@ -40,7 +35,6 @@ import {
   selectOverviewObligations,
   sortTowerObligations,
 } from "@/lib/tower-details";
-import { towerRuleConfigurationLabel } from "@/lib/tower-rule-configuration";
 import { buttonClass } from "@/lib/button-variants";
 import { completionHrefForObligation } from "@/lib/deadline-view";
 import { SubmitButton } from "@/components/submit-button";
@@ -48,7 +42,6 @@ import {
   responsibilityFamilyForObligation,
   responsibilityForServiceObligation,
   serviceResponsibilityFamilies,
-  serviceResponsibilityLabel,
 } from "@/lib/service-responsibility";
 import {
   eventEntryHref,
@@ -56,6 +49,14 @@ import {
   isResampleObligation,
   parseEventEntryIntent,
 } from "@/lib/event-entry-intent";
+import { TowerWorkspaceNavigation } from "./components/tower-workspace-navigation";
+import { TowerInformation } from "./components/tower-information";
+import { TowerSettings } from "./components/tower-settings";
+import {
+  RecentTowerActivity,
+  TowerComplianceRecords,
+} from "./components/tower-records";
+import { ComplianceUpdateSummary } from "./components/compliance-update-summary";
 
 export default async function SystemPage({
   params,
@@ -707,140 +708,23 @@ export default async function SystemPage({
           )}
         </div>
       )}
-      <nav
-        className="panel mb-6 flex gap-1 overflow-x-auto p-2"
-        aria-label="Tower workspace"
-      >
-        {[
-          ["Overview", "overview"],
-          ["Required work", "obligations"],
-          ["Records", "history"],
-          ["Tower Information", "information"],
-          ...(canViewSettings ? [["Settings", "settings"]] : []),
-        ].map(([label, tab]) => (
-          <Link
-            key={tab}
-            className={`min-h-11 min-w-max rounded-lg px-4 py-3 text-sm font-black ${
-              view === tab
-                ? "bg-emerald-800 text-white"
-                : "text-emerald-900 hover:bg-emerald-50"
-            }`}
-            href={`/systems/${id}?view=${tab}`}
-            aria-current={view === tab ? "page" : undefined}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
-      <div className="mb-6 border-l-4 border-emerald-700 pl-4">
-        <h2 className="text-lg font-black">
-          {view === "overview"
-            ? "Tower overview"
-            : view === "obligations"
-              ? "Required work"
-              : view === "history"
-                ? "Compliance records"
-                : view === "information"
-                  ? "Tower information"
-                  : "Tower settings"}
-        </h2>
-        <p className="mt-1 max-w-3xl text-sm text-slate-600">
-          {view === "overview"
-            ? "See what needs attention now, the next upcoming work, and the latest compliance dates."
-            : view === "obligations"
-              ? "Review unfinished work, dependencies, deadlines, and compatible completion dates."
-              : view === "history"
-                ? "Review completed samples, results, inspections, cleaning, submissions, corrections, and audit history."
-                : view === "information"
-                  ? "Review the facility, equipment, identifiers, and service responsibilities."
-                  : "Manage operating patterns, recommended service dates, jurisdiction, and compliance rules."}
-        </p>
-      </div>
+      <TowerWorkspaceNavigation
+        systemId={id}
+        view={view}
+        canViewSettings={canViewSettings}
+      />
       {generated && (
-        <section className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
-          <div className="label">Compliance dates recalculated</div>
-          <h2 className="mt-1 font-black">Compliance updated</h2>
-          <ul className="mt-3 grid gap-2 text-sm font-bold sm:grid-cols-2">
-            <li>✓ Compliance record saved and history updated</li>
-            <li>
-              ✓ Compliance recalculated to {dashboardRow.complianceHealth.label}
-            </li>
-            {generatedObligations.map((item) => (
-              <li key={item.id}>✓ {plainEnumLabel(item.type)} generated</li>
-            ))}
-            {satisfiedObligationTypes.map((type, index) => (
-              <li key={`${type}-${index}`}>
-                ✓ {plainEnumLabel(type)}{" "}
-                {recordedEvent?.eventType ===
-                "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
-                  ? "completed by this collection"
-                  : "already satisfied by an existing completion record"}
-              </li>
-            ))}
-            {!generatedObligations.length &&
-              !satisfiedObligationTypes.length && (
-                <li>✓ No new requirement was created by this record</li>
-              )}
-            {recordedEvent &&
-              ["CLEANING_COMPLETED", "STARTUP_CLEANING_DISINFECTION"].includes(
-                recordedEvent.eventType,
-              ) && (
-                <li>
-                  ✓ Cleaning is tracked separately; no Legionella sample clock
-                  was reset
-                </li>
-              )}
-            <li>
-              ✓ Current projection: {generated.sample} sampling,{" "}
-              {generated.inspection} inspection, {generated.maintenance}{" "}
-              maintenance, {generated.reporting} reporting
-            </li>
-            {dashboardRow.visitOpportunity && (
-              <li>
-                ✓ One completion date can cover{" "}
-                {dashboardRow.visitOpportunity.obligations.length} requirement
-                {dashboardRow.visitOpportunity.obligations.length === 1
-                  ? ""
-                  : "s"}
-              </li>
-            )}
-          </ul>
-          {recordedEvent && (
-            <div className="mt-3 border-t border-emerald-200 pt-3 text-sm">
-              <span className="font-black">
-                {plainEnumLabel(recordedEvent.eventType)}
-              </span>{" "}
-              · <ComplianceDate value={recordedEvent.eventDate} />
-            </div>
-          )}
-          {recordedPortalFollowUp && (
-            <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 p-4 text-blue-950">
-              <div className="label">Required next step</div>
-              <h3 className="mt-1 font-black">
-                Submit this sample date to the NYC Health Department portal
-              </h3>
-              <p className="mt-1 text-sm">
-                The Legionella sample is recorded, but its portal submission is
-                a separate audited requirement.
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                <ComplianceDate
-                  value={recordedPortalFollowUp.latestDueDate}
-                  label="Portal deadline"
-                  deadline
-                  compact
-                  operational
-                />
-                <Link
-                  className="btn btn-primary"
-                  href={`?view=obligations&report=${encodeURIComponent(recordedPortalFollowUp.id)}#reporting-${recordedPortalFollowUp.id}`}
-                >
-                  Record NYC portal submission
-                </Link>
-              </div>
-            </div>
-          )}
-        </section>
+        <ComplianceUpdateSummary
+          generated={generated}
+          complianceHealthLabel={dashboardRow.complianceHealth.label}
+          generatedObligations={generatedObligations}
+          satisfiedObligationTypes={satisfiedObligationTypes}
+          recordedEvent={recordedEvent}
+          visitOpportunityCount={
+            dashboardRow.visitOpportunity?.obligations.length ?? null
+          }
+          portalFollowUp={recordedPortalFollowUp ?? null}
+        />
       )}
       {newlyCreated && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
@@ -1555,447 +1439,36 @@ export default async function SystemPage({
           )}
         </div>
         {view === "information" && (
-          <section className="panel p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="label">Service responsibility</div>
-                <h2 className="mt-1 font-black">Who handles each service</h2>
-              </div>
-              {canViewSettings && (
-                <Link
-                  className="btn"
-                  href={`/systems/${id}?view=settings#service-responsibilities`}
-                >
-                  Change in Settings
-                </Link>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-slate-600">
-              These assignments control which work appears as our action and
-              which work is shown as an external dependency.
-            </p>
-            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-              {serviceResponsibilityFamilies.map(([key, label]) => {
-                const responsibility = system[key];
-                const external = responsibility !== "OUR_COMPANY";
-                return (
-                  <div
-                    key={key}
-                    className={`rounded-lg border p-3 ${
-                      external
-                        ? "border-purple-200 bg-purple-50"
-                        : "border-emerald-200 bg-emerald-50"
-                    }`}
-                  >
-                    <div className="text-xs font-bold text-slate-600">
-                      {label}
-                    </div>
-                    <div className="mt-1 font-black">
-                      {serviceResponsibilityLabel(responsibility)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-        {view === "information" && (
-          <div className="panel p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="label">Facility and identifiers</div>
-                <h2 className="mt-1 font-black">Tower location</h2>
-              </div>
-              {canViewSettings && (
-                <Link
-                  className="btn"
-                  href={`/systems/${id}/edit?returnTo=${encodeURIComponent(`/systems/${id}?view=information`)}`}
-                >
-                  Edit customer and tower information
-                </Link>
-              )}
-            </div>
-            <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
-              <div>
-                <dt className="label">Customer</dt>
-                <dd className="font-bold">{system.building.customer.name}</dd>
-              </div>
-              <div>
-                <dt className="label">Facility</dt>
-                <dd className="font-bold">{system.building.buildingName}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="label">Address</dt>
-                <dd className="font-bold">
-                  {system.building.streetAddress}, {system.building.city},{" "}
-                  {system.building.state}
-                </dd>
-              </div>
-              <div>
-                <dt className="label">Internal job number</dt>
-                <dd className="font-bold">{system.internalJobNumber}</dd>
-              </div>
-              <div>
-                <dt className="label">Registration number</dt>
-                <dd className="font-bold">
-                  {system.registrationNumber || "Not recorded"}
-                </dd>
-              </div>
-              <div>
-                <dt className="label">NYC cooling tower system ID</dt>
-                <dd className="font-bold">
-                  {system.NYCSystemId || "Not recorded"}
-                </dd>
-              </div>
-              <div>
-                <dt className="label">NYS cooling tower system ID</dt>
-                <dd className="font-bold">
-                  {system.NYSSystemId || "Not recorded"}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        )}
-        <div className={view === "information" ? "panel p-5" : "hidden"}>
-          <div className="label">Cooling tower information</div>
-          <h2 className="mt-1 font-black">Equipment details</h2>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
-            <div>
-              <dt className="label">Manufacturer</dt>
-              <dd className="font-bold">
-                {system.manufacturer || "Not recorded"}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Model</dt>
-              <dd className="font-bold">
-                {system.modelNumber || "Not recorded"}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Serial number</dt>
-              <dd className="font-bold">
-                {system.serialNumber || "Not recorded"}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Tower location</dt>
-              <dd className="font-bold">
-                {system.towerLocation || "Not recorded"}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Tonnage</dt>
-              <dd className="font-bold">
-                {system.tonnage ? `${system.tonnage} tons` : "Not recorded"}
-              </dd>
-            </div>
-          </dl>
-        </div>
-        {view === "settings" && (
-          <section
-            id="service-responsibilities"
-            className="panel scroll-mt-6 p-5"
-          >
-            <div className="label">1. Service responsibilities</div>
-            <h2 className="mt-1 font-black">Who performs each service</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              These assignments determine which work appears in our queues and
-              which work remains an external dependency. Saved separately.
-            </p>
-            <Link
-              className="btn btn-primary mt-4"
-              href={`/systems/${id}/edit?section=responsibilities&returnTo=${encodeURIComponent(`/systems/${id}?view=settings`)}`}
-            >
-              Edit service responsibilities
-            </Link>
-          </section>
-        )}
-        <div className={view === "settings" ? "panel p-5" : "hidden"}>
-          <div className="label">2. Operating schedule</div>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="font-black">Tower operation pattern</h2>
-              <p className="mt-1 text-sm font-bold text-slate-700">
-                {seasonLabel(system)} · {seasonalStatus(system)}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                Choose whether this tower operates continuously or during a
-                recurring season. This controls date calculations; actual
-                startup and shutdown remain separate audited events.
-              </p>
-            </div>
-          </div>
-          <OperationPatternForm
+          <TowerInformation
             systemId={id}
-            seasonal={system.operationPeriodType === "SEASONAL"}
-            seasonStartMonth={system.seasonStartMonth}
-            seasonStartDay={system.seasonStartDay}
-            seasonEndMonth={system.seasonEndMonth}
-            seasonEndDay={system.seasonEndDay}
-            currentLabel={seasonLabel(system)}
-            currentStatus={seasonalStatus(system)}
+            system={system}
+            canViewSettings={canViewSettings}
           />
-        </div>
-        <div className={view === "settings" ? "panel p-5" : "hidden"}>
-          <div className="label">3. Recommended service dates</div>
-          <h2 className="font-black">
-            Recommended monthly sample collection dates
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            This recommended service date stays stable; the compliance deadline
-            still comes from the last qualifying sample.
-          </p>
-          <MonthlyTargetWindowForm
-            systemId={id}
-            startDay={system.monthlyTargetStartDay}
-            endDay={system.monthlyTargetEndDay}
-          />
-        </div>
+        )}
       </div>
+      {view === "settings" && (
+        <TowerSettings
+          systemId={id}
+          system={system}
+          profileVersion={dashboardRow.profileVersion}
+          profileEffectiveDate={dashboardRow.profileEffectiveDate}
+          profileJurisdiction={dashboardRow.profileJurisdiction}
+          profileAudit={profileAudit}
+        />
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className={view === "settings" ? "panel p-5" : "hidden"}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="label">4. Jurisdiction and compliance rules</div>
-              <h2 className="mt-1 font-black">Current rule assignment</h2>
-            </div>
-            <Link
-              className="btn"
-              href={`/systems/${id}/edit?section=rules&returnTo=${encodeURIComponent(`/systems/${id}?view=settings`)}`}
-            >
-              Change compliance rules
-            </Link>
-          </div>
-          <dl className="mt-4 space-y-4 text-sm">
-            <div>
-              <dt className="label">Profile</dt>
-              <dd className="font-bold">{system.ruleProfile.name}</dd>
-            </div>
-            <div>
-              <dt className="label">Compliance rules</dt>
-              <dd className="font-bold">
-                {towerRuleConfigurationLabel(system.ruleConfiguration)}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Profile version</dt>
-              <dd className="break-all font-mono text-xs">
-                {dashboardRow.profileVersion}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Effective date</dt>
-              <dd className="font-bold">
-                {formatDate(dashboardRow.profileEffectiveDate)}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Profile review</dt>
-              <dd className="font-bold">
-                {dashboardRow.profileJurisdiction === "CUSTOM"
-                  ? "Review local requirements and enabled policy rules"
-                  : "Assigned profile active"}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Assigned / last changed by</dt>
-              <dd className="font-bold">
-                {profileAudit
-                  ? `${profileAudit.changedBy.name} · ${formatDate(profileAudit.changedAt)}`
-                  : "Historical assignment — audit detail unavailable"}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Jurisdiction</dt>
-              <dd>
-                {[
-                  system.jurisdiction.city,
-                  system.jurisdiction.county,
-                  system.jurisdiction.state,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-              </dd>
-            </div>
-            <div>
-              <dt className="label">Operating status</dt>
-              <dd className="capitalize">
-                {system.operatingStatus.replaceAll("_", " ").toLowerCase()}
-              </dd>
-            </div>
-            {system.pendingRegulation && (
-              <div>
-                <dt className="label">Pending regulation</dt>
-                <dd className="font-bold text-purple-800">
-                  {system.pendingRegulation.expectedRuleName} ·{" "}
-                  {plainEnumLabel(system.pendingRegulation.status)}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </section>
-        <section
-          className={view === "overview" ? "panel p-5 lg:col-span-3" : "hidden"}
-        >
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="label">Latest completed records</div>
-              <h2 className="mt-1 font-black">Recent activity</h2>
-            </div>
-            <Link className="btn" href={`/systems/${id}?view=history`}>
-              View full history
-            </Link>
-          </div>
-          <div className="mt-4 space-y-3">
-            {recentActiveEvents.map((event) => (
-              <Link
-                key={event.id}
-                href={`/systems/${id}/events/${event.id}`}
-                className="block border-b pb-3 text-sm last:border-0"
-              >
-                <div className="font-bold">
-                  {plainEnumLabel(event.eventType)}
-                </div>
-                <div className="text-slate-500">
-                  <time dateTime={dateOnly(event.eventDate)}>
-                    {formatDate(event.eventDate)}
-                  </time>{" "}
-                  · {plainEnumLabel(event.status)}
-                </div>
-              </Link>
-            ))}
-            {!recentActiveEvents.length && (
-              <p className="text-sm text-slate-500">No events recorded yet.</p>
-            )}
-          </div>
-        </section>
+        {view === "overview" && (
+          <RecentTowerActivity systemId={id} events={recentActiveEvents} />
+        )}
       </div>
-      <span id="compliance-history" className="block scroll-mt-6" />
-      <section
-        id="regulatory-events"
-        className={`${view === "history" ? "panel mt-6" : "hidden"} scroll-mt-6 p-5`}
-      >
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <div className="label">Audit history</div>
-            <h2 className="mt-1 text-xl font-black">Compliance records</h2>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <p className="text-sm text-slate-500">
-              Edits create a replacement; removals preserve the audit trail.
-              Both recalculate every projection.
-            </p>
-            {mostRecentActiveEvent && (
-              <details className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-left text-sm text-amber-950">
-                <summary className="cursor-pointer font-black">
-                  Mark {plainEnumLabel(mostRecentActiveEvent.eventType)} from{" "}
-                  {formatDate(mostRecentActiveEvent.eventDate)} invalid
-                </summary>
-                <p className="mt-2 max-w-sm">
-                  This voids {plainEnumLabel(mostRecentActiveEvent.eventType)}
-                  from {formatDate(mostRecentActiveEvent.eventDate)} and
-                  recalculates every dependent date. The audit record remains.
-                </p>
-                <form action={voidServiceEventAction} className="mt-3">
-                  <input
-                    type="hidden"
-                    name="eventId"
-                    value={mostRecentActiveEvent.id}
-                  />
-                  <input
-                    type="hidden"
-                    name="reason"
-                    value="Void most recently recorded active compliance record"
-                  />
-                  <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-white p-3 font-bold">
-                    <input
-                      className="mt-1"
-                      type="checkbox"
-                      name="confirmVoid"
-                      value="yes"
-                      required
-                    />
-                    <span>
-                      I understand this preserves the audit record and
-                      recalculates dependent requirements and deadlines.
-                    </span>
-                  </label>
-                  <SubmitButton
-                    variant="destructive"
-                    pendingLabel="Marking record invalid…"
-                  >
-                    Mark this record invalid
-                  </SubmitButton>
-                </form>
-              </details>
-            )}
-          </div>
-        </div>
-        <div className="mt-4 space-y-3">
-          {system.serviceEvents.length ? (
-            system.serviceEvents.map((event) => (
-              <article
-                key={event.id}
-                className="group grid gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-emerald-700 hover:shadow-sm lg:grid-cols-[1fr_auto]"
-              >
-                <Link href={`/systems/${id}/events/${event.id}`}>
-                  <StatusBadge
-                    color={event.status === "ACTIVE" ? "GREEN" : "GRAY"}
-                    label={plainEnumLabel(event.status)}
-                  />
-                  <div className="mt-2 font-black">
-                    {plainEnumLabel(event.eventType)}
-                  </div>
-                  <div className="text-sm text-slate-500">
-                    {formatDate(event.eventDate)}
-                    {event.correctedFromEventId
-                      ? " · corrected replacement"
-                      : ""}
-                  </div>
-                  {event.performedByResponsibility !== "OUR_COMPANY" && (
-                    <div className="mt-1 text-xs font-bold text-purple-800">
-                      {serviceResponsibilityLabel(
-                        event.performedByResponsibility,
-                      )}
-                      {event.externalProviderName
-                        ? ` — ${event.externalProviderName}`
-                        : ""}
-                    </div>
-                  )}
-                </Link>
-                <div className="flex flex-wrap items-center gap-2 self-center text-sm font-black text-emerald-800">
-                  {samplesAwaitingResultIds.has(event.id) && (
-                    <Link
-                      className="btn"
-                      href={eventEntryHref({
-                        type: "result",
-                        towerId: id,
-                        sampleEventId: event.id,
-                        returnTo: `/systems/${id}?view=history#regulatory-events`,
-                      })}
-                    >
-                      Record lab result
-                    </Link>
-                  )}
-                  <Link
-                    className="group-hover:underline"
-                    href={`/systems/${id}/events/${event.id}`}
-                  >
-                    {event.status === "ACTIVE"
-                      ? "View or edit event →"
-                      : "View audit record →"}
-                  </Link>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="text-sm text-slate-500">
-              No regulatory events have been recorded yet.
-            </p>
-          )}
-        </div>
-      </section>
+      {view === "history" && (
+        <TowerComplianceRecords
+          systemId={id}
+          events={system.serviceEvents}
+          mostRecentActiveEvent={mostRecentActiveEvent}
+          samplesAwaitingResultIds={samplesAwaitingResultIds}
+        />
+      )}
     </>
   );
 }
