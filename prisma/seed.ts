@@ -19,12 +19,14 @@ import {
   type ProfileMode,
 } from "../lib/rules";
 import { rebuildSystemComplianceProjections } from "../lib/obligation-projections";
+import { assertDestructiveSeedAllowed } from "../lib/destructive-database-guard";
 
 const db = new PrismaClient();
 const TODAY = "2026-07-13";
 const D = (value: string) => new Date(`${value}T12:00:00Z`);
 
 async function main() {
+  assertDestructiveSeedAllowed();
   const demoMode = process.env.DEMO_MODE === "true";
   await db.legacyImportRow.deleteMany();
   await db.legacyImportBatch.deleteMany();

@@ -39,11 +39,9 @@ test("administrator previews, confirms, and safely rolls back a legacy workbook"
   await page.getByRole("button", { name: "Analyze workbook" }).click();
 
   await expect(
-    page.getByText(
-      "Analysis complete. No operational records have been written.",
-    ),
+    page.getByText("Analysis complete. Nothing has been imported yet."),
   ).toBeVisible();
-  await expect(page.getByText("Proposed systems")).toBeVisible();
+  await expect(page.getByText("Proposed cooling towers")).toBeVisible();
   const missingZipSummary = page.locator("div.rounded-lg").filter({
     hasText: "missing Postal Codes",
   });
@@ -54,11 +52,15 @@ test("administrator previews, confirms, and safely rolls back a legacy workbook"
   await expect(page.getByText("NEEDS REVIEW", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Confirm import of 2 rows" }).click();
-  await expect(page.getByText(/Import confirmed: 2 systems/)).toBeVisible();
+  await expect(
+    page.getByText(/Import confirmed: 2 cooling towers/),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Rollback untouched imported records" })
     .click();
   await expect(
-    page.getByText("Rolled back 2 untouched imported rows."),
+    page.getByText(
+      "Removed 2 imported records that had not been edited or used.",
+    ),
   ).toBeVisible();
 });

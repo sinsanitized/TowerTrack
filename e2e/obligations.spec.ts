@@ -7,12 +7,13 @@ async function confirmRecorder(recorder: Locator) {
 }
 
 async function openCompliancePreview(recorder: Locator) {
-  const preview = recorder.locator("section").filter({
-    has: recorder.getByRole("heading", {
-      name: "What saving this record will do",
-    }),
-  });
+  const preview = recorder
+    .getByRole("heading", { name: "What saving this record will do" })
+    .locator("xpath=ancestor::section[1]");
   await expect(preview).toBeVisible();
+  await preview
+    .getByText("View detailed compliance changes", { exact: true })
+    .click();
   return preview;
 }
 
@@ -43,7 +44,7 @@ test.beforeEach(async ({ page }) => {
     .click();
   await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "What happened?" }),
   ).toBeVisible();
 });
 
@@ -61,7 +62,7 @@ test("disinfection choices explain corrective treatment and full remediation", a
   await recorder.getByLabel(/date.*Required/).fill("2026-07-17");
   const preview = await openCompliancePreview(recorder);
   await expect(
-    preview.getByText("Generates Post disinfection retest"),
+    preview.getByText("Creates Post disinfection retest"),
   ).toBeVisible();
   await expect(preview.getByText(/Jul 20, 2026/).first()).toBeVisible();
   await expect(preview.getByText(/Jul 24, 2026/).first()).toBeVisible();
@@ -74,7 +75,7 @@ test("disinfection choices explain corrective treatment and full remediation", a
 
   await recorder.getByLabel(/date.*Required/).fill("2026-07-11");
   await expect(
-    preview.getByText(/Legal deadline falls on a weekend/),
+    preview.getByText(/Compliance deadline falls on a weekend/),
   ).toBeVisible();
   await expect(preview.getByText(/Fri, Jul 17, 2026/)).toBeVisible();
   await recorder
@@ -101,13 +102,13 @@ test("correction and reversion replay a post-disinfection sample window", async 
   page,
 }) => {
   const year = 2026;
-  const triggerDate = `${year}-01-06`;
-  const correctedDate = `${year}-01-08`;
-  const collectionDate = `${year}-01-12`;
+  const triggerDate = `${year}-08-06`;
+  const correctedDate = `${year}-08-08`;
+  const collectionDate = `${year}-08-12`;
   for (const [eventType, eventDate] of [
-    ["High legionella disinfection", `Jan 6, ${year}`],
-    ["High legionella disinfection", `Jan 8, ${year}`],
-    ["Routine legionella sample collected", `Jan 12, ${year}`],
+    ["High legionella disinfection", `Aug 6, ${year}`],
+    ["High legionella disinfection", `Aug 8, ${year}`],
+    ["Routine legionella sample collected", `Aug 12, ${year}`],
   ]) {
     let priorReplayEvent = page
       .locator("#regulatory-events a")
@@ -123,7 +124,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
       await page.getByRole("button", { name: "Mark record invalid" }).click();
       await expect(page).toHaveURL(/voidedEvent=1/, { timeout: 30_000 });
       await expect(
-        page.getByRole("heading", { name: "Record what happened" }),
+        page.getByRole("heading", { name: "Compliance updated" }),
       ).toBeVisible({ timeout: 30_000 });
       await expect(
         page.getByText(/Compliance record marked invalid/),
@@ -145,7 +146,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
   await confirmRecorder(recorder);
   await expect(page).toHaveURL(/event=/, { timeout: 30_000 });
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "Compliance updated" }),
   ).toBeVisible({ timeout: 30_000 });
 
   const sampling = page
@@ -160,13 +161,13 @@ test("correction and reversion replay a post-disinfection sample window", async 
     sampling.getByText("Post disinfection retest").first(),
   ).toBeVisible();
   await expect(
-    sampling.getByText(new RegExp(`Jan 13, ${year}`)).first(),
+    sampling.getByText(new RegExp(`Aug 13, ${year}`)).first(),
   ).toBeVisible();
 
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "High legionella disinfection" })
-    .filter({ hasText: `Jan 6, ${year}` })
+    .filter({ hasText: `Aug 6, ${year}` })
     .first()
     .click();
   await expect(
@@ -180,11 +181,11 @@ test("correction and reversion replay a post-disinfection sample window", async 
   await page.getByRole("button", { name: "Save corrected record" }).click();
   await expect(page).toHaveURL(/correctedEvent=/, { timeout: 30_000 });
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "Compliance updated" }),
   ).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Compliance record corrected/)).toBeVisible();
   await expect(
-    sampling.getByText(new RegExp(`Jan 15, ${year}`)).first(),
+    sampling.getByText(new RegExp(`Aug 15, ${year}`)).first(),
   ).toBeVisible();
 
   const nextActionCallout = page.getByTestId("next-action-callout");
@@ -214,7 +215,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
   await confirmRecorder(recorder);
   await expect(page).toHaveURL(/event=/, { timeout: 30_000 });
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "Compliance updated" }),
   ).toBeVisible({ timeout: 30_000 });
   await expect(
     page
@@ -226,7 +227,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "Routine legionella sample collected" })
-    .filter({ hasText: `Jan 12, ${year}` })
+    .filter({ hasText: `Aug 12, ${year}` })
     .first()
     .click();
   await page
@@ -236,7 +237,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
   await page.getByRole("button", { name: "Mark record invalid" }).click();
   await expect(page).toHaveURL(/voidedEvent=1/, { timeout: 30_000 });
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "Compliance updated" }),
   ).toBeVisible({ timeout: 30_000 });
   await expect(
     page.getByText(/Compliance record marked invalid/),
@@ -245,13 +246,13 @@ test("correction and reversion replay a post-disinfection sample window", async 
     sampling.getByText("Post disinfection retest").first(),
   ).toBeVisible();
   await expect(
-    sampling.getByText(new RegExp(`Jan 15, ${year}`)).first(),
+    sampling.getByText(new RegExp(`Aug 15, ${year}`)).first(),
   ).toBeVisible();
 
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "High legionella disinfection" })
-    .filter({ hasText: `Jan 8, ${year}` })
+    .filter({ hasText: `Aug 8, ${year}` })
     .first()
     .click();
   await page
@@ -261,12 +262,12 @@ test("correction and reversion replay a post-disinfection sample window", async 
   await page.getByRole("button", { name: "Mark record invalid" }).click();
   await expect(page).toHaveURL(/voidedEvent=1/, { timeout: 30_000 });
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "Compliance updated" }),
   ).toBeVisible({ timeout: 30_000 });
   await expect(
     page.getByText(/Compliance record marked invalid/),
   ).toBeVisible();
-  await expect(sampling.getByText(new RegExp(`Jan 15, ${year}`))).toHaveCount(
+  await expect(sampling.getByText(new RegExp(`Aug 15, ${year}`))).toHaveCount(
     0,
   );
 });
@@ -284,15 +285,15 @@ test("startup immediately generates sampling and DOH reporting windows", async (
   await recorder.getByLabel("Notes").fill("Seasonal startup field record");
   const startupPreview = await openCompliancePreview(recorder);
   await expect(
-    startupPreview.getByText(/Generates Startup sample/),
+    startupPreview.getByText(/Creates Startup sample/),
   ).toBeVisible();
   await expect(startupPreview.getByText(/Jul 17, 2026/).first()).toBeVisible();
   await expect(startupPreview.getByText(/Jul 28, 2026/).first()).toBeVisible();
   await expect(
-    startupPreview.getByText(/Generates Startup doh notification/),
+    startupPreview.getByText(/Creates Startup doh notification/),
   ).toBeVisible();
   await expect(
-    startupPreview.getByText(/Generates Startup cleaning and disinfection/),
+    startupPreview.getByText(/Creates Startup cleaning and disinfection/),
   ).toBeVisible();
   await expect(startupPreview.getByText(/Jun 29, 2026/).first()).toBeVisible();
   await expect(startupPreview.getByText(/Jul 14, 2026/).first()).toBeVisible();
@@ -339,7 +340,7 @@ test("emergency event creates an immediate sample without a made-up latest date"
     .fill("Biocide feed interrupted long enough for growth");
   const emergencyPreview = await openCompliancePreview(recorder);
   await expect(
-    emergencyPreview.getByText(/Generates Emergency sample/),
+    emergencyPreview.getByText(/Creates Emergency sample/),
   ).toBeVisible();
   await expect(
     emergencyPreview.getByText(

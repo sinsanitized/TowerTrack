@@ -6,12 +6,14 @@ import {
   createRuleDefinitionAction,
   createCustomRuleProfileAction,
   cloneSharedRuleProfileAction,
-  createUserAction,
-  setUserActiveAction,
-  updateUserRoleAction,
   updateRuleDefinitionAction,
   updateRuleProfileAction,
 } from "@/app/actions";
+import {
+  createUserAction,
+  setUserActiveAction,
+  updateUserRoleAction,
+} from "@/app/actions/users";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { plainEnumLabel } from "@/lib/labels";

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import {
   clearLoginFailures,
+  loginAccountAttemptKey,
   loginAttemptKey,
   loginBlocked,
   recordLoginFailure,
@@ -31,10 +32,12 @@ export async function POST(request: Request) {
     password: formData.get("password"),
   });
   if (!parsed.success) return relativeRedirect("/login?error=1");
-  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0];
-  const clientIp = forwardedFor?.trim() || "unknown";
-  const attemptKey = loginAttemptKey(parsed.data.email, clientIp);
-  if (loginBlocked(attemptKey))
+  const clientIp = request.headers.get("x-real-ip")?.trim() || "unknown";
+  const attemptKeys = [
+    loginAccountAttemptKey(parsed.data.email),
+    loginAttemptKey(parsed.data.email, clientIp),
+  ];
+  if (attemptKeys.some((key) => loginBlocked(key)))
     return relativeRedirect("/login?error=rate-limited");
   const user = await db.user.findUnique({
     where: { email: parsed.data.email },
@@ -44,11 +47,11 @@ export async function POST(request: Request) {
     user?.passwordHash ?? DUMMY_PASSWORD_HASH,
   );
   if (!user || !user.active || !validPassword) {
-    const blocked = recordLoginFailure(attemptKey);
+    const blocked = attemptKeys.some((key) => recordLoginFailure(key));
     if (blocked) return relativeRedirect("/login?error=rate-limited");
     return relativeRedirect("/login?error=1");
   }
-  clearLoginFailures(attemptKey);
+  attemptKeys.forEach(clearLoginFailures);
   await createSession(user);
   return relativeRedirect("/");
 }

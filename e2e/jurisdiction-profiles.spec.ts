@@ -19,7 +19,7 @@ test("tower settings derive effective-dated compliance rules from location", asy
   const table = page.getByRole("table", {
     name: "All cooling tower required work",
   });
-  await table.getByRole("row").nth(1).getByRole("link").first().click();
+  await table.locator('tbody a[href^="/systems/"]').first().click();
   await page
     .getByLabel("Tower workspace")
     .getByRole("link", { name: "Settings", exact: true })
@@ -56,13 +56,17 @@ test("tower settings derive effective-dated compliance rules from location", asy
   await expect(page.getByLabel(/^Effective date/)).toBeVisible();
 });
 
-test("deadline hyperhalogenation action opens the date-only focused form", async ({
+test("hyperhalogenation entry opens the date-only focused form", async ({
   page,
 }) => {
   await page.goto("/deadlines");
-  const action = page.locator('a[href*="record=hyperhalogenation"]');
-  await expect(action.first()).toBeVisible();
-  await action.first().click();
+  const towerHref = await page
+    .getByRole("table", { name: "All cooling tower required work" })
+    .locator('tbody a[href^="/systems/"]')
+    .first()
+    .getAttribute("href");
+  expect(towerHref).toBeTruthy();
+  await page.goto(`${towerHref}?record=hyperhalogenation#record-event`);
   await expect(page).toHaveURL(/record=hyperhalogenation/);
   await expect(
     page.getByRole("heading", {

@@ -12,7 +12,7 @@ docker compose down
 
 The local database is only reachable inside the Compose network. PostgreSQL and uploads use persistent volumes. Caddy exposes only HTTP port 80. For a LAN deployment, configure internal DNS for `towertrack.local`, use a trusted internal TLS certificate, and change all default credentials.
 
-Apply checked-in migrations: `docker compose exec web npm run db:migrate`. Seed an empty local database: `docker compose exec web npx tsx prisma/seed.ts`. Create admin: `docker compose exec web npm run admin:create -- person@example.com 'strong-password' 'Name'`. Reset password: `docker compose exec web npm run admin:reset-password -- person@example.com 'new-password'`.
+Apply checked-in migrations: `docker compose exec web npm run db:migrate`. The container automatically seeds only a confirmed-empty local database. Direct destructive reseeding is refused unless the database name contains a standalone `test`/`e2e` marker or the operator explicitly sets `ALLOW_DESTRUCTIVE_SEED=true`. Create admin: `docker compose exec web npm run admin:create -- person@example.com 'strong-password' 'Name'`. Reset password: `docker compose exec web npm run admin:reset-password -- person@example.com 'new-password'`.
 
 Update with `git pull`, then `docker compose up --build -d`. Review schema changes and take a backup first.
 

@@ -8,10 +8,8 @@ const DEVELOPMENT_SECRET = "dev-only-change-this-secret-please-1234";
 
 function sessionSecret() {
   const secret = process.env.AUTH_SECRET || DEVELOPMENT_SECRET;
-  const demoMode = process.env.DEMO_MODE === "true";
   if (
     process.env.NODE_ENV === "production" &&
-    !demoMode &&
     (secret === DEVELOPMENT_SECRET || secret.length < 32)
   )
     throw new Error(

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { UserRole } from "@prisma/client";
-import { addCustomerAddressAction } from "@/app/actions";
+import { addCustomerAddressAction } from "@/app/actions/customers";
 import { PageHeader } from "@/components/page-header";
 import { SubmitButton } from "@/components/submit-button";
 import { requireRole } from "@/lib/auth";

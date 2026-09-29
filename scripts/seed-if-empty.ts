@@ -8,6 +8,7 @@ async function main() {
   if (count === 0) {
     const result = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
       stdio: "inherit",
+      env: { ...process.env, SEED_CONFIRMED_EMPTY: "true" },
     });
     process.exit(result.status ?? 1);
   }

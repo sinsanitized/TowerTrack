@@ -1,4 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+
+async function waitForReact(locator: Locator) {
+  await locator.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        const ready = () =>
+          Object.keys(element).some((key) => key.startsWith("__reactProps$"));
+        if (ready()) return resolve();
+        const interval = window.setInterval(() => {
+          if (!ready()) return;
+          window.clearInterval(interval);
+          resolve();
+        }, 10);
+      }),
+  );
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
@@ -56,7 +72,7 @@ test("deadline table shows working days in a separate scan-friendly column", asy
       table.getByRole("columnheader", { name: removed }),
     ).toHaveCount(0);
 
-  const firstDataRow = table.getByRole("row").nth(1);
+  const firstDataRow = table.locator("tbody tr").first();
   await expect(firstDataRow.getByRole("link").first()).toHaveAttribute(
     "href",
     /^\/systems\//,
@@ -114,6 +130,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
     }),
   ).toHaveCount(0);
   const dueDateFilter = page.getByRole("combobox", { name: "Due date" });
+  await waitForReact(dueDateFilter);
   for (const label of [
     "All due dates",
     "Overdue",
@@ -128,6 +145,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
   await expect(page).toHaveURL("/deadlines?period=NEXT_WEEK");
 
   const workTypeFilter = page.getByRole("combobox", { name: "Work type" });
+  await waitForReact(workTypeFilter);
   for (const label of [
     "All work types",
     "Samples",
@@ -166,6 +184,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
   const scheduleFilter = page.getByRole("combobox", {
     name: "Filter deadlines by operating schedule",
   });
+  await waitForReact(scheduleFilter);
   for (const label of [
     "All schedules",
     "Seasonal",
@@ -183,6 +202,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
   const responsibility = page.getByRole("combobox", {
     name: "Filter deadlines by responsible party",
   });
+  await waitForReact(responsibility);
   for (const label of [
     "Our company",
     "Customer",
@@ -214,8 +234,8 @@ test("mobile keeps reference metadata readable without adding columns", async ({
   });
   await expect(table.locator("th")).toHaveCount(6);
   await expect(table.getByRole("columnheader")).toHaveCount(0);
-  await expect(table.getByRole("row").nth(1)).toContainText(
-    /(?:[A-Z][a-z]{2} \d{1,2}, \d{4}|Not submitted|Submission date missing|Not applicable|Review)/,
+  await expect(table.locator("tbody tr").first()).toContainText(
+    /(?:[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}|Not submitted|Submission date missing|Not applicable|Review)/,
   );
 });
 

@@ -16,10 +16,6 @@ test("history records open from anywhere in the row", async ({ page }) => {
   await page.goto("/history");
   const firstRow = page.getByTestId("history-record-row").first();
   await expect(firstRow).toBeVisible();
-  await expect(firstRow.getByRole("link")).toHaveCount(1);
-  await expect(firstRow.getByRole("link")).toHaveAttribute(
-    "href",
-    /\/systems\/.+\/events\/.+/,
-  );
-  await expect(firstRow.getByText("Open", { exact: false })).toBeVisible();
+  await firstRow.click({ position: { x: 12, y: 12 } });
+  await expect(page).toHaveURL(/\/systems\/.+\/events\/.+/);
 });

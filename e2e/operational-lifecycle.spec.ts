@@ -20,7 +20,10 @@ async function createNycTower(
   legionellaResponsibility: "OUR_COMPANY" | "CUSTOMER" = "OUR_COMPANY",
 ) {
   await page.getByRole("link", { name: "Customers" }).click();
-  await page.getByText("Add a new customer", { exact: true }).click();
+  await page
+    .locator("summary")
+    .filter({ hasText: "Add a new customer" })
+    .click();
   const customerForm = page.locator("form").filter({
     has: page.getByRole("button", {
       name: "Continue to cooling tower details",

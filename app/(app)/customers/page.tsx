@@ -2,7 +2,7 @@ import { Building2, Plus } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { ClickableTableRow } from "@/components/clickable-row";
-import { createCustomerAction } from "@/app/actions";
+import { createCustomerAction } from "@/app/actions/customers";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { SubmitButton } from "@/components/submit-button";

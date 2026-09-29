@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   clearLoginFailures,
+  loginAccountAttemptKey,
   loginAttemptKey,
   loginBlocked,
   recordLoginFailure,
@@ -24,5 +25,11 @@ describe("login rate limiting", () => {
     recordLoginFailure(key, 1_000);
     clearLoginFailures(key);
     expect(loginBlocked(key, 1_000)).toBe(false);
+  });
+
+  it("normalizes account-wide keys so changing IP cannot evade a block", () => {
+    expect(loginAccountAttemptKey(" Admin@Example.com ")).toBe(
+      "admin@example.com|account",
+    );
   });
 });

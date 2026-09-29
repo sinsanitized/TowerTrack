@@ -60,7 +60,7 @@ test("home leads directly into tower event entry", async ({ page }) => {
     page.getByRole("heading", { name: "Recent activity" }),
   ).toBeVisible();
 });
-test("system view shows authority and separate target and hard due", async ({
+test("system view shows explanation and separate target and hard due", async ({
   page,
 }) => {
   const search = page.getByRole("combobox", { name: "Find a tower" });
@@ -86,9 +86,16 @@ test("system view shows authority and separate target and hard due", async ({
   await page
     .getByText("Reporting and advanced requirement details", { exact: true })
     .click();
-  const requirement = page.locator("article").first();
-  await requirement.getByText("Why this is required", { exact: true }).click();
-  await expect(requirement.getByText(/^Source:/)).toBeVisible();
+  const whyRequired = page
+    .getByText("Why this is required", { exact: true })
+    .first();
+  const requirement = whyRequired.locator("xpath=ancestor::article[1]");
+  await whyRequired.click();
+  await expect(
+    requirement.getByText(
+      /Operating systems require Legionella culture sampling/,
+    ),
+  ).toBeVisible();
 });
 test("theme toggle replaces the decorative bell and persists the choice", async ({
   page,
@@ -324,7 +331,10 @@ test("customer onboarding continues from address to cooling tower details", asyn
 }) => {
   const customerName = `Workflow Test Customer ${Date.now()}`;
   await page.getByRole("link", { name: "Customers" }).click();
-  await page.getByText("Add a new customer", { exact: true }).click();
+  await page
+    .locator("summary")
+    .filter({ hasText: "Add a new customer" })
+    .click();
   const addCustomer = page.locator("form").filter({
     has: page.getByRole("button", {
       name: "Continue to cooling tower details",
@@ -344,19 +354,36 @@ test("customer onboarding continues from address to cooling tower details", asyn
   await page.getByLabel("Manufacturer (optional)").fill("Test Manufacturer");
   await page.getByLabel("Model number").fill("MODEL-100");
   await page.getByLabel("Serial number").fill("SERIAL-100");
-  await page.getByLabel("Tower location").fill("Roof, west side");
+  await page
+    .getByRole("textbox", { name: "Tower location · Required" })
+    .fill("Roof, west side");
   await page.getByLabel("Cooling Tower Tonnage").fill("450");
   await page.getByLabel("Year-round").check();
   await page.getByLabel("Our company manages Legionella").check();
-  await page
-    .getByLabel(/Tower jurisdiction/)
-    .selectOption({ label: "New York, NY" });
+  const jurisdiction = page.getByLabel(/Tower jurisdiction/);
+  await jurisdiction.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        const ready = () =>
+          Object.keys(element).some((key) => key.startsWith("__reactProps$"));
+        if (ready()) return resolve();
+        const interval = window.setInterval(() => {
+          if (!ready()) return;
+          window.clearInterval(interval);
+          resolve();
+        }, 10);
+      }),
+  );
+  await jurisdiction.selectOption({ label: "Westchester, NY" });
+  await jurisdiction.selectOption({ label: "New York, NY" });
   await expect(
     page.getByRole("heading", { name: "New York City regulatory program" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Create cooling tower" }).click();
   await expect(page.getByText("Cooling tower created")).toBeVisible();
-  await page.getByRole("link", { name: "Tower Information" }).click();
+  await page
+    .getByRole("link", { name: "Tower Information", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Equipment details" }),
   ).toBeVisible();
@@ -370,14 +397,21 @@ test("customer onboarding continues from address to cooling tower details", asyn
     page.getByRole("heading", { name: new RegExp(`Edit ${customerName}`) }),
   ).toBeVisible();
   await expect(page.getByLabel("Jurisdiction", { exact: true })).toHaveCount(0);
-  await page.getByLabel("Tower location").fill("Roof, east side");
+  await page
+    .getByRole("textbox", { name: "Tower location", exact: true })
+    .fill("Roof, east side");
+  await page
+    .getByRole("textbox", { name: "Reason for changes" })
+    .fill("Verified the tower location on site");
   await page
     .getByRole("button", { name: "Save customer and tower changes" })
     .click();
   await expect(
     page.getByText(/customer, address, and tower equipment saved/i),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Tower Information" }).click();
+  await page
+    .getByRole("link", { name: "Tower Information", exact: true })
+    .click();
   await expect(page.getByText("Roof, east side")).toBeVisible();
 });
 
@@ -395,7 +429,9 @@ test("legacy sample correction route opens the audited event editor", async ({
   await page.goto(`${systemUrl}/correct`);
   await expect(page).toHaveURL(/\/events\//);
   await expect(
-    page.getByRole("heading", { name: "Correct record details" }),
+    page.getByRole("heading", {
+      name: "The information is wrong—replace it with corrected information",
+    }),
   ).toBeVisible();
   await expect(page.getByText("Correction reason (required)")).toBeVisible();
 });
@@ -407,23 +443,23 @@ test("operations manager can open and correct an individual event", async ({
   await search.fill("JOB-1002");
   await search.press("Enter");
   await page.getByRole("option").first().click();
+  await page.getByRole("link", { name: "Records", exact: true }).click();
   const eventHistory = page.locator("#regulatory-events");
   await eventHistory
     .getByRole("link", { name: /View or edit event/ })
     .first()
     .click();
   await expect(
-    page.getByRole("heading", { name: "Correct record details" }),
+    page.getByRole("heading", {
+      name: "The information is wrong—replace it with corrected information",
+    }),
   ).toBeVisible();
-  await expect(page.getByLabel("Event type")).toBeVisible();
+  await expect(page.getByLabel("Record type · Required")).toBeVisible();
   await expect(page.getByLabel(/date.*Required/)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Correction impact preview" }),
   ).toBeVisible();
   await page.getByLabel(/date.*Required/).fill("2026-07-17");
-  await page
-    .getByLabel("Notes")
-    .fill("Corrected through event detail workflow");
   await page
     .getByLabel("Correction reason (required)")
     .fill("Verified against the signed field record");
@@ -451,7 +487,7 @@ test("operations manager records cleaning in the tower event workflow", async ({
   await expect(page).toHaveURL(/\/systems\//);
   await page.getByRole("button", { name: "Add compliance record" }).click();
   await expect(
-    page.getByRole("heading", { name: "Record what happened" }),
+    page.getByRole("heading", { name: "What happened?" }),
   ).toBeVisible();
   await page
     .getByText("Other work and special conditions", { exact: true })
@@ -466,16 +502,18 @@ test("operations manager records cleaning in the tower event workflow", async ({
   const completionDate = eventForm.getByLabel(/date.*Required/);
   await expect(completionDate).toBeFocused();
   await expect(completionDate).toHaveValue("");
-  await completionDate.fill("2026-07-14");
+  await completionDate.fill("2026-07-13");
   await eventForm.getByText("Add notes (optional)", { exact: true }).click();
   await eventForm.getByLabel("Notes").fill("Verified field cleaning record");
   await eventForm.getByRole("button", { name: "Save record" }).click();
   await expect(page).toHaveURL(/event=/);
-  await expect(page.getByText(/Event recorded/)).toBeVisible();
+  await expect(
+    page.getByText("Compliance record saved and history updated"),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Overview", exact: true }).click();
   const recentActivity = page.locator(".panel").filter({
     has: page.getByRole("heading", { name: "Recent activity" }),
   });
   await expect(recentActivity).toBeVisible();
-  await expect(recentActivity.getByText("Tue, Jul 14, 2026")).toBeVisible();
+  await expect(recentActivity.getByText("Mon, Jul 13, 2026")).toBeVisible();
 });

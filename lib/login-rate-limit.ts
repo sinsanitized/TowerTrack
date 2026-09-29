@@ -31,6 +31,10 @@ export function loginAttemptKey(email: string, ip: string) {
   return `${email.trim().toLowerCase()}|${ip}`;
 }
 
+export function loginAccountAttemptKey(email: string) {
+  return `${email.trim().toLowerCase()}|account`;
+}
+
 export function loginBlocked(key: string, now = Date.now()) {
   const attempt = attempts.get(key);
   if (!attempt) return false;

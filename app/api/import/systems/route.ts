@@ -3,8 +3,12 @@ import { requireRole } from "@/lib/auth";
 import { previewSystemCsv } from "@/lib/csv";
 import { db } from "@/lib/db";
 import { todayInTimeZone } from "@/lib/date";
+import {
+  accessibleRuleProfileWhere,
+  organizationSystemWhere,
+} from "@/lib/tenant-scope";
 export async function POST(request: Request) {
-  await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
+  const user = await requireRole([UserRole.ADMIN, UserRole.OPERATIONS_MANAGER]);
   const data = await request.formData();
   const file = data.get("file");
   if (!(file instanceof File))
@@ -17,7 +21,10 @@ export async function POST(request: Request) {
   const preview = previewSystemCsv(await file.text(), todayInTimeZone());
   const profileIds = [...new Set(preview.rows.map((r) => r.rule_profile_id))];
   const profiles = await db.ruleProfile.findMany({
-    where: { id: { in: profileIds } },
+    where: {
+      id: { in: profileIds },
+      ...accessibleRuleProfileWhere(user.organizationId),
+    },
     select: { id: true },
   });
   const known = new Set(profiles.map((p) => p.id));
@@ -29,7 +36,10 @@ export async function POST(request: Request) {
       });
   });
   const existing = await db.coolingTowerSystem.findMany({
-    where: { internalJobNumber: { in: preview.rows.map((r) => r.job_number) } },
+    where: {
+      internalJobNumber: { in: preview.rows.map((r) => r.job_number) },
+      ...organizationSystemWhere(user.organizationId),
+    },
     select: { internalJobNumber: true },
   });
   const conflicts = new Set(existing.map((x) => x.internalJobNumber));
