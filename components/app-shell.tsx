@@ -54,10 +54,10 @@ export function AppShell({
       : [];
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[238px_1fr]">
-      <aside className="bg-[#173f31] text-white lg:sticky lg:top-0 lg:h-screen">
+      <aside className="bg-[var(--nav)] text-white lg:sticky lg:top-0 lg:h-screen">
         <div className="flex min-h-16 items-center justify-between gap-3 px-4 py-3 lg:block lg:p-5">
           <Link href="/" className="flex items-center gap-3 text-xl font-black">
-            <span className="grid size-10 place-items-center rounded-xl bg-[#d9ef61] text-[#173f31]">
+            <span className="grid size-10 place-items-center rounded-xl bg-[#bae6fd] text-[#0c4a6e]">
               <Map size={22} />
             </span>
             TowerTrack
@@ -70,7 +70,7 @@ export function AppShell({
               <Menu size={21} aria-hidden />
               <span>Menu</span>
             </summary>
-            <div className="absolute right-0 top-[calc(100%+.5rem)] z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-white/15 bg-[#173f31] p-2 shadow-2xl">
+            <div className="absolute right-0 top-[calc(100%+.5rem)] z-50 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-white/15 bg-[var(--nav)] p-2 shadow-2xl">
               <nav aria-label="Mobile navigation" className="space-y-1">
                 {visibleNav.map(([name, href, Icon]) => (
                   <Link

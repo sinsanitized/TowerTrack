@@ -11,9 +11,9 @@ export default async function LoginPage({
   const { error } = await searchParams;
   const demoMode = process.env.DEMO_MODE === "true";
   return (
-    <main className="grid min-h-screen place-items-center bg-[#173f31] p-5">
+    <main className="grid min-h-screen place-items-center bg-[#075985] p-5">
       <div className="grid w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl md:grid-cols-[1.1fr_.9fr]">
-        <section className="hidden bg-[#d9ef61] p-12 md:block">
+        <section className="hidden bg-[#bae6fd] p-12 text-[#0c4a6e] md:block">
           <Droplets size={42} />
           <h1 className="mt-16 text-5xl font-black leading-[.95]">
             Every tower.
@@ -22,13 +22,13 @@ export default async function LoginPage({
             <br />
             Every date clear.
           </h1>
-          <p className="mt-6 max-w-sm text-lg text-emerald-950/70">
+          <p className="mt-6 max-w-sm text-lg text-sky-950/75">
             Legionella-first date tracking that keeps completed work, valid
             windows, and compliance deadlines clear.
           </p>
         </section>
         <section className="p-8 md:p-12">
-          <div className="label text-emerald-800">Internal access</div>
+          <div className="label text-sky-800">Internal access</div>
           <h2 className="mt-2 text-3xl font-black">Sign in to TowerTrack</h2>
           <p className="mt-2 text-slate-600">
             Ask an administrator to create your account.

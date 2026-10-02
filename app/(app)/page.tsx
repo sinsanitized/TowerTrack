@@ -9,7 +9,6 @@ import { PageHeader } from "@/components/page-header";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { StatusBadge } from "@/components/status-badge";
 import { ClickableRow } from "@/components/clickable-row";
-import { getUrgency } from "@/lib/compliance-intelligence";
 import {
   deadlinePeriodBounds,
   deadlinePeriodForDate,
@@ -23,7 +22,13 @@ import { buttonClass } from "@/lib/button-variants";
 import { complianceDashboardRows } from "@/lib/queries";
 import { requirementLabel, requiredActionLabel } from "@/lib/labels";
 import { requireUser } from "@/lib/auth";
-import { asUtc, todayDateOnly } from "@/lib/date";
+import {
+  asUtc,
+  complianceDateInfo,
+  formatComplianceDate,
+  formatWorkingDaysLeft,
+  todayDateOnly,
+} from "@/lib/date";
 import { withReturnPath } from "@/lib/workflow-context";
 import { isResampleObligation } from "@/lib/event-entry-intent";
 
@@ -53,13 +58,6 @@ function ActionRow({
   today: string;
   tone?: "default" | "next" | "immediate";
 }) {
-  const urgency = getUrgency({
-    today,
-    status: obligation.status,
-    priority: obligation.priority,
-    latestDueDate: obligation.latest,
-    targetStartDate: obligation.targetStart,
-  });
   const responsibility = operationalResponsibility(row, obligation);
   const executionLabel =
     responsibility == null
@@ -71,6 +69,9 @@ function ActionRow({
           : responsibility === "NOT_TRACKED"
             ? "Reference only"
             : "Completion not recorded";
+  const deadlineInfo = obligation.latest
+    ? complianceDateInfo(obligation.latest, today)
+    : null;
   const primaryHref =
     responsibility == null
       ? withReturnPath(
@@ -104,20 +105,20 @@ function ActionRow({
       as="article"
       href={primaryHref}
       label={`${primaryLabel}: ${requiredActionLabel(obligation.type)} for ${row.systemName}`}
-      className={`record-row border-l-4 p-4 sm:p-5 ${
+      className={`record-row border-l-4 p-3 sm:p-4 ${
         tone === "next"
           ? "urgency-blue"
           : tone === "immediate"
             ? "urgency-red"
-            : "urgency-amber"
+            : "urgency-cyan"
       }`}
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(260px,1.15fr)_minmax(220px,.9fr)_minmax(210px,.8fr)_auto] lg:items-center">
+      <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.15fr)_minmax(220px,.9fr)_minmax(190px,.75fr)_auto] lg:items-start">
         <div className="min-w-0">
           <h3 className="text-lg font-black leading-snug">
             {requiredActionLabel(obligation.type)}
           </h3>
-          <details className="detail-disclosure mt-3">
+          <details className="detail-disclosure mt-2">
             <summary>Why this is required</summary>
             <p className="mt-2 text-slate-600">{obligation.reason}</p>
             <p className="mt-2 text-xs font-black uppercase tracking-wide text-slate-500">
@@ -128,7 +129,7 @@ function ActionRow({
             (item) => item.id === obligation.id,
           ) &&
             row.visitOpportunity.obligations.length > 1 && (
-              <details className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+              <details className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-950">
                 <summary className="cursor-pointer font-black">
                   Optional: complete{" "}
                   {row.visitOpportunity.obligations.length - 1} other
@@ -161,19 +162,33 @@ function ActionRow({
           <div className="mt-1 font-bold text-slate-800">{row.building}</div>
           <div className="mt-1 text-sm text-slate-600">{row.address}</div>
         </div>
-        <div className="date-block">
+        <div className="date-block !p-3">
           <ComplianceDate
             value={obligation.latest}
             label="Deadline"
             deadline
+            compact
             operational
+            showWeekendLabel={false}
             empty={obligation.priority === "EMERGENCY" ? "Immediate" : "Open"}
           />
-          <div className="mt-2">
-            <StatusBadge color={urgency.color} label={urgency.label} />
-          </div>
+          {obligation.latest && (
+            <p className="mt-1 text-sm font-black text-emerald-900">
+              {formatWorkingDaysLeft(obligation.latest, today)}
+            </p>
+          )}
+          {deadlineInfo?.weekendRisk && (
+            <details className="detail-disclosure mt-1 text-sm">
+              <summary>Weekend deadline</summary>
+              <p className="mt-1">
+                Last normal workday:{" "}
+                {formatComplianceDate(deadlineInfo.weekendRisk.lastWorkingDay)}.
+                The compliance deadline does not move.
+              </p>
+            </details>
+          )}
           {executionLabel === "Completion not recorded" ? (
-            <p className="mt-2 text-sm font-bold text-slate-600">
+            <p className="mt-1 text-sm font-bold text-slate-600">
               Completion not recorded
             </p>
           ) : (
@@ -193,7 +208,7 @@ function ActionRow({
         <Link
           className={buttonClass(
             "primary",
-            "min-h-11 w-full justify-center whitespace-normal text-center lg:w-auto",
+            "min-h-11 w-full justify-center whitespace-normal text-center lg:self-center lg:w-auto",
           )}
           href={primaryHref}
         >
@@ -376,15 +391,18 @@ export default async function ActionCenterPage({
       )}
 
       <section
-        className="section-panel mb-7 border-amber-200"
+        className="section-panel action-center-due-week mb-7"
         data-testid="this-week-section"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 p-5">
+        <div className="action-center-due-week-header flex flex-wrap items-center justify-between gap-3 border-b p-5">
           <div className="flex items-start gap-3">
-            <CalendarCheck className="mt-1 text-amber-800" size={20} />
+            <CalendarCheck
+              className="action-center-due-week-accent mt-1"
+              size={20}
+            />
             <div>
               <h2 className="mt-1 text-xl font-black">Due this week</h2>
-              <p className="mt-1 text-sm font-bold text-amber-900">
+              <p className="action-center-due-week-accent mt-1 text-sm font-bold">
                 Work requiring action now
               </p>
               <p className="mt-1 text-sm text-slate-700">
@@ -393,7 +411,7 @@ export default async function ActionCenterPage({
             </div>
           </div>
           <Link
-            className="text-sm font-black text-amber-900"
+            className="action-center-due-week-accent text-sm font-black"
             href="/deadlines?period=THIS_WEEK"
           >
             View all due this week →
@@ -416,9 +434,9 @@ export default async function ActionCenterPage({
           </p>
         )}
         {thisWeekItems.length > actionPreviewLimit && (
-          <div className="border-t border-amber-200 bg-amber-50/50 p-4 text-center">
+          <div className="action-center-due-week-footer border-t p-4 text-center">
             <Link
-              className="font-black text-amber-900 underline underline-offset-4"
+              className="action-center-due-week-accent font-black underline underline-offset-4"
               href="/deadlines?period=THIS_WEEK"
             >
               Showing {actionPreviewLimit} of {thisWeekItems.length} · View all

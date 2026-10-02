@@ -46,6 +46,7 @@ export function ComplianceDate({
   deadline = false,
   compact = false,
   operational = false,
+  showWeekendLabel = true,
   empty = "Not generated",
 }: {
   value?: string | Date | null;
@@ -53,6 +54,7 @@ export function ComplianceDate({
   deadline?: boolean;
   compact?: boolean;
   operational?: boolean;
+  showWeekendLabel?: boolean;
   empty?: string;
 }) {
   const today = useComplianceToday();
@@ -87,7 +89,7 @@ export function ComplianceDate({
             {formatWorkingDaysLeft(info.date, today)}
           </span>
         )}
-        {info.weekend && (
+        {info.weekend && showWeekendLabel && (
           <span className="font-black text-slate-700">Weekend</span>
         )}
       </div>
