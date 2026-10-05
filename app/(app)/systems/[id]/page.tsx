@@ -591,14 +591,21 @@ export default async function SystemPage({
             item.triggerEventId === recordedEvent.id,
         )
       : null;
+  const buildingName = system.building.buildingName.trim();
+  const systemName = system.systemName.trim();
+  const towerTitle = systemName
+    .toLocaleLowerCase()
+    .startsWith(buildingName.toLocaleLowerCase())
+    ? systemName
+    : `${buildingName} — ${systemName}`;
   return (
     <>
       <PageHeader
         eyebrow={system.building.customer.name}
-        title={`${system.building.buildingName} — ${system.systemName}`}
+        title={towerTitle}
         description={`${system.building.streetAddress}, ${system.building.city}, ${system.building.state} · ${system.internalJobNumber}`}
         actions={
-          <>
+          <div className="grid w-full gap-2 sm:w-60">
             <Link
               className={buttonClass("secondary")}
               href={returnTo ?? "/towers"}
@@ -676,7 +683,7 @@ export default async function SystemPage({
                 sourceCitation: item.sourceCitation,
               }))}
             />
-          </>
+          </div>
         }
       />
       {(invalidIntentContext ||

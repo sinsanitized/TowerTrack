@@ -5,6 +5,19 @@ const ANNUAL_CLEANING_ACTIVITY_TYPES = new Set([
   "CLEANING_AND_DISINFECTION",
 ]);
 
+const CLEANING_VISIT_ACTIVITY_TYPES = new Set([
+  ...ANNUAL_CLEANING_ACTIVITY_TYPES,
+  "FULL_REMEDIATION",
+]);
+
+const LEGIONELLA_SAMPLE_ACTIVITY_TYPES = new Set([
+  "ROUTINE_LEGIONELLA_SAMPLE",
+  "STARTUP_LEGIONELLA_SAMPLE",
+  "POST_HYPERHALOGENATION_SAMPLE",
+  "EMERGENCY_SAMPLE",
+  "CORRECTIVE_RETEST",
+]);
+
 const CLEANING_EVENT_TYPES = new Set([
   "CLEANING_COMPLETED",
   "STARTUP_CLEANING_DISINFECTION",
@@ -21,7 +34,12 @@ export function activitiesCanShareVisit(left: string, right: string) {
       right === "SUMMERTIME_HYPERHALOGENATION") ||
     (ANNUAL_CLEANING_ACTIVITY_TYPES.has(right) &&
       left === "SUMMERTIME_HYPERHALOGENATION");
-  return !cleaningAndHyper;
+  const cleaningAndLegionellaSample =
+    (CLEANING_VISIT_ACTIVITY_TYPES.has(left) &&
+      LEGIONELLA_SAMPLE_ACTIVITY_TYPES.has(right)) ||
+    (CLEANING_VISIT_ACTIVITY_TYPES.has(right) &&
+      LEGIONELLA_SAMPLE_ACTIVITY_TYPES.has(left));
+  return !cleaningAndHyper && !cleaningAndLegionellaSample;
 }
 
 export function completedEventsConflictOnSameDate(left: string, right: string) {

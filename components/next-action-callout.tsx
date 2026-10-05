@@ -90,7 +90,7 @@ export function NextActionCallout({
   const upcoming = !selection.immediate;
   return (
     <section
-      className={`mb-6 rounded-xl border-2 p-5 ${state.className}`}
+      className={`mb-6 rounded-xl border-2 p-4 ${state.className}`}
       aria-labelledby="next-action-required"
       data-testid="next-action-callout"
     >
@@ -118,11 +118,11 @@ export function NextActionCallout({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-3 grid gap-3">
         {items.map((item) => (
           <article
             key={item.id}
-            className="grid gap-3 rounded-lg border border-current/20 bg-white/80 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+            className="grid gap-3 rounded-lg border border-current/20 bg-white/80 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
           >
             <div>
               {(multiple || upcoming) && (

@@ -42,25 +42,29 @@ export function TowerSettings({
 }) {
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="space-y-6">
         <section
           id="service-responsibilities"
-          className="panel scroll-mt-6 p-5"
+          className="panel scroll-mt-6 p-4 sm:p-5"
         >
-          <div className="label">1. Service responsibilities</div>
-          <h2 className="mt-1 font-black">Who performs each service</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            These assignments determine which work appears in our queues and
-            which work remains an external dependency. Saved separately.
-          </p>
-          <Link
-            className="btn btn-primary mt-4"
-            href={`/systems/${systemId}/edit?section=responsibilities&returnTo=${encodeURIComponent(`/systems/${systemId}?view=settings`)}`}
-          >
-            Edit service responsibilities
-          </Link>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-3xl">
+              <div className="label">1. Service responsibilities</div>
+              <h2 className="mt-1 font-black">Who performs each service</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                These assignments determine which work appears in our queues and
+                which work remains an external dependency. Saved separately.
+              </p>
+            </div>
+            <Link
+              className="btn btn-primary"
+              href={`/systems/${systemId}/edit?section=responsibilities&returnTo=${encodeURIComponent(`/systems/${systemId}?view=settings`)}`}
+            >
+              Edit service responsibilities
+            </Link>
+          </div>
         </section>
-        <section className="panel p-5">
+        <section className="panel p-4 sm:p-5">
           <div className="label">2. Operating schedule</div>
           <h2 className="font-black">Tower operation pattern</h2>
           <p className="mt-1 text-sm font-bold text-slate-700">
@@ -82,7 +86,7 @@ export function TowerSettings({
             currentStatus={seasonalStatus(system)}
           />
         </section>
-        <section className="panel p-5">
+        <section className="panel p-4 sm:p-5">
           <div className="label">3. Recommended service dates</div>
           <h2 className="font-black">
             Recommended monthly sample collection dates
@@ -98,8 +102,8 @@ export function TowerSettings({
           />
         </section>
       </div>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="panel p-5">
+      <div className="mt-6">
+        <section className="panel p-4 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="label">4. Jurisdiction and compliance rules</div>
@@ -112,7 +116,7 @@ export function TowerSettings({
               Change compliance rules
             </Link>
           </div>
-          <dl className="mt-4 space-y-4 text-sm">
+          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
             <div>
               <dt className="label">Profile</dt>
               <dd className="font-bold">{system.ruleProfile.name}</dd>

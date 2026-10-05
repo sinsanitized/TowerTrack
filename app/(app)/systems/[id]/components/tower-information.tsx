@@ -35,7 +35,7 @@ export function TowerInformation({
 }) {
   return (
     <>
-      <section className="panel p-5">
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="label">Service responsibility</div>
@@ -54,14 +54,14 @@ export function TowerInformation({
           These assignments control which work appears as our action and which
           work is shown as an external dependency.
         </p>
-        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
           {serviceResponsibilityFamilies.map(([key, label]) => {
             const responsibility = system[key];
             const external = responsibility !== "OUR_COMPANY";
             return (
               <div
                 key={key}
-                className={`rounded-lg border p-3 ${
+                className={`rounded-lg border p-2.5 ${
                   external
                     ? "border-purple-200 bg-purple-50"
                     : "border-emerald-200 bg-emerald-50"
@@ -76,7 +76,7 @@ export function TowerInformation({
           })}
         </div>
       </section>
-      <section className="panel p-5">
+      <section className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="label">Facility and identifiers</div>
@@ -91,7 +91,7 @@ export function TowerInformation({
             </Link>
           )}
         </div>
-        <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <dt className="label">Customer</dt>
             <dd className="font-bold">{system.building.customer.name}</dd>
@@ -131,10 +131,10 @@ export function TowerInformation({
           </div>
         </dl>
       </section>
-      <section className="panel p-5">
+      <section className="panel p-4 sm:p-5">
         <div className="label">Cooling tower information</div>
         <h2 className="mt-1 font-black">Equipment details</h2>
-        <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
+        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
           <div>
             <dt className="label">Manufacturer</dt>
             <dd className="font-bold">

@@ -5,7 +5,7 @@ import {
   completedEventsConflictOnSameDate,
 } from "@/lib/activity-compatibility";
 
-describe("annual cleaning and hyperhalogenation compatibility", () => {
+describe("field activity compatibility", () => {
   it("requires separate visits for annual cleaning and hyperhalogenation", () => {
     expect(
       activitiesCanShareVisit(
@@ -15,6 +15,15 @@ describe("annual cleaning and hyperhalogenation compatibility", () => {
     ).toBe(false);
     expect(
       activitiesCanShareVisit("ROUTINE_LEGIONELLA_SAMPLE", "ROUTINE_CLEANING"),
+    ).toBe(false);
+    expect(
+      activitiesCanShareVisit("STARTUP_CLEANING", "STARTUP_LEGIONELLA_SAMPLE"),
+    ).toBe(false);
+    expect(
+      activitiesCanShareVisit("FULL_REMEDIATION", "CORRECTIVE_RETEST"),
+    ).toBe(false);
+    expect(
+      activitiesCanShareVisit("ROUTINE_CLEANING", "COMPLIANCE_INSPECTION"),
     ).toBe(true);
   });
 

@@ -192,7 +192,7 @@ describe("visit opportunity intersections", () => {
     ).toHaveLength(1);
   });
 
-  it("can bundle the next annual cleaning with an open sample", () => {
+  it("keeps annual cleaning separate from an open Legionella sample", () => {
     const cleaning = obligation("cleaning", {
       type: "ANNUAL_CLEANING",
       category: "MAINTENANCE",
@@ -205,7 +205,8 @@ describe("visit opportunity intersections", () => {
       [obligation("sample"), cleaning],
       "2026-07-16",
     );
-    expect(result?.obligations).toHaveLength(2);
+    expect(result?.obligations).toHaveLength(1);
+    expect(result?.obligations[0]?.id).toBe("sample");
     expect(
       activityTypeForObligation({
         type: "ANNUAL_CLEANING",
