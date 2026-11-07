@@ -124,7 +124,7 @@ export function EventRecorderDrawer({
           setOpen(true);
         }}
       >
-        <ClipboardPlus size={18} /> Add compliance record
+        <ClipboardPlus size={18} /> Record completed work
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 sm:items-center sm:p-6">
@@ -174,7 +174,7 @@ export function EventRecorderDrawer({
             <div className="z-10 flex shrink-0 items-start justify-between gap-3 border-b border-slate-300 bg-white p-4 sm:p-5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="label">Add a verified record</div>
+                  <div className="label">Save work to this tower</div>
                   {dirty && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-sm font-black text-amber-900">
                       Unsaved changes
@@ -185,7 +185,7 @@ export function EventRecorderDrawer({
                   {intentContext &&
                   isResampleObligation(intentContext.obligationType)
                     ? "Record resample"
-                    : "Add compliance record"}
+                    : "Record completed work"}
                 </h2>
                 <p className="mt-1 max-w-xl text-sm text-slate-600">
                   {intentContext

@@ -274,7 +274,7 @@ export function EventRecorder({
                 "w-full cursor-pointer justify-start text-sm",
               )}
             >
-              Other work and special conditions
+              More types of completed work
             </summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {moreEvents.map(({ label, type: value }) => {
@@ -387,7 +387,7 @@ export function EventRecorder({
         <form
           id="event-details"
           action={recordServiceEventAction}
-          className={`panel grid gap-4 p-5 sm:grid-cols-2 ${intentContext ? "" : "mt-4"}`}
+          className={`panel grid gap-3 p-4 sm:grid-cols-2 ${intentContext ? "" : "mt-4"}`}
         >
           <div className="border-b border-slate-200 pb-4 sm:col-span-2">
             <div className="label">
@@ -805,12 +805,11 @@ export function EventRecorder({
             </p>
           )}
           <section
-            className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-950 sm:col-span-2"
+            className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950 sm:col-span-2"
             aria-live="polite"
           >
-            <div className="label">Before saving</div>
-            <h3 className="mt-1 font-black">What saving this record will do</h3>
-            <div className="mt-3">
+            <h3 className="font-black">Save impact</h3>
+            <div className="mt-2">
               {preview.error ? (
                 <p className="text-sm font-bold">
                   Correct the validation issue above before saving.
@@ -909,7 +908,7 @@ export function EventRecorder({
               </details>
             </div>
           </section>
-          <div className="-mx-5 -mb-5 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-4 sm:col-span-2 sm:flex-row sm:justify-end">
+          <div className="-mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-3 sm:col-span-2 sm:flex-row sm:justify-end">
             {onCancel && (
               <button
                 className={buttonClass(

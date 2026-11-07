@@ -19,7 +19,7 @@ export default async function TowersPage({
   const query = await searchParams;
   const search = query.q?.trim() ?? "";
   const requestedPage = Number.parseInt(query.page ?? "1", 10);
-  const pageSize = 25;
+  const pageSize = 10;
   const where = {
     active: true,
     deletedAt: null,
@@ -89,7 +89,7 @@ export default async function TowersPage({
       <PageHeader
         eyebrow="Portfolio"
         title="Towers"
-        description="Current condition, next action, deadline, and unresolved issues for every cooling tower."
+        description="Find a tower and see what it needs next."
       />
       <form className="panel mb-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
         <label className="grow">
@@ -110,12 +110,11 @@ export default async function TowersPage({
         )}
       </form>
       <div className="panel overflow-hidden">
-        <div className="hidden grid-cols-[1.1fr_.55fr_1.3fr_.75fr_.4fr] gap-4 border-b bg-slate-50 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-500 lg:grid">
+        <div className="hidden grid-cols-[1.1fr_.7fr_1.3fr_.75fr] gap-4 border-b bg-slate-50 px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-500 lg:grid">
           <div>Tower</div>
           <div>Status</div>
           <div>Next required action</div>
           <div>Deadline</div>
-          <div>Unresolved issues</div>
         </div>
         {rows.map((row) => {
           const next = row.openObligations.find(
@@ -137,7 +136,7 @@ export default async function TowersPage({
               key={row.id}
               href={`/systems/${row.id}`}
               label={`Open ${row.systemName}`}
-              className={`record-row grid gap-4 border-l-4 p-5 lg:grid-cols-[1.1fr_.55fr_1.3fr_.75fr_.4fr] lg:items-center ${issues ? "urgency-red" : row.complianceHealth.color === "YELLOW" ? "urgency-amber" : "border-l-slate-300"}`}
+              className={`record-row grid gap-4 border-l-4 p-5 lg:grid-cols-[1.1fr_.7fr_1.3fr_.75fr] lg:items-center ${issues ? "urgency-red" : row.complianceHealth.color === "YELLOW" ? "urgency-amber" : "border-l-slate-300"}`}
             >
               <div className="identity-block">
                 <Link
@@ -149,12 +148,21 @@ export default async function TowersPage({
                 <div className="text-sm text-slate-600">
                   {row.building} · {row.customer}
                 </div>
-                <div className="mt-1 text-sm text-slate-600">{row.address}</div>
+                <div className="mt-1 hidden text-sm text-slate-600 sm:block">
+                  {row.address}
+                </div>
               </div>
-              <StatusBadge
-                color={row.complianceHealth.color}
-                label={row.complianceHealth.label}
-              />
+              <div>
+                <StatusBadge
+                  color={row.complianceHealth.color}
+                  label={row.complianceHealth.label}
+                />
+                {issues > 0 && (
+                  <div className="mt-2 text-sm font-black text-red-800">
+                    {issues} unresolved {issues === 1 ? "issue" : "issues"}
+                  </div>
+                )}
+              </div>
               <div>
                 <div className="label lg:hidden">Next required action</div>
                 <div className="font-bold">
@@ -169,17 +177,6 @@ export default async function TowersPage({
                 compact
                 operational
               />
-              <div
-                className={
-                  issues
-                    ? "font-black text-red-800"
-                    : "font-bold text-slate-600"
-                }
-              >
-                {issues === 0
-                  ? "No issues"
-                  : `${issues} unresolved ${issues === 1 ? "issue" : "issues"}`}
-              </div>
             </ClickableRow>
           );
         })}
@@ -201,7 +198,7 @@ export default async function TowersPage({
                 className="btn"
                 href={`/towers?${new URLSearchParams({ ...(search ? { q: search } : {}), ...(page > 2 ? { page: String(page - 1) } : {}) })}`}
               >
-                ← Previous 25
+                ← Previous {pageSize}
               </Link>
             ) : (
               <span />
@@ -214,7 +211,7 @@ export default async function TowersPage({
                 className="btn"
                 href={`/towers?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(page + 1) })}`}
               >
-                Next 25 →
+                Next {pageSize} →
               </Link>
             ) : (
               <span />

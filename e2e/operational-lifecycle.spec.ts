@@ -19,6 +19,7 @@ async function createNycTower(
   name: string,
   legionellaResponsibility: "OUR_COMPANY" | "CUSTOMER" = "OUR_COMPANY",
 ) {
+  await page.getByText("Manage & reports", { exact: true }).click();
   await page.getByRole("link", { name: "Customers" }).click();
   await page
     .locator("summary")
@@ -40,19 +41,16 @@ async function createNycTower(
   await expect(
     page.getByRole("heading", { name: "Add cooling tower details" }),
   ).toBeVisible();
+  await page.getByText("Add manufacturer (optional)", { exact: true }).click();
   await page.getByLabel("Manufacturer (optional)").fill("Lifecycle Works");
   await page.getByLabel("Model number").fill("LC-500");
   await page.getByLabel("Serial number").fill(`SER-${Date.now()}`);
   await page.getByLabel("Tower location").fill("Roof, mechanical penthouse");
   await page.getByLabel("Cooling Tower Tonnage").fill("500");
-  await page.getByLabel("Year-round").check();
+  await page.getByLabel("Operating schedule").selectOption("YEAR_ROUND");
   await page
-    .getByLabel(
-      legionellaResponsibility === "OUR_COMPANY"
-        ? "Our company manages Legionella"
-        : "Customer manages Legionella",
-    )
-    .check();
+    .getByLabel("Responsible party")
+    .selectOption(legionellaResponsibility);
   await page
     .getByLabel("Jurisdiction", { exact: true })
     .selectOption({ label: "New York, NY" });
@@ -90,12 +88,12 @@ async function recordEvent(
 ) {
   const recorder = page.locator("#record-event");
   const eventButton = recorder.getByRole("button", { name: button });
-  const moreActions = recorder.getByText("Other work and special conditions", {
+  const moreActions = recorder.getByText("More types of completed work", {
     exact: true,
   });
   if (!(await recorder.isVisible())) {
     const openRecorder = page.getByRole("button", {
-      name: "Add compliance record",
+      name: "Record completed work",
     });
     await openRecorder.click();
     await expect(recorder).toBeVisible();
@@ -174,11 +172,11 @@ test("customer-managed sampling is excluded from TowerTrack work", async ({
   const name = `Owner-Managed Tower ${Date.now()}`;
   await createNycTower(page, name, "CUSTOMER");
 
-  await page.getByRole("button", { name: "Add compliance record" }).click();
-  const drawer = page.getByRole("dialog", { name: "Add compliance record" });
+  await page.getByRole("button", { name: "Record completed work" }).click();
+  const drawer = page.getByRole("dialog", { name: "Record completed work" });
   await expect(drawer.getByRole("button", { name: "Sample" })).toHaveCount(0);
   await drawer
-    .getByText("Other work and special conditions", { exact: true })
+    .getByText("More types of completed work", { exact: true })
     .click();
   await expect(
     drawer.getByRole("button", {
@@ -190,7 +188,7 @@ test("customer-managed sampling is excluded from TowerTrack work", async ({
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await expect(
     page.getByRole("link", { name: /Record .*sample/i }),
   ).toHaveCount(0);
@@ -203,7 +201,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
 }) => {
   const name = `Lifecycle Building ${Date.now()}`;
   const systemUrl = await createNycTower(page, name);
-  await page.getByRole("button", { name: "Add compliance record" }).click();
+  await page.getByRole("button", { name: "Record completed work" }).click();
   await expect(
     page.getByRole("button", { name: "Laboratory result" }),
   ).toBeDisabled();
@@ -254,12 +252,12 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   ).toBeVisible();
   await expandObligation(samples, "Monthly Legionella sample");
   await expect(samples.getByText(/Aug 6, 2026/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Add compliance record" }).click();
+  await page.getByRole("button", { name: "Record completed work" }).click();
   await expect(
     page.getByRole("button", { name: "Laboratory result" }),
   ).toBeEnabled();
   await page.keyboard.press("Escape");
-  await page.getByRole("link", { name: "Records", exact: true }).click();
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
   const recordedSample = page
     .locator("#regulatory-events article")
     .filter({ hasText: "Routine legionella sample collected" })
@@ -280,15 +278,15 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     "2026-07-06",
     "Qualified-person commissioning inspection",
   );
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await expect(
     page.locator('time[datetime="2026-10-04"]:visible').first(),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Add compliance record" }).click();
+  await page.getByRole("button", { name: "Record completed work" }).click();
   await page
     .locator("#record-event")
-    .getByText("Other work and special conditions", { exact: true })
+    .getByText("More types of completed work", { exact: true })
     .click();
   await page.getByRole("button", { name: "Disinfection" }).click();
   const recorder = page.locator("#record-event");
@@ -304,7 +302,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await expandObligation(samples, "Post disinfection retest");
   await expect(samples.getByText(/Jul 9, 2026/).first()).toBeVisible();
 
-  await page.getByRole("link", { name: "Records", exact: true }).click();
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "High legionella disinfection" })
@@ -323,13 +321,13 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     .fill("Corrected against the signed treatment ticket");
   await page.getByRole("button", { name: "Save corrected record" }).click();
   await expect(page.getByText(/Compliance record corrected/)).toBeVisible();
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await expect(samples.getByText("Post disinfection retest")).toHaveCount(1);
   await expect(
     page.locator('time[datetime="2026-07-12"]:visible').first(),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Records", exact: true }).click();
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
   await page
     .locator("#regulatory-events a")
     .filter({ hasText: "High legionella disinfection" })
@@ -344,10 +342,10 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await expect(
     page.getByText(/Compliance record marked invalid/),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await expect(samples.getByText("Post disinfection retest")).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Records", exact: true }).click();
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
   await page
     .locator("#regulatory-events article")
     .filter({ hasText: "Routine legionella sample collected" })
@@ -365,7 +363,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     ).toContainText("Monday 07/06/2026");
     await form.getByLabel("Result (CFU/mL)").fill("250");
   });
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Level 3 corrective action" }).first(),
   ).toBeVisible();
@@ -394,7 +392,10 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     ),
   ).toBeVisible();
   await expect(opportunity.getByText("Schedule this visit")).toHaveCount(0);
-  await opportunity.getByRole("link", { name: "Open tower" }).last().click();
+  await opportunity
+    .getByRole("link", { name: /Open tower:/ })
+    .last()
+    .click();
   await recordEvent(
     page,
     "Sample",

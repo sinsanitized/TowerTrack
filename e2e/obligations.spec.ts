@@ -38,11 +38,11 @@ test.beforeEach(async ({ page }) => {
   expect(systemUrl).toMatch(/^\/systems\//);
   await page.goto(systemUrl!, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/systems\//);
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await page
     .getByText("Reporting and advanced requirement details", { exact: true })
     .click();
-  await page.getByRole("button", { name: "Add compliance record" }).click();
+  await page.getByRole("button", { name: "Record completed work" }).click();
   await expect(
     page.getByRole("heading", { name: "What happened?" }),
   ).toBeVisible();
@@ -170,6 +170,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
     .filter({ hasText: `Aug 6, ${year}` })
     .first()
     .click();
+  await page.getByText("Advanced record actions", { exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Correct record details" }),
   ).toBeVisible();
@@ -275,9 +276,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
 test("startup immediately generates sampling and DOH reporting windows", async ({
   page,
 }) => {
-  await page
-    .getByText("Other work and special conditions", { exact: true })
-    .click();
+  await page.getByText("More types of completed work", { exact: true }).click();
   await page.getByRole("button", { name: "Record startup" }).click();
   const recorder = page.locator("#record-event");
   await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
@@ -325,9 +324,7 @@ test("startup immediately generates sampling and DOH reporting windows", async (
 test("emergency event creates an immediate sample without a made-up latest date", async ({
   page,
 }) => {
-  await page
-    .getByText("Other work and special conditions", { exact: true })
-    .click();
+  await page.getByText("More types of completed work", { exact: true }).click();
   await page
     .getByRole("button", { name: "Record emergency condition" })
     .click();

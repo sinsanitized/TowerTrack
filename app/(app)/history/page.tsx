@@ -7,16 +7,30 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { plainEnumLabel } from "@/lib/labels";
 
-export default async function HistoryPage() {
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const user = await requireUser();
-  const events = await db.serviceEvent.findMany({
-    where: {
-      coolingTowerSystem: {
-        building: { customer: { organizationId: user.organizationId } },
-      },
+  const query = await searchParams;
+  const pageSize = 15;
+  const requestedPage = Number.parseInt(query.page ?? "1", 10);
+  const where = {
+    coolingTowerSystem: {
+      building: { customer: { organizationId: user.organizationId } },
     },
+  };
+  const eventCount = await db.serviceEvent.count({ where });
+  const pageCount = Math.max(1, Math.ceil(eventCount / pageSize));
+  const page = Number.isFinite(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), pageCount)
+    : 1;
+  const events = await db.serviceEvent.findMany({
+    where,
     orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-    take: 100,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
     include: {
       coolingTowerSystem: { include: { building: true } },
     },
@@ -25,8 +39,8 @@ export default async function HistoryPage() {
     <>
       <PageHeader
         eyebrow="Audit trail"
-        title="All compliance records"
-        description="Records from every tower, newest first. Open a record to review its evidence, correction history, or satisfied requirement."
+        title="Records"
+        description="Completed work from every tower, newest first."
       />
       <ol className="panel overflow-hidden">
         {events.map((event) => (
@@ -59,6 +73,35 @@ export default async function HistoryPage() {
             </Link>
           </li>
         ))}
+        {pageCount > 1 && (
+          <li>
+            <nav
+              className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4"
+              aria-label="Compliance record pages"
+            >
+              {page > 1 ? (
+                <Link
+                  className="btn"
+                  href={page === 2 ? "/history" : `/history?page=${page - 1}`}
+                >
+                  ← Previous {pageSize}
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="text-sm font-bold text-slate-700">
+                Page {page} of {pageCount}
+              </span>
+              {page < pageCount ? (
+                <Link className="btn" href={`/history?page=${page + 1}`}>
+                  Next {pageSize} →
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          </li>
+        )}
       </ol>
     </>
   );

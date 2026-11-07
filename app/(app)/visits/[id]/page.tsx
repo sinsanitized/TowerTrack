@@ -107,7 +107,9 @@ export default async function VisitPage({
                     {formatDate(dateOnly(activity.scheduledDate))}
                   </div>
                 </div>
-                <span className="btn">Record actual work</span>
+                <span className="text-sm font-black text-emerald-900">
+                  Record actual work <span aria-hidden>→</span>
+                </span>
               </div>
             </Link>
           ))}

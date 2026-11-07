@@ -87,7 +87,7 @@ export default async function SamplesPage({
     typeof query.page === "string" ? query.page : "1",
     10,
   );
-  const pageSize = 50;
+  const pageSize = 15;
   const sampleReturnTo = `/samples?status=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
   const baseSystemWhere: Prisma.CoolingTowerSystemWhereInput = {
     legionellaResponsibility: { not: "CUSTOMER" },
@@ -236,10 +236,17 @@ export default async function SamplesPage({
         })}
       </section>
       <form
-        className="panel mb-5 flex flex-col gap-3 p-3 sm:flex-row sm:items-end"
+        className="panel mb-5 grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end"
         method="get"
       >
         <input type="hidden" name="status" value={filter} />
+        <p className="text-sm font-bold text-slate-700 sm:col-span-3">
+          {filter === "ACTION_NEEDED"
+            ? "Start with the oldest sample. Enter its laboratory result or assign responsibility."
+            : filter === "WAITING"
+              ? "These results are handled by another party. Follow up only when needed."
+              : "These results are complete. Open a row to review its record."}
+        </p>
         <label className="grow">
           <span className="label">
             Find a customer, facility, tower, or job
@@ -264,15 +271,6 @@ export default async function SamplesPage({
           </Link>
         )}
       </form>
-      <div className="mb-4 rounded-xl border border-slate-300 bg-white p-4 text-slate-800">
-        <div className="font-black">
-          {filter === "ACTION_NEEDED"
-            ? "Start with the oldest sample below. Enter its laboratory result or assign who is responsible."
-            : filter === "WAITING"
-              ? "No result entry is required. Follow up when another party is responsible; reference-only samples remain visible here."
-              : "These samples already have results. Open a record only to review its details."}
-        </div>
-      </div>
       <div className="panel divide-y divide-slate-200 overflow-hidden">
         {visibleSamples.map((sample) => {
           const result = sample.labResultsForSample[0];
@@ -328,8 +326,7 @@ export default async function SamplesPage({
                   {sample.coolingTowerSystem.building.buildingName}
                 </div>
                 <div className="text-xs text-slate-600">
-                  {sample.coolingTowerSystem.building.customer.name} ·{" "}
-                  {sample.coolingTowerSystem.internalJobNumber}
+                  {sample.coolingTowerSystem.building.customer.name}
                 </div>
                 <div className="mt-3">
                   <StatusBadge color={presentation.color} label={statusLabel} />
@@ -360,15 +357,9 @@ export default async function SamplesPage({
                   </div>
                 )}
               </div>
-              <Link
-                className={buttonClass(
-                  state === "ACTION_NEEDED" ? "primary" : "secondary",
-                  "min-h-11 w-full justify-center text-center xl:w-auto",
-                )}
-                href={primaryHref}
-              >
-                {primaryLabel}
-              </Link>
+              <div className="text-sm font-black text-emerald-900">
+                {primaryLabel} <span aria-hidden>→</span>
+              </div>
             </ClickableRow>
           );
         })}
@@ -387,7 +378,7 @@ export default async function SamplesPage({
           >
             {page > 1 ? (
               <Link className="btn" href={pageHref(page - 1)}>
-                ← Previous 50
+                ← Previous {pageSize}
               </Link>
             ) : (
               <span />
@@ -397,7 +388,7 @@ export default async function SamplesPage({
             </span>
             {page < pageCount ? (
               <Link className="btn" href={pageHref(page + 1)}>
-                Next 50 →
+                Next {pageSize} →
               </Link>
             ) : (
               <span />

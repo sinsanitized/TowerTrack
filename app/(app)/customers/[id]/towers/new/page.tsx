@@ -63,8 +63,8 @@ export default async function NewCoolingTowerPage({
         title="Add cooling tower details"
         description={`Customer and address saved for ${customer.name}. Complete the three short sections below for the tower at ${building.streetAddress}, ${building.city}, ${building.state}.`}
       />
-      <div className="panel mx-auto max-w-3xl p-6">
-        <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
+      <div className="panel mx-auto max-w-3xl p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
           <span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-900">
             ✓ Step 1 · Customer and address
           </span>
@@ -74,11 +74,11 @@ export default async function NewCoolingTowerPage({
         </div>
         <form
           action={createCoolingTowerSystemAction}
-          className="grid gap-5 sm:grid-cols-2"
+          className="grid gap-4 sm:grid-cols-2"
         >
           <input type="hidden" name="customerId" value={customer.id} />
           <input type="hidden" name="buildingId" value={building.id} />
-          <div className="rounded-xl border-l-4 border-emerald-700 bg-emerald-50 p-4 sm:col-span-2">
+          <div className="border-b border-slate-200 pb-3 sm:col-span-2">
             <div className="label text-emerald-800">Section 1 of 3</div>
             <h2 className="mt-1 text-lg font-black">Tower equipment</h2>
             <p className="mt-1 text-sm text-slate-600">
@@ -93,10 +93,6 @@ export default async function NewCoolingTowerPage({
               defaultValue="CT-1"
               required
             />
-          </label>
-          <label>
-            <span className="label">Manufacturer (optional)</span>
-            <input className="field mt-1" name="manufacturer" />
           </label>
           <label>
             <span className="label">Model number · Required</span>
@@ -126,7 +122,16 @@ export default async function NewCoolingTowerPage({
               required
             />
           </label>
-          <div className="mt-3 rounded-xl border-l-4 border-blue-700 bg-blue-50 p-4 sm:col-span-2">
+          <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">
+            <summary className="cursor-pointer font-black text-sky-900">
+              Add manufacturer (optional)
+            </summary>
+            <label className="mt-3 block">
+              <span className="label">Manufacturer (optional)</span>
+              <input className="field mt-1" name="manufacturer" />
+            </label>
+          </details>
+          <div className="mt-2 border-b border-slate-200 pb-3 sm:col-span-2">
             <div className="label text-blue-800">Section 2 of 3</div>
             <h2 className="mt-1 text-lg font-black">
               Operation and responsibility
@@ -137,7 +142,7 @@ export default async function NewCoolingTowerPage({
           </div>
           <OperatingScheduleFields />
           <LegionellaResponsibilityFields />
-          <div className="mt-3 rounded-xl border-l-4 border-amber-600 bg-amber-50 p-4 sm:col-span-2">
+          <div className="mt-2 border-b border-slate-200 pb-3 sm:col-span-2">
             <div className="label text-amber-900">Section 3 of 3</div>
             <h2 className="mt-1 text-lg font-black">
               Compliance rules · Administrator review
@@ -170,16 +175,6 @@ export default async function NewCoolingTowerPage({
               Enter the date as month, day, and year.
             </span>
           </label>
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 sm:col-span-2">
-            <div className="font-black text-amber-950">
-              Before creating the tower
-            </div>
-            <p className="mt-1 text-sm text-amber-950">
-              Jurisdiction and rules are stored on this cooling tower. NYC rules
-              are never selected automatically. Choose the verified combination
-              that actually applies to this address.
-            </p>
-          </div>
           <div className="sm:col-span-2">
             <SubmitButton
               className="w-full"

@@ -123,7 +123,7 @@ textarea:focus-visible {
   text-underline-offset: 3px;
 }
 .label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -231,7 +231,7 @@ table {
 }
 th {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   text-align: left;
@@ -270,6 +270,9 @@ tbody tr:hover {
 }
 .urgency-purple {
   border-left-color: #9333ea;
+}
+.urgency-slate {
+  border-left-color: #94a3b8;
 }
 
 .action-center-due-week {
@@ -487,6 +490,27 @@ tbody tr:hover {
 }
 :root[data-theme="dark"] .bg-purple-50 {
   background-color: #211e32 !important;
+}
+:root[data-theme="dark"] .bg-sky-50 {
+  background-color: #082f49;
+}
+:root[data-theme="dark"] .border-sky-300,
+:root[data-theme="dark"] .border-sky-500,
+:root[data-theme="dark"] .border-sky-600 {
+  border-color: #38bdf8;
+}
+:root[data-theme="dark"] .text-sky-900,
+:root[data-theme="dark"] .text-sky-950 {
+  color: #e0f2fe;
+}
+:root[data-theme="dark"] .bg-violet-50 {
+  background-color: #2e1065;
+}
+:root[data-theme="dark"] .border-violet-500 {
+  border-color: #a78bfa;
+}
+:root[data-theme="dark"] .text-violet-950 {
+  color: #ede9fe;
 }
 :root[data-theme="dark"] [class*="bg-purple-50/"] {
   background-color: rgb(33 30 50 / 0.9) !important;

@@ -29,42 +29,32 @@ export function LegionellaResponsibilityFields() {
   const [responsibility, setResponsibility] = useState("");
 
   return (
-    <fieldset className="grid gap-3 rounded-xl border border-blue-300 bg-blue-50/40 p-4 sm:col-span-2">
-      <legend className="label">Legionella responsibility · Required</legend>
-      <p className="text-sm font-bold text-blue-950">
-        Affects the Action Center: choose who must complete and report this
-        work.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {choices.map((choice) => (
-          <label
-            key={choice.value}
-            className={`cursor-pointer rounded-xl border-2 p-4 ${
-              responsibility === choice.value
-                ? "border-emerald-800 bg-emerald-50"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <span className="flex items-start gap-3">
-              <input
-                className="mt-1 size-5 accent-emerald-800"
-                type="radio"
-                name="legionellaResponsibility"
-                value={choice.value}
-                checked={responsibility === choice.value}
-                onChange={() => setResponsibility(choice.value)}
-                required
-              />
-              <span>
-                <span className="block font-black">{choice.label}</span>
-                <span className="mt-1 block text-sm text-slate-600">
-                  {choice.description}
-                </span>
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
+    <fieldset className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:col-span-2">
+      <legend className="label">Legionella responsibility</legend>
+      <label className="block max-w-xl">
+        <span className="label">Responsible party · Required</span>
+        <select
+          className="field mt-1 bg-white"
+          name="legionellaResponsibility"
+          value={responsibility}
+          onChange={(event) => setResponsibility(event.target.value)}
+          required
+        >
+          <option value="" disabled>
+            Choose who handles this work
+          </option>
+          {choices.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-sm text-slate-600">
+          {choices.find((choice) => choice.value === responsibility)
+            ?.description ??
+            "This determines whether the work appears in your Action Center."}
+        </span>
+      </label>
       {responsibility === "OTHER_VENDOR" && (
         <label className="max-w-xl">
           <span className="label">Legionella vendor name · Required</span>

@@ -75,7 +75,7 @@ export function NextActionCallout({
             aria-hidden
           />
           <div>
-            <div className="label">Next Action Required</div>
+            <div className="label">What to do next</div>
             <h2 className="mt-1 text-xl font-black">
               No immediate action required
             </h2>
@@ -97,24 +97,13 @@ export function NextActionCallout({
       <div className="flex items-start gap-3">
         <state.Icon className="mt-0.5 shrink-0" aria-hidden />
         <div className="min-w-0 flex-1">
-          <div className="label">Next Action Required</div>
+          <div className="label">What to do next</div>
           <div className="mt-1 text-sm font-black uppercase tracking-wide">
             {state.label}
           </div>
           <h2 id="next-action-required" className="mt-1 text-xl font-black">
-            {upcoming
-              ? "No immediate action required"
-              : multiple
-                ? "Multiple actions required"
-                : items[0]?.requiredAction}
+            {multiple ? "Multiple actions required" : items[0]?.requiredAction}
           </h2>
-          <p className="mt-1 text-sm font-bold">Reason: {selection.reason}</p>
-          {upcoming && items[0] && (
-            <p className="mt-2 text-sm">
-              Next upcoming obligation:{" "}
-              <strong>{items[0].requiredAction}</strong>
-            </p>
-          )}
         </div>
       </div>
 
@@ -125,12 +114,12 @@ export function NextActionCallout({
             className="grid gap-3 rounded-lg border border-current/20 bg-white/80 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
           >
             <div>
-              {(multiple || upcoming) && (
+              {multiple && (
                 <h3 className="font-black">{item.requiredAction}</h3>
               )}
               <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <span>
-                  <strong>Hard due:</strong>{" "}
+                  <strong>Due:</strong>{" "}
                   <ComplianceDate
                     value={item.hardDueDate}
                     compact
@@ -145,9 +134,10 @@ export function NextActionCallout({
                 )}
                 <strong>{workingDaysText(item.workingDaysLeft)}</strong>
               </div>
-              <p className="mt-2 text-sm text-slate-700">
-                {item.obligationReason}
-              </p>
+              <details className="detail-disclosure mt-2 text-sm">
+                <summary>Why is this needed?</summary>
+                <p className="mt-2 text-slate-700">{item.obligationReason}</p>
+              </details>
             </div>
             <Link
               className={buttonClass(

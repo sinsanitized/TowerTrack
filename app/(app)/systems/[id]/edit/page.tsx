@@ -124,16 +124,16 @@ export default async function EditCustomerTowerPage({
       {section === "information" && (
         <form
           action={updateCustomerTowerAction}
-          className="mx-auto max-w-4xl space-y-6"
+          className="mx-auto max-w-4xl space-y-4"
         >
           <input type="hidden" name="systemId" value={system.id} />
           <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950">
             This form saves only customer, address, and tower equipment.
             Configuration changes are managed from Tower Settings.
           </p>
-          <section className="panel p-6">
+          <section className="panel p-4 sm:p-5">
             <div className="label">Customer and address</div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className="label">Customer name</span>
                 <input
@@ -190,9 +190,9 @@ export default async function EditCustomerTowerPage({
               </label>
             </div>
           </section>
-          <section className="panel p-6">
+          <section className="panel p-4 sm:p-5">
             <div className="label">Cooling tower equipment</div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label>
                 <span className="label">Tower name</span>
                 <input
@@ -247,7 +247,7 @@ export default async function EditCustomerTowerPage({
               </label>
             </div>
           </section>
-          <section className="panel p-6">
+          <section className="panel p-4 sm:p-5">
             <label>
               <span className="label">
                 Why are you making this change? · Required
@@ -273,7 +273,7 @@ export default async function EditCustomerTowerPage({
       {section === "responsibilities" && (
         <section
           id="service-responsibilities"
-          className="panel mx-auto max-w-4xl scroll-mt-6 p-6"
+          className="panel mx-auto max-w-4xl scroll-mt-6 p-4 sm:p-5"
         >
           <div className="label">Service responsibilities</div>
           <h2 className="mt-1 text-xl font-black">
@@ -300,7 +300,7 @@ export default async function EditCustomerTowerPage({
           )}
           <form
             action={updateServiceResponsibilityAction}
-            className="mt-4 grid gap-4 sm:grid-cols-2"
+            className="mt-4 grid gap-3 sm:grid-cols-2"
           >
             <input type="hidden" name="systemId" value={system.id} />
             {returnTo && (
@@ -334,7 +334,7 @@ export default async function EditCustomerTowerPage({
         </section>
       )}
       {section === "rules" && (
-        <section className="panel mx-auto max-w-4xl p-6">
+        <section className="panel mx-auto max-w-4xl p-4 sm:p-5">
           <div className="label">Compliance rules</div>
           <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
             <div>

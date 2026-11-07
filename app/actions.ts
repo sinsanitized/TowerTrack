@@ -477,162 +477,165 @@ export async function recordServiceEventAction(formData: FormData) {
       "External attribution is only available for externally managed Legionella work.",
     );
   }
-  const result = await db.$transaction(async (tx) => {
-    await assertNoCleaningHyperConflict(tx, {
-      systemId,
-      eventType: command.eventType,
-      eventDate: command.eventDate,
-    });
-    await assertValidLabResultSample(tx, {
-      systemId,
-      eventType: command.eventType,
-      eventDate: command.eventDate,
-      sampleEventId: command.details.sampleEventId,
-    });
-    if (command.details.obligationId) {
-      const obligationWhere = {
-        id: command.details.obligationId,
-        coolingTowerSystemId: systemId,
-        status: {
-          in: [
-            ObligationStatus.PENDING,
-            ObligationStatus.SCHEDULED,
-            ObligationStatus.OVERDUE,
-            ObligationStatus.MISSED,
-          ],
-        },
-      };
-      const [sample, inspection, maintenance, reporting] = await Promise.all([
-        tx.sampleObligation.findFirst({
-          where: obligationWhere,
-          select: { id: true, triggerEventId: true },
-        }),
-        tx.inspectionObligation.findFirst({
-          where: obligationWhere,
-          select: { id: true, triggerEventId: true },
-        }),
-        tx.maintenanceObligation.findFirst({
-          where: obligationWhere,
-          select: { id: true, triggerEventId: true },
-        }),
-        tx.reportingObligation.findFirst({
-          where: obligationWhere,
-          select: {
-            id: true,
-            triggerEventId: true,
-            obligationType: true,
-          },
-        }),
-      ]);
-      const selected = sample ?? inspection ?? maintenance ?? reporting;
-      if (!selected)
-        throw new Error(
-          "The selected requirement is no longer open for this tower.",
-        );
-      if (
-        command.details.triggeringEventId &&
-        command.details.triggeringEventId !== selected.triggerEventId
-      )
-        throw new Error(
-          "The selected requirement no longer matches its triggering record.",
-        );
-      if (
-        (sample &&
-          ![
-            "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
-            "BACTERIOLOGICAL_SAMPLE_COLLECTED",
-          ].includes(command.eventType)) ||
-        (inspection &&
-          command.eventType !== "QUARTERLY_INSPECTION_COMPLETED") ||
-        (maintenance &&
-          ![
-            "CLEANING_COMPLETED",
-            "STARTUP_CLEANING_DISINFECTION",
-            "SUMMERTIME_HYPERHALOGENATION",
-          ].includes(command.eventType)) ||
-        (reporting &&
-          !(
-            (reporting.obligationType.includes("CORRECTIVE_ACTION") &&
-              command.eventType === "HIGH_LEGIONELLA_DISINFECTION") ||
-            (reporting.obligationType === "LEVEL_4_FULL_REMEDIATION" &&
-              command.eventType === "FULL_REMEDIATION") ||
-            (reporting.obligationType ===
-              "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
-              command.eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT") ||
-            command.eventType === "REPORT_SUBMITTED"
-          ))
-      )
-        throw new Error(
-          "The selected requirement does not match this compliance record type.",
-        );
-    }
-    if (command.eventType === "REPORT_SUBMITTED") {
-      const reportType = command.details.reportType as string;
-      const reportingObligationId = command.details.reportingObligationId;
-      if (!reportingObligationId)
-        throw new Error("Choose the exact reporting requirement submitted.");
-      const matchingObligation = await tx.reportingObligation.findFirst({
-        where: {
-          id: reportingObligationId,
-          coolingTowerSystemId: systemId,
-          obligationType: reportType,
-          status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
-          OR: [
-            { earliestDueDate: null },
-            { earliestDueDate: { lte: asUtc(command.eventDate) } },
-          ],
-        },
-        select: { id: true },
-      });
-      if (!matchingObligation)
-        throw new Error(
-          "That reporting requirement is not available for this tower.",
-        );
-    }
-    const event = await tx.serviceEvent.create({
-      data: {
-        coolingTowerSystemId: systemId,
+  const result = await db.$transaction(
+    async (tx) => {
+      await assertNoCleaningHyperConflict(tx, {
+        systemId,
         eventType: command.eventType,
-        eventDate: asUtc(command.eventDate),
-        eventTimestamp: command.eventTimestamp,
-        details: command.details,
-        notes: command.notes,
-        performedByResponsibility: performedBy,
-        externalProviderName:
-          command.details.externalProviderName ||
-          eventSystem.legionellaVendorName,
-        externalSource: command.details.externalSource,
-        recordedById: user.id,
-      },
-    });
-    const projection = await rebuildSystemComplianceProjections(tx, systemId);
-    const satisfiedObligations = await tx.sampleObligation.findMany({
-      where: {
-        coolingTowerSystemId: systemId,
-        status: "COMPLETED",
-        OR: [{ completedByEventId: event.id }, { triggerEventId: event.id }],
-      },
-      select: { id: true, obligationType: true },
-    });
-    await tx.auditLog.create({
-      data: {
-        entityType: "ServiceEvent",
-        entityId: event.id,
-        action: "CREATED",
-        reason: `Recorded ${command.eventType.replaceAll("_", " ").toLowerCase()}`,
-        changedById: user.id,
-        newValue: {
-          systemId,
+        eventDate: command.eventDate,
+      });
+      await assertValidLabResultSample(tx, {
+        systemId,
+        eventType: command.eventType,
+        eventDate: command.eventDate,
+        sampleEventId: command.details.sampleEventId,
+      });
+      if (command.details.obligationId) {
+        const obligationWhere = {
+          id: command.details.obligationId,
+          coolingTowerSystemId: systemId,
+          status: {
+            in: [
+              ObligationStatus.PENDING,
+              ObligationStatus.SCHEDULED,
+              ObligationStatus.OVERDUE,
+              ObligationStatus.MISSED,
+            ],
+          },
+        };
+        const [sample, inspection, maintenance, reporting] = await Promise.all([
+          tx.sampleObligation.findFirst({
+            where: obligationWhere,
+            select: { id: true, triggerEventId: true },
+          }),
+          tx.inspectionObligation.findFirst({
+            where: obligationWhere,
+            select: { id: true, triggerEventId: true },
+          }),
+          tx.maintenanceObligation.findFirst({
+            where: obligationWhere,
+            select: { id: true, triggerEventId: true },
+          }),
+          tx.reportingObligation.findFirst({
+            where: obligationWhere,
+            select: {
+              id: true,
+              triggerEventId: true,
+              obligationType: true,
+            },
+          }),
+        ]);
+        const selected = sample ?? inspection ?? maintenance ?? reporting;
+        if (!selected)
+          throw new Error(
+            "The selected requirement is no longer open for this tower.",
+          );
+        if (
+          command.details.triggeringEventId &&
+          command.details.triggeringEventId !== selected.triggerEventId
+        )
+          throw new Error(
+            "The selected requirement no longer matches its triggering record.",
+          );
+        if (
+          (sample &&
+            ![
+              "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
+              "BACTERIOLOGICAL_SAMPLE_COLLECTED",
+            ].includes(command.eventType)) ||
+          (inspection &&
+            command.eventType !== "QUARTERLY_INSPECTION_COMPLETED") ||
+          (maintenance &&
+            ![
+              "CLEANING_COMPLETED",
+              "STARTUP_CLEANING_DISINFECTION",
+              "SUMMERTIME_HYPERHALOGENATION",
+            ].includes(command.eventType)) ||
+          (reporting &&
+            !(
+              (reporting.obligationType.includes("CORRECTIVE_ACTION") &&
+                command.eventType === "HIGH_LEGIONELLA_DISINFECTION") ||
+              (reporting.obligationType === "LEVEL_4_FULL_REMEDIATION" &&
+                command.eventType === "FULL_REMEDIATION") ||
+              (reporting.obligationType ===
+                "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
+                command.eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT") ||
+              command.eventType === "REPORT_SUBMITTED"
+            ))
+        )
+          throw new Error(
+            "The selected requirement does not match this compliance record type.",
+          );
+      }
+      if (command.eventType === "REPORT_SUBMITTED") {
+        const reportType = command.details.reportType as string;
+        const reportingObligationId = command.details.reportingObligationId;
+        if (!reportingObligationId)
+          throw new Error("Choose the exact reporting requirement submitted.");
+        const matchingObligation = await tx.reportingObligation.findFirst({
+          where: {
+            id: reportingObligationId,
+            coolingTowerSystemId: systemId,
+            obligationType: reportType,
+            status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
+            OR: [
+              { earliestDueDate: null },
+              { earliestDueDate: { lte: asUtc(command.eventDate) } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!matchingObligation)
+          throw new Error(
+            "That reporting requirement is not available for this tower.",
+          );
+      }
+      const event = await tx.serviceEvent.create({
+        data: {
+          coolingTowerSystemId: systemId,
           eventType: command.eventType,
-          eventDate: command.eventDate,
+          eventDate: asUtc(command.eventDate),
+          eventTimestamp: command.eventTimestamp,
           details: command.details,
-          satisfiedObligationIds: satisfiedObligations.map((item) => item.id),
-          generated: projection,
+          notes: command.notes,
+          performedByResponsibility: performedBy,
+          externalProviderName:
+            command.details.externalProviderName ||
+            eventSystem.legionellaVendorName,
+          externalSource: command.details.externalSource,
+          recordedById: user.id,
         },
-      },
-    });
-    return { event, projection, satisfiedObligations };
-  });
+      });
+      const projection = await rebuildSystemComplianceProjections(tx, systemId);
+      const satisfiedObligations = await tx.sampleObligation.findMany({
+        where: {
+          coolingTowerSystemId: systemId,
+          status: "COMPLETED",
+          OR: [{ completedByEventId: event.id }, { triggerEventId: event.id }],
+        },
+        select: { id: true, obligationType: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          entityType: "ServiceEvent",
+          entityId: event.id,
+          action: "CREATED",
+          reason: `Recorded ${command.eventType.replaceAll("_", " ").toLowerCase()}`,
+          changedById: user.id,
+          newValue: {
+            systemId,
+            eventType: command.eventType,
+            eventDate: command.eventDate,
+            details: command.details,
+            satisfiedObligationIds: satisfiedObligations.map((item) => item.id),
+            generated: projection,
+          },
+        },
+      });
+      return { event, projection, satisfiedObligations };
+    },
+    { timeout: 15_000 },
+  );
   revalidatePath("/");
   revalidatePath(`/systems/${systemId}`);
   if (returnTo)

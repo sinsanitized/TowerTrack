@@ -141,25 +141,18 @@ export default async function WorkViewPage({
                   <p className="mt-1 text-sm text-slate-600">
                     {row.customer} · {row.address}
                   </p>
-                  <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                    {row.routeZone} · {plainEnumLabel(row.operatingStatus)} ·{" "}
-                    {row.profile}
-                  </p>
+                  <details className="detail-disclosure mt-2 text-sm">
+                    <summary>More tower information</summary>
+                    <p className="mt-2 text-slate-600">
+                      {row.routeZone} · {plainEnumLabel(row.operatingStatus)} ·{" "}
+                      {row.profile}
+                    </p>
+                  </details>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    className="btn btn-primary"
-                    href={
-                      view === "overdue-towers"
-                        ? `/systems/${row.id}#compliance-history`
-                        : `/systems/${row.id}#record-event`
-                    }
-                  >
-                    {view === "overdue-towers"
-                      ? "Review history"
-                      : "Open tower"}
-                  </Link>
-                </div>
+                <span className="text-sm font-black text-emerald-900">
+                  {view === "overdue-towers" ? "Review history" : "Open tower"}{" "}
+                  <span aria-hidden>→</span>
+                </span>
               </ClickableRow>
               {view === "compatible-work" && row.visitOpportunity && (
                 <div className="mx-5 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">

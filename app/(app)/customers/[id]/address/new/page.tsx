@@ -43,7 +43,7 @@ export default async function AddCustomerAddressPage({
       />
       <form
         action={addCustomerAddressAction}
-        className="panel mx-auto max-w-2xl space-y-4 p-6"
+        className="panel mx-auto max-w-2xl space-y-3 p-4 sm:p-5"
       >
         <input type="hidden" name="customerId" value={customer.id} />
         <p className="text-sm font-bold text-slate-700">
@@ -87,9 +87,6 @@ export default async function AddCustomerAddressPage({
             required
           />
         </label>
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
-          Saving this address continues to cooling tower equipment setup.
-        </div>
         <SubmitButton
           className="w-full"
           pendingLabel="Saving customer address…"

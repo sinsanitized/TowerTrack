@@ -6,29 +6,24 @@ const viewCopy: Record<
   { title: string; description: string }
 > = {
   overview: {
-    title: "Tower overview",
-    description:
-      "See what needs attention now, the next upcoming work, and the latest compliance dates.",
+    title: "Overview",
+    description: "The next action and important dates.",
   },
   obligations: {
-    title: "Required work",
-    description:
-      "Review unfinished work, dependencies, deadlines, and compatible completion dates.",
+    title: "Work to do",
+    description: "Everything still required for this tower.",
   },
   history: {
-    title: "Compliance records",
-    description:
-      "Review completed samples, results, inspections, cleaning, submissions, corrections, and audit history.",
+    title: "Records",
+    description: "Completed work and its supporting history.",
   },
   information: {
-    title: "Tower information",
-    description:
-      "Review the facility, equipment, identifiers, and service responsibilities.",
+    title: "Tower details",
+    description: "Facility, equipment, identifiers, and responsibilities.",
   },
   settings: {
-    title: "Tower settings",
-    description:
-      "Manage operating patterns, recommended service dates, jurisdiction, and compliance rules.",
+    title: "Settings",
+    description: "Operating pattern, jurisdiction, and rule configuration.",
   },
 };
 
@@ -43,16 +38,15 @@ export function TowerWorkspaceNavigation({
 }) {
   const tabs: Array<[string, TowerDetailView]> = [
     ["Overview", "overview"],
-    ["Required work", "obligations"],
-    ["Records", "history"],
-    ["Tower Information", "information"],
+    ["Work to do", "obligations"],
+    ["Tower records", "history"],
   ];
-  if (canViewSettings) tabs.push(["Settings", "settings"]);
+  const moreActive = view === "information" || view === "settings";
 
   return (
     <>
       <nav
-        className="panel mb-6 flex gap-1 overflow-x-auto p-2"
+        className="panel mb-6 flex flex-wrap gap-1 overflow-visible p-2"
         aria-label="Tower workspace"
       >
         {tabs.map(([label, tab]) => (
@@ -60,8 +54,8 @@ export function TowerWorkspaceNavigation({
             key={tab}
             className={`min-h-11 min-w-max rounded-lg px-4 py-3 text-sm font-black ${
               view === tab
-                ? "bg-emerald-800 text-white"
-                : "text-emerald-900 hover:bg-emerald-50"
+                ? "bg-sky-800 text-white"
+                : "text-sky-900 hover:bg-sky-50"
             }`}
             href={`/systems/${systemId}?view=${tab}`}
             aria-current={view === tab ? "page" : undefined}
@@ -69,8 +63,35 @@ export function TowerWorkspaceNavigation({
             {label}
           </Link>
         ))}
+        <details className="group relative">
+          <summary
+            className={`flex min-h-11 min-w-max cursor-pointer list-none items-center rounded-lg px-4 py-3 text-sm font-black ${
+              moreActive
+                ? "bg-sky-800 text-white"
+                : "text-sky-900 hover:bg-sky-50"
+            }`}
+          >
+            More
+          </summary>
+          <div className="absolute right-0 z-20 mt-1 min-w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+            <Link
+              className="block rounded-lg px-3 py-2 text-sm font-bold text-sky-900 hover:bg-sky-50"
+              href={`/systems/${systemId}?view=information`}
+            >
+              Tower details
+            </Link>
+            {canViewSettings && (
+              <Link
+                className="block rounded-lg px-3 py-2 text-sm font-bold text-sky-900 hover:bg-sky-50"
+                href={`/systems/${systemId}?view=settings`}
+              >
+                Settings
+              </Link>
+            )}
+          </div>
+        </details>
       </nav>
-      <div className="mb-6 border-l-4 border-emerald-700 pl-4">
+      <div className="mb-6 border-l-4 border-sky-700 pl-4">
         <h2 className="text-lg font-black">{viewCopy[view].title}</h2>
         <p className="mt-1 max-w-3xl text-sm text-slate-600">
           {viewCopy[view].description}

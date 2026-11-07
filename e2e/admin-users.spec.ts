@@ -13,6 +13,7 @@ test("administrator manages user access and roles", async ({ page }) => {
 
   const email = `managed-user-${Date.now()}@towertrack.local`;
   const management = page.getByRole("region", { name: "User management" });
+  await management.getByText("Add a user", { exact: true }).click();
   const createForm = management.locator("form").first();
   await createForm.getByLabel("Full name").fill("Managed User");
   await createForm.getByLabel("Email address").fill(email);

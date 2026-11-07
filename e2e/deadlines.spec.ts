@@ -28,102 +28,49 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL("/");
 });
 
-test("deadline table shows working days in a separate scan-friendly column", async ({
+test("deadline register groups requirements by tower and urgency", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1536, height: 900 });
-  await page.getByRole("link", { name: "All Deadlines" }).click();
-  await expect(
-    page.getByRole("link", { name: /active requirements/ }),
-  ).toHaveAttribute("href", "/deadlines");
-  await expect(
-    page.getByRole("link", { name: /cooling towers/ }),
-  ).toHaveAttribute("href", "/towers");
+  await page.getByRole("link", { name: "Deadline register" }).click();
   await expect(
     page.getByRole("link", { name: /^\d+ overdue/ }),
   ).toHaveAttribute("href", "/deadlines?period=OVERDUE");
-  const table = page.getByRole("table", {
-    name: "All cooling tower required work",
-  });
-  const expected = [
-    "Cooling tower",
-    "Required work",
-    "Target window",
-    "Hard deadline",
-    "Working days left",
-    "Next step",
-  ];
-  await expect(table.getByRole("columnheader")).toHaveCount(expected.length);
-  for (const heading of expected)
-    await expect(
-      table.getByRole("columnheader", { name: heading, exact: true }),
-    ).toBeVisible();
-  for (const removed of [
-    "Obligation Satisfied",
-    "Jurisdiction",
-    "Rule set",
-    "Authority",
-    "Primary Action",
-    "Service Date",
-    "Service Window",
-    "Status",
-  ])
-    await expect(
-      table.getByRole("columnheader", { name: removed }),
-    ).toHaveCount(0);
-
-  const firstDataRow = table.locator("tbody tr").first();
-  await expect(firstDataRow.getByRole("link").first()).toHaveAttribute(
-    "href",
-    /^\/systems\//,
-  );
-  await expect(firstDataRow).toContainText(
-    /, [A-Z]{2} (?:\d{5}|Postal code not recorded)/,
-  );
-  await expect(firstDataRow).toContainText(
-    /Collect|Complete|Perform|Submit|Monitor|Review/,
-  );
-
-  const overflow = await page
-    .getByTestId("deadline-table-scroll")
-    .evaluate((element) => ({
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth,
-    }));
-  // The row priority border and enclosing panel borders account for up to six
-  // layout pixels without creating user-scrollable content.
-  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 6);
+  await expect(
+    page.getByText(/requirements? across \d+ cooling tower/),
+  ).toBeVisible();
+  await expect(page.getByRole("table")).toHaveCount(0);
+  const firstTower = page.locator("details details > summary").first();
+  await expect(firstTower).toContainText(/requirements?/);
+  await expect(firstTower).toContainText(/working day|overdue|Review/i);
+  await firstTower.click();
+  const towerDetails = firstTower.locator("..");
+  await expect(towerDetails.getByText("Target window").first()).toBeVisible();
+  await expect(towerDetails.getByText("Hard deadline").first()).toBeVisible();
+  await expect(
+    towerDetails.getByRole("link", { name: /^Open / }),
+  ).toHaveAttribute("href", /^\/systems\//);
 });
 
-test("smaller desktop keeps identity and decision columns visible", async ({
-  page,
-}) => {
+test("smaller desktop keeps tower summaries readable", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto("/deadlines");
-  const table = page.getByRole("table", {
-    name: "All cooling tower required work",
-  });
-  for (const heading of [
-    "Cooling tower",
-    "Required work",
-    "Target window",
-    "Hard deadline",
-    "Working days left",
-    "Next step",
-  ])
-    await expect(
-      table.getByRole("columnheader", { name: heading, exact: true }),
-    ).toBeVisible();
-  for (const removed of ["Service Date", "Service Window", "Status"])
-    await expect(
-      table.getByRole("columnheader", { name: removed }),
-    ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Deadline register" }),
+  ).toBeVisible();
+  const firstTower = page.locator("details details > summary").first();
+  await expect(firstTower).toBeVisible();
+  await expect(firstTower).toContainText(/Hard deadline/);
+  const horizontalOverflow = await page
+    .locator("main")
+    .evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(horizontalOverflow).toBeLessThanOrEqual(2);
 });
 
 test("due-date and work-type filters narrow displayed rows", async ({
   page,
 }) => {
-  await page.getByRole("link", { name: "All Deadlines" }).click();
+  await page.getByRole("link", { name: "Deadline register" }).click();
   await expect(
     page.getByRole("navigation", {
       name: "Filter by Rule Configuration",
@@ -134,7 +81,7 @@ test("due-date and work-type filters narrow displayed rows", async ({
   for (const label of [
     "All due dates",
     "Overdue",
-    "Due this week",
+    "This week",
     "Due next week",
     "Due later",
   ])
@@ -239,31 +186,26 @@ test("mobile keeps reference metadata readable without adding columns", async ({
   );
 });
 
-test("action center separates this week from next week", async ({ page }) => {
+test("Today stays focused on current-week work", async ({ page }) => {
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Due this week" }),
-  ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Next Week" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Next Week" })).toHaveCount(0);
   await expect(page.getByText(/next three working days/i)).toHaveCount(0);
   await expect(page.getByTestId("this-week-section")).toHaveClass(
     /border-amber-200/,
   );
-  await expect(page.getByTestId("next-week-section")).toHaveClass(
-    /border-blue-200/,
-  );
   await expect(page.getByText("Work requiring action now")).toBeVisible();
-  await expect(page.getByText("Upcoming completion dates")).toBeVisible();
+  await expect(page.getByText("Upcoming completion dates")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Work that can be completed together" }),
-  ).toBeVisible();
-  await expect(page.getByText("Shared valid completion dates")).toBeVisible();
+  ).toHaveCount(0);
+  await expect(page.getByText("Shared valid completion dates")).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: "View all due this week" }),
   ).toHaveAttribute("href", "/deadlines?period=THIS_WEEK");
   await expect(
     page.getByRole("link", { name: "View all due next week" }),
-  ).toHaveAttribute("href", "/deadlines?period=NEXT_WEEK");
+  ).toHaveCount(0);
 });
 
 test("simplified deadline controls wrap at laptop and mobile widths", async ({

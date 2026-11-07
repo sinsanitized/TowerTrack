@@ -19,7 +19,7 @@ test("operations manager can record cleaning without creating or resetting a sam
   await search.fill("100 Park Avenue");
   await search.press("Enter");
   await page.getByRole("option").first().click();
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await page
     .getByText("Reporting and advanced requirement details", { exact: true })
     .click();
@@ -38,11 +38,11 @@ test("operations manager can record cleaning without creating or resetting a sam
       })),
     );
 
-  await page.getByRole("button", { name: "Add compliance record" }).click();
+  await page.getByRole("button", { name: "Record completed work" }).click();
   const recorder = page.getByRole("dialog");
   await expect(recorder).toBeVisible();
   await recorder
-    .getByText("Other work and special conditions", { exact: true })
+    .getByText("More types of completed work", { exact: true })
     .click();
   await recorder.getByRole("button", { name: "Cleaning" }).click();
   await expect(

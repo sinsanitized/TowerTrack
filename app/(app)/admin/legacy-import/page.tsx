@@ -18,7 +18,7 @@ export default async function LegacyImportPage() {
       <PageHeader
         eyebrow="Administration"
         title="Legacy Excel import"
-        description="Analyze first, review every proposed transformation, then explicitly confirm eligible rows. Historical activities remain unverified and cannot establish compliance."
+        description="Preview the workbook first. Nothing is imported until you review and confirm it."
       />
       <LegacyImportWorkflow
         jurisdictions={jurisdictions.map((item) => ({

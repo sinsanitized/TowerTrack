@@ -19,22 +19,23 @@ test.beforeEach(async ({ page }) => {
 test("tower details uses focused role-aware views", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Next required actions" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Recent activity" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Compliance snapshot" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(page.getByText("More tower information")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Record completed cleaning" }),
   ).toHaveCount(0);
 
   const recordButton = page.getByRole("button", {
-    name: "Add compliance record",
+    name: "Record completed work",
   });
   await recordButton.click();
-  const drawer = page.getByRole("dialog", { name: "Add compliance record" });
+  const drawer = page.getByRole("dialog", { name: "Record completed work" });
   await expect(drawer).toBeVisible();
   await expect(
     drawer.getByRole("button", { name: "Inspection" }),
@@ -48,7 +49,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
   await expect(
     drawer.getByRole("heading", { name: "What saving this record will do" }),
   ).toBeVisible();
-  const moreEvents = drawer.getByText("Other work and special conditions", {
+  const moreEvents = drawer.getByText("More types of completed work", {
     exact: true,
   });
   await moreEvents.focus();
@@ -63,7 +64,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
   await expect(drawer).toHaveCount(0);
   await expect(recordButton).toBeFocused();
 
-  await page.getByRole("link", { name: "Required work", exact: true }).click();
+  await page.getByRole("link", { name: "Work to do", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "All required work" }),
   ).toBeVisible();
@@ -71,7 +72,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "Record completed cleaning" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Records", exact: true }).click();
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Compliance records" }),
   ).toBeVisible();
@@ -79,8 +80,12 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "Compliance snapshot" }),
   ).toHaveCount(0);
 
-  await page
-    .getByRole("link", { name: "Tower Information", exact: true })
+  const towerNavigation = page.getByRole("navigation", {
+    name: "Tower workspace",
+  });
+  await towerNavigation.getByText("More", { exact: true }).click();
+  await towerNavigation
+    .getByRole("link", { name: "Tower details", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Tower location" }),
@@ -124,14 +129,12 @@ test("samples prioritize action and expose clear status views", async ({
   ).toBeVisible();
 });
 
-test("recent activity is ordered by completed event date, newest first", async ({
+test("records are ordered by completed event date, newest first", async ({
   page,
 }) => {
-  const recentActivity = page.locator("section.panel").filter({
-    has: page.getByRole("heading", { name: "Recent activity" }),
-  });
-  const dates = await recentActivity
-    .locator("time")
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
+  const dates = await page
+    .locator("main time")
     .evaluateAll((items) =>
       items.map((item) => item.getAttribute("datetime") || ""),
     );

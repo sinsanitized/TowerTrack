@@ -71,9 +71,11 @@ describe("next action callout", () => {
       />,
     );
     expect(
-      screen.getByText("No immediate action required"),
+      screen.getByRole("heading", {
+        name: "Collect routine Legionella sample",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Next upcoming obligation:/)).toBeInTheDocument();
+    expect(screen.getByText("Why is this needed?")).toBeInTheDocument();
     expect(screen.getByText("Target date:")).toBeInTheDocument();
   });
 

@@ -25,47 +25,32 @@ export function OperatingScheduleFields() {
   const [endDay, setEndDay] = useState(31);
 
   return (
-    <fieldset className="rounded-xl border border-blue-300 bg-blue-50/40 p-4 sm:col-span-2">
-      <legend className="label px-1">Operating dates · Required</legend>
-      <p className="mb-3 text-sm font-bold text-blue-950">
-        Affects future deadlines: choose when this tower normally operates.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          ["YEAR_ROUND", "Year-round", "Operates throughout the year."],
-          ["SEASONAL", "Seasonal", "Operates during a recurring season."],
-        ].map(([value, label, description]) => (
-          <label
-            key={value}
-            className={`cursor-pointer rounded-xl border-2 p-4 ${
-              schedule === value
-                ? "border-emerald-800 bg-emerald-50"
-                : "border-slate-200 bg-slate-50"
-            }`}
-          >
-            <span className="flex items-start gap-3">
-              <input
-                className="mt-1 size-5 accent-emerald-800"
-                type="radio"
-                name="operatingSchedule"
-                value={value}
-                checked={schedule === value}
-                onChange={() => setSchedule(value as "YEAR_ROUND" | "SEASONAL")}
-                required
-              />
-              <span>
-                <span className="block font-black">{label}</span>
-                <span className="mt-1 block text-sm text-slate-600">
-                  {description}
-                </span>
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
+    <fieldset className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:col-span-2">
+      <legend className="label px-1">Operating dates</legend>
+      <label className="block max-w-xl">
+        <span className="label">Operating schedule · Required</span>
+        <select
+          className="field mt-1 bg-white"
+          name="operatingSchedule"
+          value={schedule}
+          onChange={(event) =>
+            setSchedule(event.target.value as "YEAR_ROUND" | "SEASONAL" | "")
+          }
+          required
+        >
+          <option value="" disabled>
+            Choose a schedule
+          </option>
+          <option value="YEAR_ROUND">Year-round</option>
+          <option value="SEASONAL">Seasonal</option>
+        </select>
+        <span className="mt-1 block text-sm text-slate-600">
+          This choice controls which future deadlines are active.
+        </span>
+      </label>
 
       {schedule === "SEASONAL" && (
-        <div className="mt-4 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 border-t border-blue-200 pt-4 sm:grid-cols-2">
           {[
             [
               "Start",
@@ -78,7 +63,7 @@ export function OperatingScheduleFields() {
           ].map(([label, monthName, dayName, month, day]) => (
             <fieldset
               key={String(label)}
-              className="grid grid-cols-[1fr_90px] gap-2"
+              className="grid grid-cols-[1fr_88px] gap-2"
             >
               <legend className="mb-2 font-black">Season {label}</legend>
               <label>
@@ -120,7 +105,7 @@ export function OperatingScheduleFields() {
               </label>
             </fieldset>
           ))}
-          <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950 sm:col-span-2">
+          <p className="text-sm font-bold text-blue-950 sm:col-span-2">
             Seasonal schedule: {months[startMonth - 1]} {startDay} through{" "}
             {months[endMonth - 1]} {endDay} each year.
           </p>

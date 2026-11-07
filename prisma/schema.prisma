@@ -259,6 +259,7 @@ model User {
   assignedSystems        CoolingTowerSystem[]  @relation("AssignedTechnician")
   visits                 Visit[]               @relation("AssignedVisitTechnician")
   createdVisits          Visit[]               @relation("VisitCreator")
+  createdCleaningJobs    CleaningJob[]         @relation("CleaningJobCreator")
   routes                 Route[]
   serviceEvents          ServiceEvent[]
   auditLogs              AuditLog[]
@@ -307,6 +308,7 @@ model Building {
   active              Boolean              @default(true)
   systems             CoolingTowerSystem[]
   visits              Visit[]
+  cleaningJobs        CleaningJob[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
@@ -460,6 +462,7 @@ model CoolingTowerSystem {
   notes                             String?
   active                            Boolean                 @default(true)
   activities                        VisitActivity[]
+  cleaningJobTowers                 CleaningJobTower[]
   requirements                      Requirement[]
   correctiveCases                   CorrectiveActionCase[]
   operatingPeriods                  OperatingPeriod[]
@@ -534,6 +537,7 @@ model ServiceEvent {
   completedMaintenanceObligations MaintenanceObligation[] @relation("MaintenanceCompletion")
   labResult                       LabResult?
   labResultsForSample             LabResult[]             @relation("LabResultSample")
+  cleaningJobTowerCompletion      CleaningJobTower?       @relation("CleaningJobTowerCompletion")
   createdAt                       DateTime                @default(now())
   updatedAt                       DateTime                @updatedAt
 
@@ -693,9 +697,45 @@ model Visit {
   createdById          String
   createdBy            User            @relation("VisitCreator", fields: [createdById], references: [id])
   activities           VisitActivity[]
+  addForCleaningJob    CleaningJob?    @relation("CleaningJobAddVisit")
+  cleanForCleaningJob  CleaningJob?    @relation("CleaningJobCleanVisit")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   deletedAt            DateTime?
+}
+
+model CleaningJob {
+  id              String             @id @default(cuid())
+  buildingId      String
+  building        Building           @relation(fields: [buildingId], references: [id])
+  addVisitId      String             @unique
+  addVisit        Visit              @relation("CleaningJobAddVisit", fields: [addVisitId], references: [id])
+  cleaningVisitId String             @unique
+  cleaningVisit   Visit              @relation("CleaningJobCleanVisit", fields: [cleaningVisitId], references: [id])
+  scopeMode       String
+  notes           String?
+  createdById     String
+  createdBy       User               @relation("CleaningJobCreator", fields: [createdById], references: [id])
+  towers          CleaningJobTower[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  cancelledAt     DateTime?
+
+  @@index([buildingId, createdAt])
+}
+
+model CleaningJobTower {
+  id                        String             @id @default(cuid())
+  cleaningJobId             String
+  cleaningJob               CleaningJob        @relation(fields: [cleaningJobId], references: [id], onDelete: Cascade)
+  coolingTowerSystemId      String
+  coolingTowerSystem        CoolingTowerSystem @relation(fields: [coolingTowerSystemId], references: [id])
+  systemNameSnapshot        String
+  completedByServiceEventId String?            @unique
+  completedByServiceEvent   ServiceEvent?      @relation("CleaningJobTowerCompletion", fields: [completedByServiceEventId], references: [id], onDelete: SetNull)
+  createdAt                 DateTime           @default(now())
+
+  @@unique([cleaningJobId, coolingTowerSystemId])
 }
 
 model VisitActivity {

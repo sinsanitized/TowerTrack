@@ -91,7 +91,7 @@ export function GlobalSearch() {
             role="combobox"
             autoComplete="off"
             className="field pl-10"
-            placeholder="Customer, building, address, tower, or job number"
+            placeholder="Find a tower"
             type="search"
             disabled={!hydrated}
             value={query}
@@ -108,10 +108,10 @@ export function GlobalSearch() {
         <button
           className={buttonClass("secondary", "min-h-11 shrink-0 px-3")}
           type="submit"
+          aria-label="Show matches"
         >
           <Search size={17} aria-hidden />
           <span className="hidden sm:inline">Show matches</span>
-          <span className="sm:hidden">Show</span>
         </button>
       </form>
       {open && normalizedQuery && (

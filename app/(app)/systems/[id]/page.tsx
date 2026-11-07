@@ -22,7 +22,6 @@ import {
   plainEnumLabel,
   requiredActionLabel,
 } from "@/lib/labels";
-import { seasonalStatus } from "@/lib/season";
 import { requireUser } from "@/lib/auth";
 import {
   compileTowerRuleConfig,
@@ -32,7 +31,6 @@ import {
   canViewTowerSettings,
   resolveTowerDetailView,
   selectNextTowerActions,
-  selectOverviewObligations,
   sortTowerObligations,
 } from "@/lib/tower-details";
 import { buttonClass } from "@/lib/button-variants";
@@ -41,7 +39,6 @@ import { SubmitButton } from "@/components/submit-button";
 import {
   responsibilityFamilyForObligation,
   responsibilityForServiceObligation,
-  serviceResponsibilityFamilies,
 } from "@/lib/service-responsibility";
 import {
   eventEntryHref,
@@ -52,10 +49,7 @@ import {
 import { TowerWorkspaceNavigation } from "./components/tower-workspace-navigation";
 import { TowerInformation } from "./components/tower-information";
 import { TowerSettings } from "./components/tower-settings";
-import {
-  RecentTowerActivity,
-  TowerComplianceRecords,
-} from "./components/tower-records";
+import { TowerComplianceRecords } from "./components/tower-records";
 import { ComplianceUpdateSummary } from "./components/compliance-update-summary";
 
 export default async function SystemPage({
@@ -237,6 +231,24 @@ export default async function SystemPage({
     }),
   ]);
   if (!system || !dashboardRow) notFound();
+  const upcomingCleaningJobs = await db.cleaningJob.findMany({
+    where: {
+      towers: { some: { coolingTowerSystemId: system.id } },
+      OR: [
+        {
+          addVisit: { status: { in: ["PLANNED", "CONFIRMED", "IN_PROGRESS"] } },
+        },
+        {
+          cleaningVisit: {
+            status: { in: ["PLANNED", "CONFIRMED", "IN_PROGRESS"] },
+          },
+        },
+      ],
+    },
+    include: { addVisit: true, cleaningVisit: true },
+    orderBy: { addVisit: { scheduledDate: "asc" } },
+    take: 3,
+  });
   const selectedSampleObligation = entryIntent?.obligationId
     ? system.sampleObligations.find(
         (item) => item.id === entryIntent.obligationId,
@@ -496,18 +508,7 @@ export default async function SystemPage({
       actionHref,
     };
   });
-  const warningCount = trackedOpenObligations.filter(
-    (item) =>
-      item.priority === "EMERGENCY" ||
-      item.priority === "CRITICAL" ||
-      item.priority === "WARNING" ||
-      (item.latest != null && item.latest < today),
-  ).length;
   const orderedOpenObligations = sortTowerObligations(
-    trackedOpenObligations,
-    today,
-  );
-  const overviewObligations = selectOverviewObligations(
     trackedOpenObligations,
     today,
   );
@@ -518,17 +519,6 @@ export default async function SystemPage({
   );
   const mostRecentActiveEvent = system.serviceEvents.find(
     (event) => event.status === "ACTIVE",
-  );
-  const recentActiveEvents = system.serviceEvents
-    .filter((event) => event.status === "ACTIVE")
-    .sort(
-      (a, b) =>
-        dateOnly(b.eventDate).localeCompare(dateOnly(a.eventDate)) ||
-        b.createdAt.getTime() - a.createdAt.getTime(),
-    )
-    .slice(0, 3);
-  const responsibilityExceptions = serviceResponsibilityFamilies.filter(
-    ([key]) => system[key] !== "OUR_COMPANY",
   );
   const timelineItems = nextRequired
     ? [
@@ -598,23 +588,37 @@ export default async function SystemPage({
     .startsWith(buildingName.toLocaleLowerCase())
     ? systemName
     : `${buildingName} — ${systemName}`;
+  const updateNotice = newlyCreated
+    ? "Cooling tower created. Record the first verified real-world event to calculate its compliance requirements."
+    : detailsUpdated
+      ? "Customer, address, and tower equipment saved. Compliance requirements were recalculated from the record history."
+      : responsibilitiesUpdated
+        ? "Service responsibilities saved. Work queues now reflect who handles each service."
+        : operationPatternUpdated
+          ? "Operating schedule saved. No startup or shutdown event was recorded."
+          : targetWindowUpdated
+            ? "Recommended monthly sample dates saved. The compliance deadline did not change."
+            : rulesUpdated
+              ? "Compliance rules saved. Requirements and deadlines were recalculated from valid records."
+              : typeof query.correctedEvent === "string"
+                ? "Compliance record corrected. The original remains in the audit history and requirements were recalculated."
+                : query.voidedEvent === "1"
+                  ? "Compliance record marked invalid. It remains in the audit history and dependent requirements were recalculated."
+                  : null;
+  const updateNoticeIsWarning = query.voidedEvent === "1";
   return (
     <>
       <PageHeader
         eyebrow={system.building.customer.name}
         title={towerTitle}
-        description={`${system.building.streetAddress}, ${system.building.city}, ${system.building.state} · ${system.internalJobNumber}`}
+        description={`${system.building.streetAddress}, ${system.building.city}, ${system.building.state}`}
         actions={
           <div className="grid w-full gap-2 sm:w-60">
             <Link
-              className={buttonClass("secondary")}
-              href={returnTo ?? "/towers"}
+              className={buttonClass("secondary", "order-2")}
+              href={`/calendar?new=1&buildingId=${system.buildingId}&towerId=${system.id}`}
             >
-              {returnTo?.startsWith("/samples")
-                ? "Back to Samples"
-                : returnTo?.startsWith("/deadlines")
-                  ? "Back to Deadlines"
-                  : "Back to Towers"}
+              Plan future cleaning
             </Link>
             <EventRecorderDrawer
               key={
@@ -733,54 +737,13 @@ export default async function SystemPage({
           portalFollowUp={recordedPortalFollowUp ?? null}
         />
       )}
-      {newlyCreated && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Cooling tower created. Record the first verified real-world event to
-          calculate its compliance requirements.
-        </div>
-      )}
-      {detailsUpdated && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Customer, address, and tower equipment saved. Compliance requirements
-          were recalculated from the compliance record history.
-        </div>
-      )}
-      {responsibilitiesUpdated && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Service responsibilities saved. Action queues now reflect who handles
-          each service.
-        </div>
-      )}
-      {operationPatternUpdated && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Operating schedule saved. This setting did not record a startup or
-          shutdown event.
-        </div>
-      )}
-      {targetWindowUpdated && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Recommended monthly sample dates saved. The compliance deadline was
-          not changed.
-        </div>
-      )}
-      {rulesUpdated && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Compliance rules saved. Open requirements and deadlines were
-          recalculated from the tower&apos;s valid record history.
-        </div>
-      )}
-      {typeof query.correctedEvent === "string" && (
-        <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
-          Compliance record corrected. The original record remains in audit
-          history, and all compliance requirements were recalculated. Review
-          “Next Action Required” below for any remaining work.
-        </div>
-      )}
-      {query.voidedEvent === "1" && (
-        <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-950">
-          Compliance record marked invalid. It remains in audit history, and
-          every dependent requirement was recalculated from the remaining valid
-          records. Review “Next Action Required” below for any remaining work.
+      {updateNotice && (
+        <div
+          className={`mb-5 rounded-xl border p-4 text-sm font-bold ${updateNoticeIsWarning ? "border-amber-300 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}
+          role="status"
+        >
+          <span className="mr-2 font-black">Latest update:</span>
+          {updateNotice}
         </div>
       )}
       {view === "overview" && (
@@ -789,97 +752,20 @@ export default async function SystemPage({
           items={nextActionItems}
         />
       )}
-      <section
-        id="overview"
-        className={`${view === "overview" ? "panel mb-6" : "hidden"} scroll-mt-6 p-5`}
-      >
-        <div className="label">What needs attention</div>
-        <div className="mt-3 grid gap-4 lg:grid-cols-2">
-          <div
-            className={`rounded-xl border p-4 ${
-              dashboardRow.complianceHealth.color === "RED"
-                ? "border-red-300 bg-red-50"
-                : dashboardRow.complianceHealth.color === "YELLOW"
-                  ? "border-amber-300 bg-amber-50"
-                  : "border-emerald-200 bg-emerald-50"
-            }`}
-          >
-            <div className="label">Current compliance status</div>
-            <div className="mt-2">
-              <StatusBadge
-                color={dashboardRow.complianceHealth.color}
-                label={dashboardRow.complianceHealth.label}
-              />
-            </div>
-            <p className="mt-2 text-sm font-bold text-slate-700">
-              {dashboardRow.complianceHealth.reason}
-            </p>
-          </div>
-          <div
-            className={`rounded-xl border p-4 ${
-              responsibilityExceptions.length
-                ? "border-purple-300 bg-purple-50"
-                : "border-slate-200 bg-slate-50"
-            }`}
-          >
-            <div className="label">Work and dependencies</div>
-            <div className="mt-2 font-black">
-              {dashboardRow.openCount} open requirement
-              {dashboardRow.openCount === 1 ? "" : "s"} · {warningCount} urgent
-            </div>
-            <p className="mt-2 text-sm text-slate-700">
-              {responsibilityExceptions.length
-                ? `${responsibilityExceptions.length} service ${responsibilityExceptions.length === 1 ? "area needs" : "areas need"} external or responsibility review.`
-                : "All configured service areas are our responsibility."}
-            </p>
-            <p className="mt-2 text-xs font-bold text-slate-600">
-              {plainEnumLabel(system.operatingStatus)} ·{" "}
-              {seasonalStatus(system)}
-            </p>
-          </div>
-        </div>
-      </section>
-      {view === "overview" && (
-        <section className="panel mb-6 p-5" aria-labelledby="next-actions">
-          <div className="label">Daily work</div>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="next-actions" className="mt-1 text-xl font-black">
-                Next required actions
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                All urgent items are shown first, followed by the next three
-                upcoming requirements.
-              </p>
-            </div>
-            <Link className="btn" href={`/systems/${id}?view=obligations`}>
-              View all requirements
-            </Link>
-          </div>
-          <div className="mt-5">
-            <TowerActionList
-              systemId={id}
-              today={today}
-              items={overviewObligations}
-              combinedObligationIds={combinedObligationIds}
-              canConfirmOwnerManaged={canConfirmOwnerManaged}
-              legionellaResponsibility={system.legionellaResponsibility}
-              responsibilities={system}
-            />
-          </div>
-        </section>
-      )}
-      <section
-        className={view === "overview" ? "mb-6" : "hidden"}
+      <details
+        className={view === "overview" ? "panel mb-6 p-5" : "hidden"}
         aria-labelledby="key-compliance-dates"
       >
-        <div className="mb-3">
-          <div className="label">Latest dates and recurring work</div>
-          <h2 id="key-compliance-dates" className="mt-1 text-xl font-black">
-            Compliance snapshot
-          </h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <summary
+          id="key-compliance-dates"
+          className="cursor-pointer text-lg font-black"
+        >
+          More tower information
+        </summary>
+        <p className="mt-1 text-sm text-slate-600">
+          Last completed dates and recurring compliance status
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <article className="panel p-4">
             <div className="label">Last monthly Legionella test</div>
             <div className="mt-3">
@@ -991,7 +877,7 @@ export default async function SystemPage({
             )}
           </article>
         </div>
-      </section>
+      </details>
       {system.labResults.length > 0 && (
         <section
           id="samples"
@@ -1397,6 +1283,24 @@ export default async function SystemPage({
             </p>
           ) : (
             <div className="mt-4 space-y-4">
+              {upcomingCleaningJobs.map((job) => (
+                <Link
+                  key={job.id}
+                  href={`/calendar?month=${dateOnly(job.addVisit.scheduledDate).slice(0, 7)}&job=${job.id}`}
+                  className="block rounded-xl border border-sky-300 bg-sky-50 p-4 text-sky-950 transition hover:border-sky-500"
+                >
+                  <div className="font-black">
+                    Upcoming linked cleaning visits
+                  </div>
+                  <p className="mt-1 text-sm">
+                    ADD {formatDate(job.addVisit.scheduledDate)} → CLEAN{" "}
+                    {formatDate(job.cleaningVisit.scheduledDate)}
+                  </p>
+                  <div className="mt-2 text-sm font-bold">
+                    Open in Calendar →
+                  </div>
+                </Link>
+              ))}
               {activeCleaningPlan && (
                 <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-slate-800">
                   <div className="font-black">Legacy planning reference</div>
@@ -1463,11 +1367,6 @@ export default async function SystemPage({
           profileAudit={profileAudit}
         />
       )}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {view === "overview" && (
-          <RecentTowerActivity systemId={id} events={recentActiveEvents} />
-        )}
-      </div>
       {view === "history" && (
         <TowerComplianceRecords
           systemId={id}

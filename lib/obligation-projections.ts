@@ -949,19 +949,21 @@ export async function rebuildSystemComplianceProjections(
       reason: item.reason,
     }),
   );
-  const missedCount =
-    (await tx.sampleObligation.count({
+  const missedCounts = await Promise.all([
+    tx.sampleObligation.count({
       where: { coolingTowerSystemId: systemId, status: "MISSED" },
-    })) +
-    (await tx.inspectionObligation.count({
+    }),
+    tx.inspectionObligation.count({
       where: { coolingTowerSystemId: systemId, status: "MISSED" },
-    })) +
-    (await tx.reportingObligation.count({
+    }),
+    tx.reportingObligation.count({
       where: { coolingTowerSystemId: systemId, status: "MISSED" },
-    })) +
-    (await tx.maintenanceObligation.count({
+    }),
+    tx.maintenanceObligation.count({
       where: { coolingTowerSystemId: systemId, status: "MISSED" },
-    }));
+    }),
+  ]);
+  const missedCount = missedCounts.reduce((total, count) => total + count, 0);
   const status = missedCount
     ? {
         risk: "OVERDUE" as const,

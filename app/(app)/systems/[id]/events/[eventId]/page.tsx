@@ -184,9 +184,11 @@ export default async function EventPage({
         }
       />
       {event.performedByResponsibility !== "OUR_COMPANY" && (
-        <section className="panel mb-5 p-4">
-          <div className="label">Work attribution</div>
-          <div className="mt-1 font-black text-purple-900">
+        <details className="panel mb-5 p-4">
+          <summary className="cursor-pointer list-none font-black text-purple-900">
+            Work provided by another party
+          </summary>
+          <div className="mt-3 font-black text-purple-900">
             {serviceResponsibilityLabel(event.performedByResponsibility)}
             {event.externalProviderName
               ? ` — ${event.externalProviderName}`
@@ -199,9 +201,9 @@ export default async function EventPage({
           {event.externalSource && (
             <p className="mt-2 text-sm">Source: {event.externalSource}</p>
           )}
-        </section>
+        </details>
       )}
-      <section className="panel mb-6 p-5">
+      <section className="panel mb-5 p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <StatusBadge
@@ -225,8 +227,10 @@ export default async function EventPage({
       </section>
       {event.eventType === "SUMMERTIME_HYPERHALOGENATION" &&
         historicalTreatmentDetails.length > 0 && (
-          <section className="panel mb-6 p-5">
-            <div className="label">Historical service-form details</div>
+          <details className="panel mb-5 p-5">
+            <summary className="cursor-pointer list-none font-black text-emerald-900">
+              Historical service-form details
+            </summary>
             <p className="mt-2 text-sm text-slate-600">
               Preserved from the original TowerTrack record. New entries require
               only the date performed.
@@ -239,40 +243,53 @@ export default async function EventPage({
                 </div>
               ))}
             </dl>
-          </section>
+          </details>
         )}
       {canEdit ? (
-        <EventEditor
-          systemId={id}
-          currentDate={todayDateOnly()}
-          event={{
-            id: event.id,
-            eventType: event.eventType as ServiceEventTypeValue,
-            eventDate: dateOnly(event.eventDate),
-            eventTimestamp: event.eventTimestamp
-              ? dateTimeLocalValue(event.eventTimestamp)
-              : "",
-            notes: event.notes ?? "",
-            cfuPerMl: textDetail(details, "cfuPerMl"),
-            residualOutcome:
-              details.residualRestoredWithin3Days === true
-                ? "RESTORED"
-                : details.residualRestoredWithin3Days === false
-                  ? "NOT_RESTORED"
-                  : "UNKNOWN",
-            reportType: textDetail(details, "reportType"),
-            reportingObligationId: textDetail(details, "reportingObligationId"),
-            sampleEventId: currentSampleEventId,
-            chemical: textDetail(details, "chemical"),
-            quantity: textDetail(details, "quantity"),
-            contactTime: textDetail(details, "contactTime"),
-            ph: textDetail(details, "ph"),
-            freeHalogenResidual: textDetail(details, "freeHalogenResidual"),
-            technician: textDetail(details, "technician"),
-          }}
-          ruleConfig={ruleConfig}
-          availableSamples={availableSamples}
-        />
+        <details className="panel p-5">
+          <summary className="cursor-pointer list-none font-black text-emerald-900">
+            Advanced record actions
+            <span className="mt-1 block text-sm font-medium text-slate-600">
+              Correct or invalidate this record
+            </span>
+          </summary>
+          <div className="mt-5 border-t border-slate-200 pt-5">
+            <EventEditor
+              systemId={id}
+              currentDate={todayDateOnly()}
+              event={{
+                id: event.id,
+                eventType: event.eventType as ServiceEventTypeValue,
+                eventDate: dateOnly(event.eventDate),
+                eventTimestamp: event.eventTimestamp
+                  ? dateTimeLocalValue(event.eventTimestamp)
+                  : "",
+                notes: event.notes ?? "",
+                cfuPerMl: textDetail(details, "cfuPerMl"),
+                residualOutcome:
+                  details.residualRestoredWithin3Days === true
+                    ? "RESTORED"
+                    : details.residualRestoredWithin3Days === false
+                      ? "NOT_RESTORED"
+                      : "UNKNOWN",
+                reportType: textDetail(details, "reportType"),
+                reportingObligationId: textDetail(
+                  details,
+                  "reportingObligationId",
+                ),
+                sampleEventId: currentSampleEventId,
+                chemical: textDetail(details, "chemical"),
+                quantity: textDetail(details, "quantity"),
+                contactTime: textDetail(details, "contactTime"),
+                ph: textDetail(details, "ph"),
+                freeHalogenResidual: textDetail(details, "freeHalogenResidual"),
+                technician: textDetail(details, "technician"),
+              }}
+              ruleConfig={ruleConfig}
+              availableSamples={availableSamples}
+            />
+          </div>
+        </details>
       ) : (
         <section className="panel p-6">
           <h2 className="text-xl font-black">Audit record</h2>

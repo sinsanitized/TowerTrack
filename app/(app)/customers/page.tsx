@@ -16,7 +16,7 @@ export default async function CustomersPage({
   const query = await searchParams;
   const search = query.q?.trim() ?? "";
   const requestedPage = Number.parseInt(query.page ?? "1", 10);
-  const pageSize = 25;
+  const pageSize = 10;
   const where = {
     organizationId: user.organizationId,
     active: true,
@@ -249,7 +249,6 @@ export default async function CustomersPage({
               <tr>
                 <th>Customer</th>
                 <th>Building / tower</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -278,9 +277,6 @@ export default async function CustomersPage({
                         </span>
                         <div>
                           <div className="font-black">{customer.name}</div>
-                          <div className="text-xs text-slate-500">
-                            Customer account number: {customer.accountNumber}
-                          </div>
                         </div>
                       </div>
                     </td>
@@ -301,35 +297,6 @@ export default async function CustomersPage({
                         <div className="font-bold text-slate-500">
                           Address not added
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      {system ? (
-                        <div className="flex flex-wrap gap-2">
-                          <Link className="btn" href={`/systems/${system.id}`}>
-                            Open tower
-                          </Link>
-                          <Link
-                            className="btn"
-                            href={`/systems/${system.id}/edit`}
-                          >
-                            Edit details
-                          </Link>
-                        </div>
-                      ) : building ? (
-                        <Link
-                          className="btn btn-primary"
-                          href={`/customers/${customer.id}/towers/new?buildingId=${building.id}`}
-                        >
-                          Continue tower setup
-                        </Link>
-                      ) : (
-                        <Link
-                          className="btn btn-primary"
-                          href={`/customers/${customer.id}/address/new`}
-                        >
-                          Add customer address
-                        </Link>
                       )}
                     </td>
                   </ClickableTableRow>
@@ -356,7 +323,7 @@ export default async function CustomersPage({
                   className="btn"
                   href={`/customers?${new URLSearchParams({ ...(search ? { q: search } : {}), ...(page > 2 ? { page: String(page - 1) } : {}) })}`}
                 >
-                  ← Previous 25
+                  ← Previous {pageSize}
                 </Link>
               ) : (
                 <span />
@@ -369,7 +336,7 @@ export default async function CustomersPage({
                   className="btn"
                   href={`/customers?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(page + 1) })}`}
                 >
-                  Next 25 →
+                  Next {pageSize} →
                 </Link>
               ) : (
                 <span />

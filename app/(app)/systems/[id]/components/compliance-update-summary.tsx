@@ -29,54 +29,71 @@ export function ComplianceUpdateSummary({
 }) {
   return (
     <section className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
-      <div className="label">Compliance dates recalculated</div>
-      <h2 className="mt-1 font-black">Compliance updated</h2>
-      <ul className="mt-3 grid gap-2 text-sm font-bold sm:grid-cols-2">
-        <li>✓ Compliance record saved and history updated</li>
-        <li>✓ Compliance recalculated to {complianceHealthLabel}</li>
-        {generatedObligations.map((item) => (
-          <li key={item.id}>✓ {plainEnumLabel(item.type)} generated</li>
-        ))}
-        {satisfiedObligationTypes.map((type, index) => (
-          <li key={`${type}-${index}`}>
-            ✓ {plainEnumLabel(type)}{" "}
-            {recordedEvent?.eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
-              ? "completed by this collection"
-              : "already satisfied by an existing completion record"}
-          </li>
-        ))}
-        {!generatedObligations.length && !satisfiedObligationTypes.length && (
-          <li>✓ No new requirement was created by this record</li>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="label">Record saved</div>
+          <h2 className="mt-1 text-lg font-black">Compliance updated</h2>
+          <p className="mt-1 text-sm font-bold">
+            Tower status: {complianceHealthLabel}
+          </p>
+        </div>
+        {recordedEvent && (
+          <div className="text-sm sm:text-right">
+            <span className="font-black">
+              {plainEnumLabel(recordedEvent.eventType)} ·{" "}
+            </span>
+            <ComplianceDate value={recordedEvent.eventDate} />
+          </div>
         )}
-        {recordedEvent &&
-          ["CLEANING_COMPLETED", "STARTUP_CLEANING_DISINFECTION"].includes(
-            recordedEvent.eventType,
-          ) && (
+      </div>
+      <details
+        className="mt-3 rounded-lg border border-emerald-200 bg-white/70 p-3"
+        open
+      >
+        <summary className="cursor-pointer font-black text-emerald-900">
+          What changed
+        </summary>
+        <ul className="mt-3 grid gap-2 text-sm font-bold sm:grid-cols-2">
+          <li>✓ Compliance record saved and history updated</li>
+          <li>✓ Compliance recalculated to {complianceHealthLabel}</li>
+          {generatedObligations.map((item) => (
+            <li key={item.id}>✓ {plainEnumLabel(item.type)} generated</li>
+          ))}
+          {satisfiedObligationTypes.map((type, index) => (
+            <li key={`${type}-${index}`}>
+              ✓ {plainEnumLabel(type)}{" "}
+              {recordedEvent?.eventType ===
+              "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
+                ? "completed by this collection"
+                : "already satisfied by an existing completion record"}
+            </li>
+          ))}
+          {!generatedObligations.length && !satisfiedObligationTypes.length && (
+            <li>✓ No new requirement was created by this record</li>
+          )}
+          {recordedEvent &&
+            ["CLEANING_COMPLETED", "STARTUP_CLEANING_DISINFECTION"].includes(
+              recordedEvent.eventType,
+            ) && (
+              <li>
+                ✓ Cleaning is tracked separately; no Legionella sample clock was
+                reset
+              </li>
+            )}
+          <li>
+            ✓ Current projection: {generated.sample} sampling,{" "}
+            {generated.inspection} inspection, {generated.maintenance}{" "}
+            maintenance, {generated.reporting} reporting
+          </li>
+          {visitOpportunityCount != null && (
             <li>
-              ✓ Cleaning is tracked separately; no Legionella sample clock was
-              reset
+              ✓ One completion date can cover {visitOpportunityCount}{" "}
+              requirement
+              {visitOpportunityCount === 1 ? "" : "s"}
             </li>
           )}
-        <li>
-          ✓ Current projection: {generated.sample} sampling,{" "}
-          {generated.inspection} inspection, {generated.maintenance}{" "}
-          maintenance, {generated.reporting} reporting
-        </li>
-        {visitOpportunityCount != null && (
-          <li>
-            ✓ One completion date can cover {visitOpportunityCount} requirement
-            {visitOpportunityCount === 1 ? "" : "s"}
-          </li>
-        )}
-      </ul>
-      {recordedEvent && (
-        <div className="mt-3 border-t border-emerald-200 pt-3 text-sm">
-          <span className="font-black">
-            {plainEnumLabel(recordedEvent.eventType)}
-          </span>{" "}
-          · <ComplianceDate value={recordedEvent.eventDate} />
-        </div>
-      )}
+        </ul>
+      </details>
       {portalFollowUp && (
         <div className="mt-4 rounded-lg border border-blue-300 bg-blue-50 p-4 text-blue-950">
           <div className="label">Required next step</div>

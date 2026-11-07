@@ -9,7 +9,7 @@ test("administrator adds a supported jurisdiction rule", async ({ page }) => {
     .getByLabel("Password")
     .fill(process.env.INITIAL_ADMIN_PASSWORD ?? "ChangeMe123!");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.goto("/admin");
+  await page.goto("/admin?section=rules");
 
   const sharedProfile = page
     .getByRole("heading", { name: "Out-of-State Company Policy" })
