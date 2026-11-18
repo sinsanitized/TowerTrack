@@ -9,9 +9,9 @@ export function cleaningGapMessage(addDate: string, cleaningDate: string) {
   if (gap < 0)
     return "Cleaning is scheduled before chemicals are added. Review both dates before saving.";
   if (gap === 0)
-    return "Add and Cleaning are on the same date. Confirm there is enough circulation time before cleaning.";
+    return "Chemical addition and cleaning are on the same date. Confirm there is enough circulation time before cleaning.";
   if (gap > 2)
-    return `Cleaning is ${gap} days after Add. This may be intentional; confirm the timing before saving.`;
+    return `Cleaning is ${gap} days after chemical addition. This may be intentional; confirm the timing before saving.`;
   return null;
 }
 

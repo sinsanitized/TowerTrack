@@ -169,12 +169,13 @@ export function CleaningJobForm({
         <div className="mb-4">
           <div className="font-black">2. Choose dates</div>
           <p className="mt-1 text-sm text-slate-600">
-            Add must happen before cleaning so treatment can circulate.
+            Treatment chemicals must be added before cleaning so they have time
+            to circulate.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
-            <span className="label">Add date</span>
+            <span className="label">Chemical addition date</span>
             <input
               className="input mt-2 w-full"
               type="date"
@@ -247,7 +248,7 @@ export function CleaningJobForm({
         className="btn btn-primary min-h-12 w-full"
         disabled={!ready || !building || selectedTowerIds.length === 0}
       >
-        Schedule Add and Cleaning
+        Schedule chemical addition and cleaning
       </button>
     </form>
   );
@@ -290,7 +291,7 @@ export function CleaningJobEditForm({
       <h3 className="font-black">Edit schedule</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label>
-          <span className="label">Add date</span>
+          <span className="label">Chemical addition date</span>
           <input
             className="input mt-1 w-full"
             type="date"

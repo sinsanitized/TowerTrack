@@ -30,6 +30,8 @@ export type EventEntryContext = {
 
 export function EventRecorderDrawer({
   systemId,
+  towerName,
+  towerAddress,
   defaultDate,
   ruleConfig,
   samplesAwaitingResults,
@@ -45,6 +47,8 @@ export function EventRecorderDrawer({
   intentContext,
 }: {
   systemId: string;
+  towerName: string;
+  towerAddress: string;
   defaultDate: string;
   ruleConfig: TowerRuleConfig;
   samplesAwaitingResults: Array<{ id: string; date: string }>;
@@ -191,6 +195,12 @@ export function EventRecorderDrawer({
                   {intentContext
                     ? "Review the deadline below, then enter the date the work actually happened."
                     : "Start with “What happened?” below. The cooling tower is already selected."}
+                </p>
+                <p className="mt-2 text-sm font-black text-slate-900">
+                  {towerName}
+                  <span className="block font-medium text-slate-600">
+                    {towerAddress}
+                  </span>
                 </p>
               </div>
               <button

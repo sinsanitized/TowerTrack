@@ -49,6 +49,10 @@ function moveMonth(month: string, amount: number) {
   return dateOnly(value).slice(0, 7);
 }
 
+function visitPhaseLabel(phase: string) {
+  return phase === "ADD" ? "CHEMICAL ADDITION" : phase;
+}
+
 export default async function CalendarPage({
   searchParams,
 }: {
@@ -214,7 +218,7 @@ export default async function CalendarPage({
             aria-label="Filter by visit type"
           >
             <option value="">All visit types</option>
-            <option value="ADD">Add</option>
+            <option value="ADD">Chemical addition</option>
             <option value="CLEAN">Cleaning</option>
             <option value="OTHER">Other scheduled work</option>
           </select>
@@ -333,7 +337,7 @@ export default async function CalendarPage({
                       className={`block rounded-lg border-l-4 p-2 text-xs shadow-sm ${phase === "ADD" ? "border-violet-500 bg-violet-50 text-violet-950" : phase === "CLEAN" ? "border-sky-600 bg-sky-50 text-sky-950" : "border-slate-500 bg-slate-50 text-slate-950"}`}
                     >
                       <div className="font-black">
-                        {phase} · {visit.building.buildingName}
+                        {visitPhaseLabel(phase)} · {visit.building.buildingName}
                       </div>
                       <div className="mt-0.5 truncate">
                         {visit.building.streetAddress}
@@ -377,7 +381,7 @@ export default async function CalendarPage({
                   className="btn min-h-10"
                   href={`/calendar?month=${month}&new=1&date=${day}`}
                 >
-                  Add visit
+                  Schedule work
                 </Link>
               </div>
               <div className="divide-y divide-slate-200">
@@ -402,7 +406,7 @@ export default async function CalendarPage({
                       className="block p-3"
                     >
                       <div className="font-black">
-                        {phase} · {visit.building.buildingName}
+                        {visitPhaseLabel(phase)} · {visit.building.buildingName}
                       </div>
                       <div className="mt-1 text-sm text-slate-600">
                         {visit.building.streetAddress}
@@ -464,7 +468,7 @@ export default async function CalendarPage({
                     className="block rounded-xl border border-slate-300 p-4 hover:border-sky-500"
                   >
                     <div className="font-black">
-                      {phase} · {visit.building.buildingName}
+                      {visitPhaseLabel(phase)} · {visit.building.buildingName}
                     </div>
                     <div className="mt-1 text-sm text-slate-600">
                       {visit.building.streetAddress}
@@ -554,7 +558,8 @@ function CalendarEmptyState({
         No visits scheduled for {monthTitle(month)}
       </div>
       <p className="mt-1 text-sm text-slate-600">
-        Choose Schedule cleaning to add linked Add and Cleaning visits.
+        Choose Schedule cleaning to add linked chemical addition and cleaning
+        visits.
       </p>
       <Link
         className="btn btn-primary mt-4"
@@ -593,8 +598,8 @@ function JobDetails({
       {job.cleaningVisit.status === "PLANNED" &&
         job.addVisit.status !== "COMPLETED" && (
           <div className="rounded-xl border border-amber-400 bg-amber-50 p-3 font-bold text-amber-950">
-            Cleaning is still planned, but Add is not complete. Confirm chemical
-            circulation before cleaning.
+            Cleaning is still planned, but chemical addition is not complete.
+            Confirm chemical circulation before cleaning.
           </div>
         )}
       {warning && (
@@ -604,7 +609,7 @@ function JobDetails({
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border-l-4 border-violet-500 bg-violet-50 p-4">
-          <div className="label">ADD</div>
+          <div className="label">Chemical addition</div>
           <div className="text-lg font-black">{formatDate(addDate)}</div>
           <div className="mt-1 text-sm font-bold">
             Status: {plainEnumLabel(job.addVisit.status)}
@@ -703,9 +708,13 @@ function JobDetails({
           <input type="hidden" name="jobId" value={job.id} />
           <label className="label">What should be cancelled?</label>
           <select className="input w-full" name="cancel" required>
-            <option value="BOTH">Cancel Add and Cleaning</option>
-            <option value="ADD_ONLY">Cancel Add; keep Cleaning</option>
-            <option value="CLEAN_ONLY">Keep Add; cancel Cleaning</option>
+            <option value="BOTH">Cancel chemical addition and cleaning</option>
+            <option value="ADD_ONLY">
+              Cancel chemical addition; keep cleaning
+            </option>
+            <option value="CLEAN_ONLY">
+              Keep chemical addition; cancel cleaning
+            </option>
           </select>
           <textarea
             className="input min-h-20 w-full"

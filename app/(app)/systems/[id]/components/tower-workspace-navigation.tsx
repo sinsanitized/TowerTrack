@@ -40,8 +40,11 @@ export function TowerWorkspaceNavigation({
     ["Overview", "overview"],
     ["Work to do", "obligations"],
     ["Tower records", "history"],
+    ["Tower details", "information"],
+    ...(canViewSettings
+      ? ([["Settings", "settings"]] as Array<[string, TowerDetailView]>)
+      : []),
   ];
-  const moreActive = view === "information" || view === "settings";
 
   return (
     <>
@@ -63,33 +66,6 @@ export function TowerWorkspaceNavigation({
             {label}
           </Link>
         ))}
-        <details className="group relative">
-          <summary
-            className={`flex min-h-11 min-w-max cursor-pointer list-none items-center rounded-lg px-4 py-3 text-sm font-black ${
-              moreActive
-                ? "bg-sky-800 text-white"
-                : "text-sky-900 hover:bg-sky-50"
-            }`}
-          >
-            More
-          </summary>
-          <div className="absolute right-0 z-20 mt-1 min-w-48 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-            <Link
-              className="block rounded-lg px-3 py-2 text-sm font-bold text-sky-900 hover:bg-sky-50"
-              href={`/systems/${systemId}?view=information`}
-            >
-              Tower details
-            </Link>
-            {canViewSettings && (
-              <Link
-                className="block rounded-lg px-3 py-2 text-sm font-bold text-sky-900 hover:bg-sky-50"
-                href={`/systems/${systemId}?view=settings`}
-              >
-                Settings
-              </Link>
-            )}
-          </div>
-        </details>
       </nav>
       <div className="mb-6 border-l-4 border-sky-700 pl-4">
         <h2 className="text-lg font-black">{viewCopy[view].title}</h2>

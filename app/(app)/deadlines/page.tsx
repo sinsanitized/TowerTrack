@@ -15,12 +15,20 @@ import {
   type DeadlineScheduleFilter,
 } from "@/lib/deadline-view";
 import { todayDateOnly } from "@/lib/date";
-import { withReturnPath } from "@/lib/workflow-context";
 import { complianceDashboardRows } from "@/lib/queries";
 import {
   serviceResponsibilityValues,
   type ResponsibilityFilter,
 } from "@/lib/service-responsibility";
+import { withReturnPath } from "@/lib/workflow-context";
+
+function deadlineColor(status: string) {
+  if (status === "Overdue") return "RED" as const;
+  if (status === "Due this week") return "YELLOW" as const;
+  if (status === "Due next week") return "BLUE" as const;
+  if (status === "Review required") return "PURPLE" as const;
+  return "GREEN" as const;
+}
 
 export default async function DeadlinesPage({
   searchParams,
@@ -64,359 +72,192 @@ export default async function DeadlinesPage({
     typeof requested.workflowNotice === "string"
       ? requested.workflowNotice
       : null;
+
   const towers = await complianceDashboardRows({
     organizationId: user.organizationId,
     today,
     includeMissed: true,
   });
-  const allRows = buildTowerDeadlineRows(towers, today);
-  const rows = filterTowerDeadlineRows(allRows, today, {
-    period,
-    action,
-    schedule,
-    responsibility,
-    search,
-  });
-  const towerGroups = Array.from(
-    rows.reduce((groups, row) => {
-      const group = groups.get(row.towerId);
-      if (group) group.push(row);
-      else groups.set(row.towerId, [row]);
-      return groups;
-    }, new Map<string, typeof rows>()),
-  ).map(([towerId, deadlines]) => ({ towerId, deadlines }));
-  const pageSize = 10;
+  const rows = filterTowerDeadlineRows(
+    buildTowerDeadlineRows(towers, today),
+    today,
+    { period, action, schedule, responsibility, search },
+  );
+  const towerCount = new Set(rows.map((row) => row.towerId)).size;
+  const pageSize = 25;
   const requestedPage = Number.parseInt(requested.page ?? "1", 10);
-  const pageCount = Math.max(1, Math.ceil(towerGroups.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const page = Number.isFinite(requestedPage)
     ? Math.min(Math.max(requestedPage, 1), pageCount)
     : 1;
-  const visibleTowerGroups = towerGroups.slice(
-    (page - 1) * pageSize,
-    page * pageSize,
-  );
-  const towerCount = towerGroups.length;
-  const statusCounts = {
-    overdue: rows.filter((row) => row.status === "Overdue").length,
-    thisWeek: rows.filter((row) => row.status === "Due this week").length,
-    nextWeek: rows.filter((row) => row.status === "Due next week").length,
-  };
-  const returnQuery = new URLSearchParams();
-  if (period !== "ALL") returnQuery.set("period", period);
-  if (action !== "ALL") returnQuery.set("action", action);
-  if (schedule !== "ALL") returnQuery.set("schedule", schedule);
+  const visibleRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const query = new URLSearchParams();
+  if (period !== "ALL") query.set("period", period);
+  if (action !== "ALL") query.set("action", action);
+  if (schedule !== "ALL") query.set("schedule", schedule);
   if (responsibility !== "OUR_COMPANY")
-    returnQuery.set("responsibility", responsibility);
-  if (search) returnQuery.set("q", search);
-  const deadlineReturnTo = returnQuery.size
-    ? `/deadlines?${returnQuery}`
-    : "/deadlines";
-  const deadlinePeriodHref = (nextPeriod: DeadlinePeriod) => {
-    const query = new URLSearchParams(returnQuery);
-    if (nextPeriod === "ALL") query.delete("period");
-    else query.set("period", nextPeriod);
-    return query.size ? `/deadlines?${query}` : "/deadlines";
-  };
+    query.set("responsibility", responsibility);
+  if (search) query.set("q", search);
+  const returnTo = query.size ? `/deadlines?${query}` : "/deadlines";
   const pageHref = (nextPage: number) => {
-    const query = new URLSearchParams(returnQuery);
-    if (nextPage > 1) query.set("page", String(nextPage));
-    return query.size ? `/deadlines?${query}` : "/deadlines";
+    const next = new URLSearchParams(query);
+    if (nextPage > 1) next.set("page", String(nextPage));
+    return next.size ? `/deadlines?${next}` : "/deadlines";
   };
-  const urgencySections = [
-    {
-      key: "Overdue",
-      label: "Overdue",
-      help: "These deadlines have passed and need attention.",
-      color: "red",
-    },
-    {
-      key: "Due this week",
-      label: "Due this week",
-      help: "Complete these before the end of this week.",
-      color: "amber",
-    },
-    {
-      key: "Due next week",
-      label: "Due next week",
-      help: "Prepare these after the current week's work.",
-      color: "blue",
-    },
-    {
-      key: "Review required",
-      label: "Needs review",
-      help: "A date or responsibility needs confirmation.",
-      color: "purple",
-    },
-    {
-      key: "Due later",
-      label: "Upcoming",
-      help: "Later deadlines, shown in date order.",
-      color: "slate",
-    },
-  ] as const;
+  const filtersActive =
+    period !== "ALL" ||
+    action !== "ALL" ||
+    schedule !== "ALL" ||
+    responsibility !== "OUR_COMPANY" ||
+    Boolean(search);
+
   return (
     <>
       <PageHeader
         eyebrow="Portfolio deadlines"
-        title="All tower deadlines"
-        description="Every deadline in date order, with working days remaining."
+        title="Deadline register"
+        description="Address, tower, required work, and compliance deadline."
       />
-      <details className="detail-disclosure mb-5">
-        <summary>How working days are calculated</summary>
-        <p className="mt-2 max-w-3xl text-sm text-slate-600">
-          Working days exclude weekends, observed federal holidays, and the day
-          after Thanksgiving. Veterans Day remains a working day.
-        </p>
-      </details>
       {workflowNotice && (
         <div
-          className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950"
           role="status"
         >
-          {workflowNotice} Continue with the remaining deadlines below.
+          {workflowNotice}
         </div>
       )}
-      <DeadlineFilterControls
-        filters={{ period, action, schedule, responsibility, search }}
-      />
 
-      <section
-        className="panel mb-4 flex flex-wrap items-center justify-between gap-3 p-3"
-        aria-labelledby="deadline-overview-heading"
-      >
-        <div>
-          <h2 id="deadline-overview-heading" className="section-heading">
-            At a glance
-          </h2>
-          <p className="supporting-text mt-1">
-            {rows.length} requirement{rows.length === 1 ? "" : "s"} across{" "}
-            {towerCount} cooling tower{towerCount === 1 ? "" : "s"}.
+      <details className="panel mb-4" open={filtersActive}>
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-black text-sky-900">
+          <span>Filter deadlines</span>
+          <span className="text-sm font-bold text-slate-600">
+            {filtersActive ? "Filters applied" : "Optional"}
+          </span>
+        </summary>
+        <div className="border-t border-slate-200 p-4">
+          <DeadlineFilterControls
+            filters={{ period, action, schedule, responsibility, search }}
+          />
+        </div>
+      </details>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-bold text-slate-700">
+          {rows.length} deadline{rows.length === 1 ? "" : "s"} · {towerCount}{" "}
+          tower{towerCount === 1 ? "" : "s"}
+        </p>
+        {pageCount > 1 && (
+          <p className="text-sm text-slate-600">
+            Showing {(page - 1) * pageSize + 1}–
+            {Math.min(page * pageSize, rows.length)}
           </p>
-        </div>
-        <div
-          className="flex flex-wrap gap-2 text-sm font-bold"
-          aria-label="Deadline status filters"
-        >
-          {statusCounts.overdue > 0 && (
-            <Link
-              aria-current={period === "OVERDUE" ? "page" : undefined}
-              className={`rounded-lg border bg-white px-3 py-2 text-red-800 transition hover:border-red-600 hover:bg-red-50 ${period === "OVERDUE" ? "border-red-600 ring-2 ring-red-100" : "border-red-300"}`}
-              href={deadlinePeriodHref("OVERDUE")}
-            >
-              {statusCounts.overdue} overdue <span aria-hidden>→</span>
-            </Link>
-          )}
-          {statusCounts.thisWeek > 0 && (
-            <Link
-              aria-current={period === "THIS_WEEK" ? "page" : undefined}
-              className={`rounded-lg border bg-white px-3 py-2 text-amber-900 transition hover:border-amber-600 hover:bg-amber-50 ${period === "THIS_WEEK" ? "border-amber-600 ring-2 ring-amber-100" : "border-amber-300"}`}
-              href={deadlinePeriodHref("THIS_WEEK")}
-            >
-              {statusCounts.thisWeek} due this week <span aria-hidden>→</span>
-            </Link>
-          )}
-          {statusCounts.nextWeek > 0 && (
-            <Link
-              aria-current={period === "NEXT_WEEK" ? "page" : undefined}
-              className={`rounded-lg border bg-white px-3 py-2 text-blue-800 transition hover:border-blue-600 hover:bg-blue-50 ${period === "NEXT_WEEK" ? "border-blue-600 ring-2 ring-blue-100" : "border-blue-300"}`}
-              href={deadlinePeriodHref("NEXT_WEEK")}
-            >
-              {statusCounts.nextWeek} due next week <span aria-hidden>→</span>
-            </Link>
-          )}
-        </div>
-      </section>
+        )}
+      </div>
 
       {rows.length === 0 ? (
-        <div className="panel p-8 text-center">
-          <h2 className="text-lg font-black">No active deadlines</h2>
+        <section className="panel p-8 text-center">
+          <h2 className="text-lg font-black">No matching deadlines</h2>
           <p className="mt-2 text-slate-600">
-            No cooling tower requirements match the selected filters.
+            Change or clear the filters to see other tower deadlines.
           </p>
-        </div>
+        </section>
       ) : (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div>
-              <h2 className="section-heading">Deadline register</h2>
-              <p className="supporting-text mt-1">
-                Towers are grouped by their most urgent deadline. Select a tower
-                to see all of its required work.
-              </p>
-            </div>
-            <div className="text-sm font-black text-slate-700">
-              Showing towers {(page - 1) * pageSize + 1}–
-              {Math.min(page * pageSize, towerGroups.length)} of{" "}
-              {towerGroups.length}
-            </div>
+        <section className="panel overflow-hidden" aria-label="Deadlines">
+          <div className="hidden grid-cols-[minmax(13rem,1.4fr)_minmax(6rem,.6fr)_minmax(13rem,1.2fr)_minmax(11rem,1fr)_minmax(8rem,.7fr)_2rem] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-600 md:grid">
+            <span>Address</span>
+            <span>Tower</span>
+            <span>Required work</span>
+            <span>Deadline</span>
+            <span>Action</span>
+            <span className="sr-only">Open</span>
           </div>
-          {urgencySections.map((section) => {
-            const groups = visibleTowerGroups.filter(
-              ({ deadlines }) => deadlines[0]?.status === section.key,
-            );
-            if (groups.length === 0) return null;
-            return (
-              <details
-                key={section.key}
-                className={`panel overflow-hidden border-l-4 urgency-${section.color}`}
-                open={section.key === "Overdue" || period !== "ALL"}
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 bg-slate-50 px-4 py-3 marker:hidden">
-                  <span>
-                    <span className="font-black text-slate-950">
-                      {section.label} · {groups.length} tower
-                      {groups.length === 1 ? "" : "s"}
+          <div className="divide-y divide-slate-200">
+            {visibleRows.map((row) => {
+              const href =
+                row.primaryActionHref.includes("#record-event") ||
+                row.primaryActionHref.includes("#service-responsibilities")
+                  ? withReturnPath(row.primaryActionHref, returnTo)
+                  : row.primaryActionHref;
+              return (
+                <Link
+                  key={row.id}
+                  href={href}
+                  aria-label={row.primaryActionAccessible}
+                  className="grid gap-2 px-4 py-3 transition hover:bg-sky-50 md:grid-cols-[minmax(13rem,1.4fr)_minmax(6rem,.6fr)_minmax(13rem,1.2fr)_minmax(11rem,1fr)_minmax(8rem,.7fr)_2rem] md:items-center md:gap-4"
+                >
+                  <span className="min-w-0">
+                    <span className="label md:hidden">Address</span>
+                    <span className="block font-bold text-slate-950">
+                      {row.address}
                     </span>
-                    <span className="mt-0.5 block text-sm text-slate-600">
-                      {section.help}
+                  </span>
+                  <span>
+                    <span className="label md:hidden">Tower</span>
+                    <span className="block font-black text-slate-950">
+                      {row.systemName}
+                    </span>
+                  </span>
+                  <span>
+                    <span className="label md:hidden">Required work</span>
+                    <span className="block font-bold text-slate-900">
+                      {row.requiredAction}
+                    </span>
+                  </span>
+                  <span>
+                    <span className="label md:hidden">Deadline</span>
+                    <span className="block font-black text-slate-950">
+                      {row.hardDueDateDisplay}
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
+                      <StatusBadge
+                        compact
+                        color={deadlineColor(row.status)}
+                        label={row.status}
+                      />
+                      <span>{row.workingDaysDisplay}</span>
+                    </span>
+                  </span>
+                  <span>
+                    <span className="label md:hidden">Action</span>
+                    <span className="block font-black text-sky-800">
+                      {row.primaryActionLabel}
                     </span>
                   </span>
                   <ChevronRight
-                    className="shrink-0 text-slate-500"
+                    className="hidden text-slate-500 md:block"
+                    size={18}
                     aria-hidden
                   />
-                </summary>
-                <div className="divide-y divide-slate-200 border-t border-slate-200">
-                  {groups.map(({ towerId, deadlines }) => {
-                    const nearest = deadlines[0];
-                    return (
-                      <details key={towerId} className="bg-white">
-                        <summary className="grid cursor-pointer list-none gap-2 px-4 py-3 marker:hidden hover:bg-slate-50 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-5">
-                          <span className="min-w-0">
-                            <span className="block font-black text-slate-950">
-                              {nearest.systemName}
-                            </span>
-                            <span className="block truncate text-sm text-slate-600">
-                              {nearest.address}
-                            </span>
-                          </span>
-                          <span className="text-sm font-bold text-slate-700">
-                            {deadlines.length} requirement
-                            {deadlines.length === 1 ? "" : "s"}
-                          </span>
-                          <span className="sm:text-right">
-                            <span className="block text-sm font-black text-slate-950">
-                              {nearest.workingDaysDisplay}
-                            </span>
-                            <span className="block text-xs font-bold text-slate-500">
-                              Hard deadline {nearest.hardDueDateDisplay}
-                            </span>
-                          </span>
-                        </summary>
-                        <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-3">
-                          <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-                            {deadlines.map((row) => {
-                              const primaryHref =
-                                row.primaryActionHref.includes(
-                                  "#record-event",
-                                ) ||
-                                row.primaryActionHref.includes(
-                                  "#service-responsibilities",
-                                )
-                                  ? withReturnPath(
-                                      row.primaryActionHref,
-                                      deadlineReturnTo,
-                                    )
-                                  : row.primaryActionHref;
-                              return (
-                                <Link
-                                  key={row.id}
-                                  href={primaryHref}
-                                  aria-label={row.primaryActionAccessible}
-                                  className="grid gap-3 p-3 transition hover:bg-slate-50 sm:grid-cols-[minmax(14rem,1.5fr)_minmax(10rem,1fr)_minmax(8rem,.8fr)_auto] sm:items-center"
-                                >
-                                  <span>
-                                    <span className="block font-bold text-slate-950">
-                                      {row.requiredAction}
-                                    </span>
-                                    <span className="mt-1 block text-xs font-bold text-slate-500">
-                                      {row.executionLane}
-                                      {row.dependency
-                                        ? ` · ${row.dependency}`
-                                        : ""}
-                                    </span>
-                                  </span>
-                                  <span className="text-sm text-slate-700">
-                                    <span className="label block">
-                                      Target window
-                                    </span>
-                                    <span
-                                      aria-label={row.targetWindowAccessible}
-                                    >
-                                      {row.targetWindowDisplay}
-                                    </span>
-                                  </span>
-                                  <span className="text-sm text-slate-700">
-                                    <span className="label block">
-                                      Hard deadline
-                                    </span>
-                                    <span
-                                      aria-label={row.hardDueDateAccessible}
-                                    >
-                                      {row.hardDueDateDisplay}
-                                    </span>
-                                  </span>
-                                  <span className="flex items-center justify-between gap-3 sm:justify-end">
-                                    <StatusBadge
-                                      compact
-                                      color={
-                                        row.status === "Overdue"
-                                          ? "RED"
-                                          : row.status === "Due this week"
-                                            ? "YELLOW"
-                                            : row.status === "Due next week"
-                                              ? "BLUE"
-                                              : row.status === "Review required"
-                                                ? "PURPLE"
-                                                : "GREEN"
-                                      }
-                                      label={row.status}
-                                    />
-                                    <ChevronRight size={18} aria-hidden />
-                                  </span>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                          <Link
-                            className="mt-3 inline-flex items-center gap-1 text-sm font-black text-emerald-900 underline decoration-emerald-300 underline-offset-2"
-                            href={`/systems/${towerId}`}
-                          >
-                            Open {nearest.systemName} <span aria-hidden>→</span>
-                          </Link>
-                        </div>
-                      </details>
-                    );
-                  })}
-                </div>
-              </details>
-            );
-          })}
-          {pageCount > 1 && (
-            <nav
-              className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-4"
-              aria-label="Deadline register pages"
-            >
-              {page > 1 ? (
-                <Link className="btn" href={pageHref(page - 1)}>
-                  ← Previous towers
                 </Link>
-              ) : (
-                <span />
-              )}
-              <span className="text-sm font-bold text-slate-700">
-                Page {page} of {pageCount}
-              </span>
-              {page < pageCount ? (
-                <Link className="btn" href={pageHref(page + 1)}>
-                  Next towers →
-                </Link>
-              ) : (
-                <span />
-              )}
-            </nav>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {pageCount > 1 && (
+        <nav
+          className="mt-4 flex items-center justify-between gap-3"
+          aria-label="Deadline register pages"
+        >
+          {page > 1 ? (
+            <Link className="btn" href={pageHref(page - 1)}>
+              ← Previous
+            </Link>
+          ) : (
+            <span />
           )}
-        </div>
+          <span className="text-sm font-bold text-slate-700">
+            Page {page} of {pageCount}
+          </span>
+          {page < pageCount ? (
+            <Link className="btn" href={pageHref(page + 1)}>
+              Next →
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
       )}
     </>
   );

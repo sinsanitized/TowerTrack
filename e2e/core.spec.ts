@@ -42,7 +42,7 @@ test("home leads directly into tower event entry", async ({ page }) => {
     page.getByRole("button", { name: "Record startup" }),
   ).not.toBeVisible();
   await expect(
-    page.getByText("More types of completed work", { exact: true }),
+    page.getByText("Less common completed work", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Inspection" }).click();
   await expect(
@@ -50,7 +50,9 @@ test("home leads directly into tower event entry", async ({ page }) => {
       name: "Record quarterly inspection completed",
     }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save record" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save inspection" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Next required actions" }),
   ).toHaveCount(0);
@@ -147,24 +149,30 @@ test("theme toggle replaces the decorative bell and persists the choice", async 
 test("secondary workflow destinations are removed from primary navigation", async ({
   page,
 }) => {
+  const navigation = page.getByRole("navigation", {
+    name: "Primary navigation",
+  });
   await expect(
-    page.getByRole("link", { name: "Corrective Actions" }),
+    navigation.getByRole("link", { name: "Corrective Actions" }),
   ).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Review" })).toHaveCount(0);
-  await page.getByText("Manage & reports", { exact: true }).click();
-  await expect(page.getByRole("link", { name: "Customers" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Review" })).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: "Overdue & Problems" }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "Towers", exact: true }),
+    navigation.getByRole("link", { name: "Customers" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Sample results", exact: true }),
+    navigation.getByRole("link", { name: "Settings" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "All records", exact: true }),
+    navigation.getByRole("link", { name: "Overdue & Problems" }),
+  ).toHaveCount(0);
+  await expect(
+    navigation.getByRole("link", { name: "Towers", exact: true }),
+  ).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "Sample results", exact: true }),
+  ).toBeVisible();
+  await expect(
+    navigation.getByRole("link", { name: "All records", exact: true }),
   ).toBeVisible();
 
   await page.goto("/work/overdue-towers");
@@ -297,7 +305,6 @@ test("compatible work guides users to record actual work without scheduling", as
 test("admin can view protected versioned rule definitions", async ({
   page,
 }) => {
-  await page.getByText("Manage & reports", { exact: true }).click();
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page
@@ -329,7 +336,6 @@ test("customer onboarding continues from address to cooling tower details", asyn
   page,
 }) => {
   const customerName = `Workflow Test Customer ${Date.now()}`;
-  await page.getByText("Manage & reports", { exact: true }).click();
   await page.getByRole("link", { name: "Customers" }).click();
   await page
     .locator("summary")
@@ -385,7 +391,6 @@ test("customer onboarding continues from address to cooling tower details", asyn
   const towerNavigation = page.getByRole("navigation", {
     name: "Tower workspace",
   });
-  await towerNavigation.getByText("More", { exact: true }).click();
   await towerNavigation
     .getByRole("link", { name: "Tower details", exact: true })
     .click();
@@ -414,7 +419,6 @@ test("customer onboarding continues from address to cooling tower details", asyn
   await expect(
     page.getByText(/customer, address, and tower equipment saved/i),
   ).toBeVisible();
-  await towerNavigation.getByText("More", { exact: true }).click();
   await towerNavigation
     .getByRole("link", { name: "Tower details", exact: true })
     .click();
@@ -434,10 +438,6 @@ test("legacy sample correction route opens the audited event editor", async ({
   const systemUrl = await result.getAttribute("href");
   await page.goto(`${systemUrl}/correct`);
   await expect(page).toHaveURL(/\/events\//);
-  await page
-    .locator("summary")
-    .filter({ hasText: "Advanced record actions" })
-    .click();
   await expect(
     page.getByRole("heading", {
       name: "The information is wrong—replace it with corrected information",
@@ -458,10 +458,6 @@ test("operations manager can open and correct an individual event", async ({
   await eventHistory
     .getByRole("link", { name: /View or edit event/ })
     .first()
-    .click();
-  await page
-    .locator("summary")
-    .filter({ hasText: "Advanced record actions" })
     .click();
   await expect(
     page.getByRole("heading", {
@@ -503,7 +499,7 @@ test("operations manager records cleaning in the tower event workflow", async ({
   await expect(
     page.getByRole("heading", { name: "What happened?" }),
   ).toBeVisible();
-  await page.getByText("More types of completed work", { exact: true }).click();
+  await page.getByText("Less common completed work", { exact: true }).click();
   const addCleaning = page.getByRole("button", { name: "Cleaning" });
   await expect(addCleaning).toBeVisible();
   await addCleaning.click();
@@ -517,7 +513,7 @@ test("operations manager records cleaning in the tower event workflow", async ({
   await completionDate.fill("2026-07-13");
   await eventForm.getByText("Add notes (optional)", { exact: true }).click();
   await eventForm.getByLabel("Notes").fill("Verified field cleaning record");
-  await eventForm.getByRole("button", { name: "Save record" }).click();
+  await eventForm.getByRole("button", { name: /^Save / }).click();
   await expect(page).toHaveURL(/event=/);
   await expect(
     page.getByText("Compliance record saved and history updated"),

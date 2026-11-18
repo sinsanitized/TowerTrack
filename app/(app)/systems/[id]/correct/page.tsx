@@ -22,5 +22,5 @@ export default async function CorrectPage({
     select: { id: true },
   });
   if (!event) notFound();
-  redirect(`/systems/${id}/events/${event.id}`);
+  redirect(`/systems/${id}/events/${event.id}?edit=1`);
 }

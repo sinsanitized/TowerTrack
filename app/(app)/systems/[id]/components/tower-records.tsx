@@ -182,7 +182,7 @@ export function TowerComplianceRecords({
                   )}
                   <Link
                     className="group-hover:underline"
-                    href={`/systems/${systemId}/events/${event.id}`}
+                    href={`/systems/${systemId}/events/${event.id}${event.status === "ACTIVE" ? "?edit=1" : ""}`}
                   >
                     {event.status === "ACTIVE"
                       ? "View or edit event →"

@@ -107,9 +107,9 @@ function ActionRow({
           <p className="mt-1 font-bold text-slate-800">
             {row.systemName} · {row.building}
           </p>
+          <p className="mt-1 text-sm text-slate-600">{row.address}</p>
           <details className="detail-disclosure mt-2">
-            <summary>Location and reason</summary>
-            <p className="mt-2 text-sm font-bold">{row.address}</p>
+            <summary>Why this is required</summary>
             <p className="mt-2 text-slate-600">{obligation.reason}</p>
           </details>
           {row.visitOpportunity?.obligations.some(
@@ -326,8 +326,9 @@ export default async function ActionCenterPage({
                     {job.towers.length === 1 ? "" : "s"}
                   </div>
                   <div className="mt-1 text-sm text-slate-700">
-                    ADD {formatComplianceDate(job.addVisit.scheduledDate)} (
-                    {job.addVisit.status.replaceAll("_", " ")}) → CLEAN{" "}
+                    Chemical addition{" "}
+                    {formatComplianceDate(job.addVisit.scheduledDate)} (
+                    {job.addVisit.status.replaceAll("_", " ")}) → Cleaning{" "}
                     {formatComplianceDate(job.cleaningVisit.scheduledDate)}
                   </div>
                 </div>

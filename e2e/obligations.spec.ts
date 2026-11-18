@@ -3,12 +3,12 @@ import { test, expect, type Locator } from "@playwright/test";
 test.describe.configure({ timeout: 180_000 });
 
 async function confirmRecorder(recorder: Locator) {
-  await recorder.getByRole("button", { name: "Save record" }).click();
+  await recorder.getByRole("button", { name: /^Save / }).click();
 }
 
 async function openCompliancePreview(recorder: Locator) {
   const preview = recorder
-    .getByRole("heading", { name: "What saving this record will do" })
+    .getByRole("heading", { name: "Save impact" })
     .locator("xpath=ancestor::section[1]");
   await expect(preview).toBeVisible();
   await preview
@@ -150,18 +150,13 @@ test("correction and reversion replay a post-disinfection sample window", async 
   ).toBeVisible({ timeout: 30_000 });
 
   const sampling = page
-    .locator("section:visible")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Open Legionella sampling requirements",
-      }),
-    })
-    .first();
+    .getByRole("heading", { name: "Open Legionella sampling requirements" })
+    .locator("xpath=ancestor::section[1]");
   await expect(
     sampling.getByText("Post disinfection retest").first(),
   ).toBeVisible();
   await expect(
-    sampling.getByText(new RegExp(`Aug 13, ${year}`)).first(),
+    sampling.locator(`time[datetime="${year}-08-13"]:visible`),
   ).toBeVisible();
 
   await page
@@ -186,7 +181,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
   ).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Compliance record corrected/)).toBeVisible();
   await expect(
-    sampling.getByText(new RegExp(`Aug 15, ${year}`)).first(),
+    sampling.locator(`time[datetime="${year}-08-15"]:visible`),
   ).toBeVisible();
 
   const nextActionCallout = page.getByTestId("next-action-callout");
@@ -276,7 +271,7 @@ test("correction and reversion replay a post-disinfection sample window", async 
 test("startup immediately generates sampling and DOH reporting windows", async ({
   page,
 }) => {
-  await page.getByText("More types of completed work", { exact: true }).click();
+  await page.getByText("Less common completed work", { exact: true }).click();
   await page.getByRole("button", { name: "Record startup" }).click();
   const recorder = page.locator("#record-event");
   await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
@@ -324,7 +319,7 @@ test("startup immediately generates sampling and DOH reporting windows", async (
 test("emergency event creates an immediate sample without a made-up latest date", async ({
   page,
 }) => {
-  await page.getByText("More types of completed work", { exact: true }).click();
+  await page.getByText("Less common completed work", { exact: true }).click();
   await page
     .getByRole("button", { name: "Record emergency condition" })
     .click();

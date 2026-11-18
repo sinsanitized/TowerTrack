@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL("/");
 
   await page.goto("/towers");
-  await page.getByRole("link", { name: "Open tower" }).first().click();
+  await page.locator("article[role='link']").first().click();
   await expect(page).toHaveURL(/\/systems\//);
 });
 
@@ -41,15 +41,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     drawer.getByRole("button", { name: "Inspection" }),
   ).toBeVisible();
   await expect(drawer.getByRole("button", { name: "Cleaning" })).toBeVisible();
-  await drawer.getByRole("button", { name: "Inspection" }).click();
-  const saveEvent = drawer.getByRole("button", { name: "Save record" });
-  const cancel = drawer.getByRole("button", { name: "Cancel", exact: true });
-  await expect(saveEvent).toHaveClass(/btn-primary/);
-  await expect(cancel).not.toHaveClass(/btn-primary/);
-  await expect(
-    drawer.getByRole("heading", { name: "What saving this record will do" }),
-  ).toBeVisible();
-  const moreEvents = drawer.getByText("More types of completed work", {
+  const moreEvents = drawer.getByText("Less common completed work", {
     exact: true,
   });
   await moreEvents.focus();
@@ -59,7 +51,16 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     drawer.getByRole("button", {
       name: "Confirm owner-managed bacteriological sample",
     }),
-  ).toHaveCount(0);
+  ).toBeVisible();
+  await page.keyboard.press("Enter");
+  await drawer.getByRole("button", { name: "Inspection" }).click();
+  const saveEvent = drawer.getByRole("button", { name: /^Save / });
+  const cancel = drawer.getByRole("button", { name: "Cancel", exact: true });
+  await expect(saveEvent).toHaveClass(/btn-primary/);
+  await expect(cancel).not.toHaveClass(/btn-primary/);
+  await expect(
+    drawer.getByRole("heading", { name: "Save impact" }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(recordButton).toBeFocused();
@@ -83,7 +84,6 @@ test("tower details uses focused role-aware views", async ({ page }) => {
   const towerNavigation = page.getByRole("navigation", {
     name: "Tower workspace",
   });
-  await towerNavigation.getByText("More", { exact: true }).click();
   await towerNavigation
     .getByRole("link", { name: "Tower details", exact: true })
     .click();
@@ -105,7 +105,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
     page.getByRole("heading", { name: "Tower operation pattern" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Jurisdiction & rules" }),
+    page.getByRole("heading", { name: "Current rule assignment" }),
   ).toBeVisible();
 });
 

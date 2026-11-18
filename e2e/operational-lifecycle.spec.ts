@@ -19,7 +19,6 @@ async function createNycTower(
   name: string,
   legionellaResponsibility: "OUR_COMPANY" | "CUSTOMER" = "OUR_COMPANY",
 ) {
-  await page.getByText("Manage & reports", { exact: true }).click();
   await page.getByRole("link", { name: "Customers" }).click();
   await page
     .locator("summary")
@@ -75,7 +74,7 @@ async function saveRecorder(
   const form = page.locator("#record-event form");
   await form.getByText("Add notes (optional)", { exact: true }).click();
   await configure(form);
-  await form.getByRole("button", { name: "Save record" }).click();
+  await form.getByRole("button", { name: /^Save / }).click();
   await waitForSavedRecord(page);
 }
 
@@ -88,7 +87,7 @@ async function recordEvent(
 ) {
   const recorder = page.locator("#record-event");
   const eventButton = recorder.getByRole("button", { name: button });
-  const moreActions = recorder.getByText("More types of completed work", {
+  const moreActions = recorder.getByText("Less common completed work", {
     exact: true,
   });
   if (!(await recorder.isVisible())) {
@@ -175,9 +174,7 @@ test("customer-managed sampling is excluded from TowerTrack work", async ({
   await page.getByRole("button", { name: "Record completed work" }).click();
   const drawer = page.getByRole("dialog", { name: "Record completed work" });
   await expect(drawer.getByRole("button", { name: "Sample" })).toHaveCount(0);
-  await drawer
-    .getByText("More types of completed work", { exact: true })
-    .click();
+  await drawer.getByText("Less common completed work", { exact: true }).click();
   await expect(
     drawer.getByRole("button", {
       name: "Confirm owner-managed bacteriological sample",
@@ -286,7 +283,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
   await page.getByRole("button", { name: "Record completed work" }).click();
   await page
     .locator("#record-event")
-    .getByText("More types of completed work", { exact: true })
+    .getByText("Less common completed work", { exact: true })
     .click();
   await page.getByRole("button", { name: "Disinfection" }).click();
   const recorder = page.locator("#record-event");

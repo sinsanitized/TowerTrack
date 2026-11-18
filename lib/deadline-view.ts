@@ -421,7 +421,6 @@ function primaryAction(
   towerName: string,
   obligation: DeadlineObligationInput,
   requiredAction: string,
-  status: DeadlineStatus,
   responsibility: ServiceResponsibility | null,
 ): Pick<
   TowerDeadlineRow,
@@ -460,12 +459,6 @@ function primaryAction(
       primaryActionLabel: "Record sample",
       primaryActionAccessible: `Record owner-managed bacteriological sampling for ${towerName}`,
       primaryActionHref: completionHrefForObligation(towerId, obligation),
-    };
-  if (status === "Overdue")
-    return {
-      primaryActionLabel: "Review issue",
-      primaryActionAccessible: `Open overdue ${lowercaseWithJurisdictionAcronyms(requiredAction)} for ${towerName}`,
-      primaryActionHref: `/systems/${towerId}?view=obligations`,
     };
   if (!obligation.targetStart && !obligation.latest)
     return {
@@ -531,7 +524,6 @@ export function buildTowerDeadlineRows(
         tower.systemName,
         obligation,
         requiredAction,
-        status.label,
         responsibility,
       );
       const executionState = executionStateFor(obligation, responsibility);

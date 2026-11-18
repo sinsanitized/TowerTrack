@@ -29,10 +29,13 @@ function textDetail(details: Record<string, unknown>, key: string) {
 
 export default async function EventPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; eventId: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }) {
   const { id, eventId } = await params;
+  const query = await searchParams;
   const user = await requireUser();
   const event = await db.serviceEvent.findFirst({
     where: {
@@ -246,7 +249,7 @@ export default async function EventPage({
           </details>
         )}
       {canEdit ? (
-        <details className="panel p-5">
+        <details className="panel p-5" open={query.edit === "1"}>
           <summary className="cursor-pointer list-none font-black text-emerald-900">
             Advanced record actions
             <span className="mt-1 block text-sm font-medium text-slate-600">

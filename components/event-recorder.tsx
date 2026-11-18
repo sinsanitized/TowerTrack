@@ -154,6 +154,19 @@ export function EventRecorder({
               : isHyper
                 ? "Date performed"
                 : "Completion date";
+  const saveLabel =
+    eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" ||
+    eventType === "BACTERIOLOGICAL_SAMPLE_COLLECTED"
+      ? "Save sample"
+      : eventType === "LEGIONELLA_RESULT_RECEIVED"
+        ? "Save laboratory result"
+        : eventType === "QUARTERLY_INSPECTION_COMPLETED"
+          ? "Save inspection"
+          : isCleaning
+            ? "Save cleaning"
+            : isRemediation || isHyper
+              ? "Save treatment"
+              : "Save completed work";
   const externalLegionella = canRecordExternalLegionella(
     legionellaResponsibility,
   );
@@ -274,8 +287,11 @@ export function EventRecorder({
                 "w-full cursor-pointer justify-start text-sm",
               )}
             >
-              More types of completed work
+              Less common completed work
             </summary>
+            <p className="mt-2 text-sm text-slate-600">
+              Emergency, shutdown, treatment, and other occasional records.
+            </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {moreEvents.map(({ label, type: value }) => {
                 const Icon = eventIcons[value as keyof typeof eventIcons];
@@ -908,7 +924,7 @@ export function EventRecorder({
               </details>
             </div>
           </section>
-          <div className="-mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-3 sm:col-span-2 sm:flex-row sm:justify-end">
+          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] sm:col-span-2 sm:flex-row sm:justify-end">
             {onCancel && (
               <button
                 className={buttonClass(
@@ -923,10 +939,10 @@ export function EventRecorder({
             )}
             <SubmitButton
               className="min-h-11 w-full lg:w-auto"
-              pendingLabel="Saving compliance record…"
+              pendingLabel={`Saving ${saveLabel.replace(/^Save /, "").toLowerCase()}…`}
               disabled={Boolean(preview.error)}
             >
-              Save record
+              {saveLabel}
             </SubmitButton>
           </div>
         </form>

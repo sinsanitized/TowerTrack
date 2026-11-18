@@ -42,7 +42,7 @@ test("operations manager can record cleaning without creating or resetting a sam
   const recorder = page.getByRole("dialog");
   await expect(recorder).toBeVisible();
   await recorder
-    .getByText("More types of completed work", { exact: true })
+    .getByText("Less common completed work", { exact: true })
     .click();
   await recorder.getByRole("button", { name: "Cleaning" }).click();
   await expect(
@@ -54,7 +54,7 @@ test("operations manager can record cleaning without creating or resetting a sam
   await cleaningForm
     .getByLabel("Notes")
     .fill("Record cleaning separately from regulatory sampling");
-  await cleaningForm.getByRole("button", { name: "Save record" }).click();
+  await cleaningForm.getByRole("button", { name: /^Save / }).click();
 
   await expect(page).toHaveURL(/event=/);
   await expect(page.getByText(/Cleaning completed ·/)).toBeVisible();

@@ -387,7 +387,7 @@ describe("all tower deadline rows", () => {
     expect(rows.find(({ id }) => id === "overdue")).toMatchObject({
       workingDaysDisplay: "Overdue by 3 working days",
       status: "Overdue",
-      primaryActionLabel: "Review issue",
+      primaryActionLabel: "Record sample",
     });
     expect(rows.find(({ id }) => id === "review")).toMatchObject({
       workingDaysDisplay: "Needs review",

@@ -635,6 +635,8 @@ export default async function SystemPage({
                 "event-recorder"
               }
               systemId={id}
+              towerName={towerTitle}
+              towerAddress={`${system.building.streetAddress}, ${system.building.city}, ${system.building.state}`}
               defaultDate={today}
               ruleConfig={ruleConfig}
               samplesAwaitingResults={samplesAwaitingResults}
@@ -1293,8 +1295,8 @@ export default async function SystemPage({
                     Upcoming linked cleaning visits
                   </div>
                   <p className="mt-1 text-sm">
-                    ADD {formatDate(job.addVisit.scheduledDate)} → CLEAN{" "}
-                    {formatDate(job.cleaningVisit.scheduledDate)}
+                    Chemical addition {formatDate(job.addVisit.scheduledDate)} →
+                    Cleaning {formatDate(job.cleaningVisit.scheduledDate)}
                   </p>
                   <div className="mt-2 text-sm font-bold">
                     Open in Calendar →

@@ -82,7 +82,8 @@ export default async function NewCoolingTowerPage({
             <div className="label text-emerald-800">Section 1 of 3</div>
             <h2 className="mt-1 text-lg font-black">Tower equipment</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Fields marked Required must be completed.
+              Enter what you know now. Optional equipment details can be added
+              later from Tower details.
             </p>
           </div>
           <label>
@@ -95,12 +96,12 @@ export default async function NewCoolingTowerPage({
             />
           </label>
           <label>
-            <span className="label">Model number · Required</span>
-            <input className="field mt-1" name="modelNumber" required />
+            <span className="label">Model number · Optional</span>
+            <input className="field mt-1" name="modelNumber" />
           </label>
           <label>
-            <span className="label">Serial number · Required</span>
-            <input className="field mt-1" name="serialNumber" required />
+            <span className="label">Serial number · Optional</span>
+            <input className="field mt-1" name="serialNumber" />
           </label>
           <label>
             <span className="label">Tower location · Required</span>
@@ -112,14 +113,13 @@ export default async function NewCoolingTowerPage({
             />
           </label>
           <label>
-            <span className="label">Cooling tower tonnage · Required</span>
+            <span className="label">Cooling tower tonnage · Optional</span>
             <input
               className="field mt-1"
               name="tonnage"
               type="number"
               min="0.1"
               step="0.1"
-              required
             />
           </label>
           <details className="rounded-lg border border-slate-200 p-3 sm:col-span-2">

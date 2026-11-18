@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef } from "react";
-import { SlidersHorizontal } from "lucide-react";
 import { buttonClass } from "@/lib/button-variants";
 import type {
   DeadlineActionFilter,
@@ -33,7 +31,6 @@ function href(filters: Filters) {
 
 export function DeadlineFilterControls({ filters }: { filters: Filters }) {
   const router = useRouter();
-  const moreFilters = useRef<HTMLDetailsElement>(null);
   const activeSecondary = [
     filters.schedule === "SEASONAL"
       ? "Seasonal"
@@ -76,8 +73,8 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
     Boolean(filters.search);
 
   return (
-    <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
-      <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_190px_220px_auto] xl:items-end">
+    <section>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_170px_200px_190px_190px] xl:items-end">
         <form
           action="/deadlines"
           className="flex min-w-0 flex-col gap-2 sm:flex-row"
@@ -157,99 +154,50 @@ export function DeadlineFilterControls({ filters }: { filters: Filters }) {
             ))}
           </select>
         </label>
-        <details
-          ref={moreFilters}
-          className="relative"
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && moreFilters.current?.open) {
-              moreFilters.current.open = false;
-              moreFilters.current.querySelector("summary")?.focus();
-            }
-          }}
-        >
-          <summary
-            className={buttonClass(
-              "secondary",
-              "w-full cursor-pointer justify-center whitespace-nowrap border-transparent bg-slate-50",
-            )}
-            aria-label="More deadline filters"
-            role="button"
-          >
-            <SlidersHorizontal size={17} /> More filters
-            {activeSecondary.length > 0 && (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-950">
-                {activeSecondary.length}
-              </span>
-            )}
-          </summary>
-          <div className="mt-2 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-[30rem]">
-            <label>
-              <span className="label">Operating schedule</span>
-              <select
-                className="field mt-1 bg-white"
-                aria-label="Filter deadlines by operating schedule"
-                value={filters.schedule}
-                onChange={(event) =>
-                  router.push(
-                    href({
-                      ...filters,
-                      schedule: event.target.value as DeadlineScheduleFilter,
-                    }),
-                  )
-                }
-              >
-                <option value="ALL">All schedules</option>
-                <option value="SEASONAL">Seasonal</option>
-                <option value="YEAR_ROUND">Year-round</option>
-                <option value="NOT_SET">Schedule not set</option>
-              </select>
-            </label>
-            <label>
-              <span className="label">Responsible party</span>
-              <select
-                className="field mt-1 bg-white"
-                aria-label="Filter deadlines by responsible party"
-                value={filters.responsibility}
-                onChange={(event) =>
-                  router.push(
-                    href({
-                      ...filters,
-                      responsibility: event.target
-                        .value as ResponsibilityFilter,
-                    }),
-                  )
-                }
-              >
-                <option value="OUR_COMPANY">Our company</option>
-                <option value="CUSTOMER">Customer</option>
-                <option value="OTHER_VENDOR">Other vendor</option>
-                <option value="NOT_TRACKED">Not tracked</option>
-                <option value="UNCONFIRMED">Responsibility not assigned</option>
-                <option value="ALL">All responsibilities</option>
-              </select>
-            </label>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
-              <div
-                className="text-sm font-bold text-slate-600"
-                aria-live="polite"
-              >
-                {activeSecondary.length
-                  ? activeSecondary.join(" · ")
-                  : "No additional filters active"}
-              </div>
-              <Link
-                className={buttonClass("ghost")}
-                href={href({
+        <label>
+          <span className="label">Operating schedule</span>
+          <select
+            className="field mt-1 bg-white"
+            aria-label="Filter deadlines by operating schedule"
+            value={filters.schedule}
+            onChange={(event) =>
+              router.push(
+                href({
                   ...filters,
-                  schedule: "ALL",
-                  responsibility: "OUR_COMPANY",
-                })}
-              >
-                Reset more filters
-              </Link>
-            </div>
-          </div>
-        </details>
+                  schedule: event.target.value as DeadlineScheduleFilter,
+                }),
+              )
+            }
+          >
+            <option value="ALL">All schedules</option>
+            <option value="SEASONAL">Seasonal</option>
+            <option value="YEAR_ROUND">Year-round</option>
+            <option value="NOT_SET">Schedule not set</option>
+          </select>
+        </label>
+        <label>
+          <span className="label">Responsible party</span>
+          <select
+            className="field mt-1 bg-white"
+            aria-label="Filter deadlines by responsible party"
+            value={filters.responsibility}
+            onChange={(event) =>
+              router.push(
+                href({
+                  ...filters,
+                  responsibility: event.target.value as ResponsibilityFilter,
+                }),
+              )
+            }
+          >
+            <option value="OUR_COMPANY">Our company</option>
+            <option value="CUSTOMER">Customer</option>
+            <option value="OTHER_VENDOR">Other vendor</option>
+            <option value="NOT_TRACKED">Not tracked</option>
+            <option value="UNCONFIRMED">Responsibility not assigned</option>
+            <option value="ALL">All responsibilities</option>
+          </select>
+        </label>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 text-sm">
         <p className="font-bold text-slate-700" aria-live="polite">

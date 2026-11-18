@@ -16,9 +16,12 @@ test("operational list rows open their primary action from row space", async ({
   page,
 }) => {
   await page.goto("/deadlines");
-  const deadlineRow = page.locator("tbody tr[data-action-label]").first();
+  const deadlineRow = page
+    .getByRole("region", { name: "Deadlines" })
+    .getByRole("link")
+    .first();
   await expect(deadlineRow).toBeVisible();
-  await deadlineRow.locator('td[data-label="Target window"]').click();
+  await deadlineRow.click();
   await expect(page).toHaveURL(/\/systems\/.+/);
 
   await page.goto("/history");
@@ -36,7 +39,10 @@ test("operational list rows open their primary action from row space", async ({
 
 test("operational rows can be opened with the keyboard", async ({ page }) => {
   await page.goto("/deadlines");
-  const deadlineRow = page.locator("tbody tr[data-action-label]").first();
+  const deadlineRow = page
+    .getByRole("region", { name: "Deadlines" })
+    .getByRole("link")
+    .first();
   await deadlineRow.focus();
   await deadlineRow.press("Enter");
   await expect(page).toHaveURL(/\/systems\/.+/);
