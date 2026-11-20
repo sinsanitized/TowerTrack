@@ -90,7 +90,14 @@ export default async function SamplesPage({
   const pageSize = 15;
   const sampleReturnTo = `/samples?status=${filter}${search ? `&q=${encodeURIComponent(search)}` : ""}`;
   const baseSystemWhere: Prisma.CoolingTowerSystemWhereInput = {
-    legionellaResponsibility: { not: "CUSTOMER" },
+    AND: [
+      {
+        OR: [
+          { legionellaResponsibility: null },
+          { legionellaResponsibility: { not: "CUSTOMER" } },
+        ],
+      },
+    ],
     building: { customer: { organizationId: user.organizationId } },
     ...(search
       ? {

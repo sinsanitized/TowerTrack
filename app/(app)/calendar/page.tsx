@@ -616,7 +616,7 @@ function JobDetails({
           </div>
         </div>
         <div className="rounded-xl border-l-4 border-sky-600 bg-sky-50 p-4">
-          <div className="label">CLEAN</div>
+          <div className="label">Cleaning</div>
           <div className="text-lg font-black">{formatDate(cleanDate)}</div>
           <div className="mt-1 text-sm font-bold">
             Status: {plainEnumLabel(job.cleaningVisit.status)}
@@ -646,15 +646,17 @@ function JobDetails({
         job.addVisit.status !== "CANCELLED" && (
           <form action={completeAddVisitAction}>
             <input type="hidden" name="jobId" value={job.id} />
-            <button className="btn w-full">Mark Add visit complete</button>
+            <button className="btn w-full">
+              Mark chemical addition complete
+            </button>
             <p className="mt-1 text-xs text-slate-600">
-              This completes only Add. It does not complete Cleaning or change
-              compliance history.
+              This completes only chemical addition. It does not complete
+              cleaning or change compliance history.
             </p>
           </form>
         )}
       <div>
-        <div className="label">Record actual Cleaning by tower</div>
+        <div className="label">Record completed cleaning by tower</div>
         <div className="mt-2 grid gap-2">
           {job.towers.map((tower) =>
             tower.completedByServiceEventId ? (

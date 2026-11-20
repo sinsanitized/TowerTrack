@@ -51,6 +51,7 @@ import { TowerInformation } from "./components/tower-information";
 import { TowerSettings } from "./components/tower-settings";
 import { TowerComplianceRecords } from "./components/tower-records";
 import { ComplianceUpdateSummary } from "./components/compliance-update-summary";
+import { buildSampleChoices } from "@/lib/sample-choices";
 
 export default async function SystemPage({
   params,
@@ -129,6 +130,7 @@ export default async function SystemPage({
             eventType: true,
             eventDate: true,
             createdAt: true,
+            notes: true,
             details: true,
             performedByResponsibility: true,
             externalProviderName: true,
@@ -342,14 +344,22 @@ export default async function SystemPage({
     )
     .map((event) => event.eventDate)
     .sort((a, b) => b.getTime() - a.getTime())[0];
-  const samplesAwaitingResults = system.serviceEvents
-    .filter(
-      (event) =>
-        event.status === "ACTIVE" &&
-        event.eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&
-        event.labResultsForSample.length === 0,
-    )
-    .map((event) => ({ id: event.id, date: dateOnly(event.eventDate) }));
+  const samplesAwaitingResults = buildSampleChoices(
+    system.serviceEvents
+      .filter(
+        (event) =>
+          event.status === "ACTIVE" &&
+          event.eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&
+          event.labResultsForSample.length === 0,
+      )
+      .map((event) => ({
+        id: event.id,
+        date: dateOnly(event.eventDate),
+        notes: event.notes,
+        externalProviderName: event.externalProviderName,
+        externalSource: event.externalSource,
+      })),
+  );
   const samplesAwaitingResultIds = new Set(
     samplesAwaitingResults.map(({ id: sampleId }) => sampleId),
   );

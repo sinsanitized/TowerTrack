@@ -194,6 +194,7 @@ test("mobile keeps reference metadata readable without adding columns", async ({
 
 test("Today stays focused on current-week work", async ({ page }) => {
   await page.goto("/");
+  await expect(page.getByText("Review issue", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Next Week" })).toHaveCount(0);
   await expect(page.getByText(/next three working days/i)).toHaveCount(0);

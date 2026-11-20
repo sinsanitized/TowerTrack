@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -20,10 +20,21 @@ describe("Legionella result input", () => {
     expect(container.querySelector('input[name="cfuPerMl"]')).toHaveValue("0");
   });
 
-  it("keeps detected results as numeric CFU/mL values", () => {
-    render(<ResultInput />);
+  it("requires an explicit report result before showing the numeric field", () => {
+    const { container } = render(<ResultInput />);
+    const resultInput = within(container);
 
-    const result = screen.getByLabelText(/Result \(CFU\/mL\)/);
+    expect(
+      resultInput.getByText(
+        "Choose the result shown on the laboratory report.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      resultInput.queryByLabelText(/Result \(CFU\/mL\)/),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(resultInput.getByLabelText("Detected"));
+    const result = resultInput.getByLabelText(/Result \(CFU\/mL\)/);
     fireEvent.change(result, { target: { value: "25" } });
     expect(result).toHaveValue(25);
   });

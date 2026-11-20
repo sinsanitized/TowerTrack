@@ -358,6 +358,7 @@ test("new NYC tower completes an auditable lifecycle and one sample closes overl
     await expect(
       form.getByLabel("Sample tested").locator("option:checked"),
     ).toContainText("Monday 07/06/2026");
+    await form.getByLabel("Detected", { exact: true }).click();
     await form.getByLabel("Result (CFU/mL)").fill("250");
   });
   await page.getByRole("link", { name: "Work to do", exact: true }).click();

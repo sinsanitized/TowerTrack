@@ -28,6 +28,13 @@ test("scheduler creates and reviews linked chemical addition and cleaning visits
   await expect(
     dialog.getByText(/Saving creates two linked visits/),
   ).toBeVisible();
+  const buildingSearch = dialog.getByLabel("Find a building · Required");
+  await expect(buildingSearch).toBeEnabled();
+  await dialog.getByRole("option", { name: /100 Park Avenue/ }).click();
+  await expect(buildingSearch).toHaveValue(/100 Park Avenue/);
+  await expect(
+    dialog.getByRole("radio", { name: "All towers at this building" }),
+  ).toBeEnabled();
   await dialog.getByLabel("Chemical addition date").fill("2026-11-06");
   await expect(dialog.getByLabel("Cleaning date")).toHaveValue("2026-11-07");
   await dialog
@@ -44,7 +51,9 @@ test("scheduler creates and reviews linked chemical addition and cleaning visits
   await expect(
     page.locator(".label").getByText("Chemical addition", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("CLEAN", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".label").getByText("Cleaning", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("paragraph").filter({ hasText: "Calendar end-to-end test" }),
   ).toBeVisible();

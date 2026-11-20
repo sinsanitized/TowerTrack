@@ -365,6 +365,7 @@ test("Level 4 date-only result creates review reminders and a retest chain", asy
   await page.getByRole("button", { name: "Laboratory result" }).click();
   recorder = page.locator("#record-event");
   await recorder.getByLabel(/date.*Required/).fill("2026-07-14");
+  await recorder.getByLabel("Detected", { exact: true }).click();
   await recorder.getByLabel("Result (CFU/mL)").fill("1250");
   await recorder.getByText("Add notes (optional)", { exact: true }).click();
   await recorder

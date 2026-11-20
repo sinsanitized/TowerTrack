@@ -11,6 +11,25 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 });
+
+test("laboratory entry requires an explicit detected result", async ({
+  page,
+}) => {
+  const search = page.getByRole("combobox", { name: "Find a tower" });
+  await search.fill("JOB-1002");
+  await page.getByRole("option").first().click();
+  await page.getByRole("link", { name: "Tower records", exact: true }).click();
+  await page.getByRole("link", { name: "Record lab result" }).first().click();
+
+  const recorder = page.locator("#record-event");
+  await expect(
+    recorder.getByText("Choose the result shown on the laboratory report."),
+  ).toBeVisible();
+  await expect(recorder.getByLabel("Result (CFU/mL)")).toHaveCount(0);
+  await recorder.getByLabel("Detected", { exact: true }).click();
+  await expect(recorder.getByLabel("Result (CFU/mL)")).toBeVisible();
+});
+
 test("home leads directly into tower event entry", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
   await expect(
@@ -464,7 +483,9 @@ test("operations manager can open and correct an individual event", async ({
       name: "The information is wrong—replace it with corrected information",
     }),
   ).toBeVisible();
-  await expect(page.getByLabel("Record type · Required")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Change record type (advanced)" }),
+  ).toBeVisible();
   await expect(page.getByLabel(/date.*Required/)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Correction impact preview" }),

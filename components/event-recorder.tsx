@@ -28,6 +28,7 @@ import { formatOperationalDate } from "@/lib/date";
 import { eventDefinitionsForLocation } from "@/lib/event-workflow";
 import { buttonClass } from "@/lib/button-variants";
 import { SubmitButton } from "@/components/submit-button";
+import type { SampleChoice } from "@/lib/sample-choices";
 import {
   canRecordExternalLegionella,
   serviceResponsibilityLabel,
@@ -82,7 +83,7 @@ export function EventRecorder({
   systemId: string;
   defaultDate: string;
   ruleConfig: TowerRuleConfig;
-  samplesAwaitingResults: Array<{ id: string; date: string }>;
+  samplesAwaitingResults: SampleChoice[];
   initialSampleEventId?: string;
   initialEventType?: RegulatoryEventType;
   canConfirmOwnerManaged?: boolean;
@@ -167,6 +168,13 @@ export function EventRecorder({
             : isRemediation || isHyper
               ? "Save treatment"
               : "Save completed work";
+  const returnLabel = returnTo?.startsWith("/samples")
+    ? "Sample results"
+    : returnTo?.startsWith("/deadlines")
+      ? "Deadline register"
+      : returnTo === "/" || returnTo?.startsWith("/?")
+        ? "Today"
+        : null;
   const externalLegionella = canRecordExternalLegionella(
     legionellaResponsibility,
   );
@@ -591,22 +599,47 @@ export function EventRecorder({
           )}
           {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
             <>
-              <label>
-                <span className="label">Sample tested</span>
-                <select
-                  className="field mt-1"
-                  name="sampleEventId"
-                  required
-                  value={sampleEventId}
-                  onChange={(event) => setSampleEventId(event.target.value)}
-                >
-                  {samplesAwaitingResults.map((sample) => (
-                    <option key={sample.id} value={sample.id}>
-                      Collected {formatOperationalDate(sample.date)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {samplesAwaitingResults.length === 1 ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950">
+                  <input
+                    type="hidden"
+                    name="sampleEventId"
+                    value={samplesAwaitingResults[0].id}
+                  />
+                  <div className="label">Sample tested</div>
+                  <div className="mt-1 font-black">
+                    Collected{" "}
+                    {formatOperationalDate(samplesAwaitingResults[0].date)}
+                  </div>
+                  {samplesAwaitingResults[0].context && (
+                    <div className="mt-1 text-sm">
+                      {samplesAwaitingResults[0].context}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label>
+                  <span className="label">Sample tested · Required</span>
+                  <select
+                    className="field mt-1"
+                    name="sampleEventId"
+                    required
+                    value={sampleEventId}
+                    onChange={(event) => setSampleEventId(event.target.value)}
+                  >
+                    {samplesAwaitingResults.map((sample) => (
+                      <option key={sample.id} value={sample.id}>
+                        Collected {formatOperationalDate(sample.date)}
+                        {sample.label ? ` · ${sample.label}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-sm text-slate-600">
+                    Match the collection date and field context to the
+                    laboratory report.
+                  </span>
+                </label>
+              )}
             </>
           )}
           {eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT" && (
@@ -924,7 +957,12 @@ export function EventRecorder({
               </details>
             </div>
           </section>
-          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] sm:col-span-2 sm:flex-row sm:justify-end">
+          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] sm:col-span-2 sm:flex-row sm:items-center sm:justify-end">
+            {returnLabel && (
+              <span className="mr-auto text-center text-sm font-bold text-slate-600 sm:text-left">
+                After saving: return to {returnLabel}
+              </span>
+            )}
             {onCancel && (
               <button
                 className={buttonClass(

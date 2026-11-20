@@ -22,6 +22,8 @@ import { plainEnumLabel, requirementLabel } from "@/lib/labels";
 import { formatOperationalDate } from "@/lib/date";
 import { buttonClass } from "@/lib/button-variants";
 import { SubmitButton } from "@/components/submit-button";
+import type { SampleChoice } from "@/lib/sample-choices";
+import { useUnsavedChanges } from "@/components/use-unsaved-changes";
 
 interface EditableEvent {
   id: string;
@@ -53,14 +55,16 @@ export function EventEditor({
   systemId: string;
   currentDate: string;
   ruleConfig: TowerRuleConfig;
-  availableSamples: Array<{ id: string; date: string }>;
+  availableSamples: SampleChoice[];
 }) {
   const [eventType, setEventType] = useState<ServiceEventTypeValue>(
     event.eventType,
   );
+  const [editingType, setEditingType] = useState(false);
   const [eventDate, setEventDate] = useState(event.eventDate);
   const [cfuPerMl, setCfuPerMl] = useState(event.cfuPerMl);
   const [sampleEventId, setSampleEventId] = useState(event.sampleEventId);
+  const { dirty, markDirty, clearDirty } = useUnsavedChanges();
   const isResult = [
     "LEGIONELLA_RESULT_RECEIVED",
     "WEEKLY_BIOLOGICAL_INDICATOR_RESULT",
@@ -105,7 +109,12 @@ export function EventEditor({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
-      <form action={correctServiceEventAction} className="panel p-6">
+      <form
+        action={correctServiceEventAction}
+        className="panel p-6"
+        onChangeCapture={markDirty}
+        onSubmitCapture={clearDirty}
+      >
         <input type="hidden" name="eventId" value={event.id} />
         <div className="label">Editable compliance record</div>
         <h2 className="mt-1 text-xl font-black">
@@ -116,23 +125,58 @@ export function EventEditor({
           obligation. The original record remains visible.
         </p>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className="md:col-span-2">
-            <span className="label">Record type · Required</span>
-            <select
-              className="field mt-1"
-              name="eventType"
-              value={eventType}
-              onChange={(value) =>
-                setEventType(value.target.value as ServiceEventTypeValue)
-              }
-            >
-              {SERVICE_EVENT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {plainEnumLabel(type)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="rounded-lg border border-slate-200 p-3 md:col-span-2">
+            <div className="label">Record type</div>
+            {!editingType ? (
+              <>
+                <input type="hidden" name="eventType" value={eventType} />
+                <div className="mt-1 font-black">
+                  {plainEnumLabel(eventType)}
+                </div>
+                <button
+                  type="button"
+                  className="mt-2 text-sm font-bold text-sky-800 underline"
+                  onClick={() => setEditingType(true)}
+                >
+                  Change record type (advanced)
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-sm font-bold text-amber-800">
+                  Change this only if the original record was filed under the
+                  wrong activity. It can substantially change deadlines.
+                </p>
+                <label className="mt-3 block">
+                  <span className="label">New record type · Required</span>
+                  <select
+                    className="field mt-1"
+                    name="eventType"
+                    value={eventType}
+                    onChange={(value) =>
+                      setEventType(value.target.value as ServiceEventTypeValue)
+                    }
+                  >
+                    {SERVICE_EVENT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {plainEnumLabel(type)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="mt-2 text-sm font-bold text-slate-700 underline"
+                  onClick={() => {
+                    setEventType(event.eventType);
+                    setEditingType(false);
+                  }}
+                >
+                  Keep original record type
+                </button>
+              </>
+            )}
+          </div>
           <label>
             <span className="label">
               {eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED"
@@ -154,22 +198,42 @@ export function EventEditor({
           </label>
           {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
             <>
-              <label>
-                <span className="label">Sample tested</span>
-                <select
-                  className="field mt-1"
-                  name="sampleEventId"
-                  required
-                  value={sampleEventId}
-                  onChange={(value) => setSampleEventId(value.target.value)}
-                >
-                  {availableSamples.map((sample) => (
-                    <option key={sample.id} value={sample.id}>
-                      Collected {formatOperationalDate(sample.date)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {availableSamples.length === 1 ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950">
+                  <input
+                    type="hidden"
+                    name="sampleEventId"
+                    value={availableSamples[0].id}
+                  />
+                  <div className="label">Sample tested</div>
+                  <div className="mt-1 font-black">
+                    Collected {formatOperationalDate(availableSamples[0].date)}
+                  </div>
+                  {availableSamples[0].context && (
+                    <div className="mt-1 text-sm">
+                      {availableSamples[0].context}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <label>
+                  <span className="label">Sample tested · Required</span>
+                  <select
+                    className="field mt-1"
+                    name="sampleEventId"
+                    required
+                    value={sampleEventId}
+                    onChange={(value) => setSampleEventId(value.target.value)}
+                  >
+                    {availableSamples.map((sample) => (
+                      <option key={sample.id} value={sample.id}>
+                        Collected {formatOperationalDate(sample.date)}
+                        {sample.label ? ` · ${sample.label}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </>
           )}
           {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
@@ -260,6 +324,14 @@ export function EventEditor({
           >
             Cancel
           </Link>
+          {dirty && (
+            <span
+              className="self-center text-sm font-bold text-amber-800"
+              role="status"
+            >
+              Unsaved changes
+            </span>
+          )}
         </div>
       </form>
 

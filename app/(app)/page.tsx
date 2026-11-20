@@ -64,28 +64,24 @@ function ActionRow({
           `/systems/${row.id}/edit?focus=${responsibilityFamilyForObligation(obligation.type, obligation.category)}#service-responsibilities`,
           "/",
         )
-      : obligation.status === "OVERDUE"
-        ? `/systems/${row.id}?view=obligations`
-        : withReturnPath(completionHrefForObligation(row.id, obligation), "/");
+      : withReturnPath(completionHrefForObligation(row.id, obligation), "/");
   const primaryLabel =
     responsibility == null
       ? "Assign responsibility"
-      : obligation.status === "OVERDUE"
-        ? "Review issue"
-        : obligation.category === "REPORTING_ACTION" &&
-            !obligation.type.includes("CORRECTIVE_ACTION") &&
-            obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
-            obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
-          ? "Record submission"
-          : obligation.category === "SAMPLE"
-            ? isResampleObligation(obligation.type)
-              ? "Record resample"
-              : "Record sample"
-            : obligation.category === "INSPECTION"
-              ? "Record inspection"
-              : obligation.type.includes("CLEANING")
-                ? "Record cleaning"
-                : "Record completion";
+      : obligation.category === "REPORTING_ACTION" &&
+          !obligation.type.includes("CORRECTIVE_ACTION") &&
+          obligation.type !== "LEVEL_4_FULL_REMEDIATION" &&
+          obligation.type !== "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING"
+        ? "Record submission"
+        : obligation.category === "SAMPLE"
+          ? isResampleObligation(obligation.type)
+            ? "Record resample"
+            : "Record sample"
+          : obligation.category === "INSPECTION"
+            ? "Record inspection"
+            : obligation.type.includes("CLEANING")
+              ? "Record cleaning"
+              : "Record completion";
   return (
     <ClickableRow
       as="article"

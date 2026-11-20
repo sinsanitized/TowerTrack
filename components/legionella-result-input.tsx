@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export function LegionellaResultInput({
   value,
   onChange,
@@ -7,7 +9,10 @@ export function LegionellaResultInput({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const noneDetected = value === "0";
+  const [mode, setMode] = useState<"" | "NONE" | "DETECTED">(
+    value === "0" ? "NONE" : value ? "DETECTED" : "",
+  );
+  const noneDetected = mode === "NONE";
 
   return (
     <fieldset>
@@ -17,8 +22,12 @@ export function LegionellaResultInput({
           <input
             type="radio"
             name="legionellaResultMode"
-            checked={noneDetected}
-            onChange={() => onChange("0")}
+            checked={mode === "NONE"}
+            required
+            onChange={() => {
+              setMode("NONE");
+              onChange("0");
+            }}
           />
           None detected
         </label>
@@ -26,13 +35,20 @@ export function LegionellaResultInput({
           <input
             type="radio"
             name="legionellaResultMode"
-            checked={!noneDetected}
-            onChange={() => onChange("")}
+            checked={mode === "DETECTED"}
+            onChange={() => {
+              setMode("DETECTED");
+              onChange("");
+            }}
           />
           Detected
         </label>
       </div>
-      {noneDetected ? (
+      {mode === "" ? (
+        <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950">
+          Choose the result shown on the laboratory report.
+        </p>
+      ) : noneDetected ? (
         <>
           <input type="hidden" name="cfuPerMl" value="0" />
           <p className="mt-2 text-sm font-medium text-emerald-700">

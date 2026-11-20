@@ -19,6 +19,7 @@ import {
   composeTowerRuleProfiles,
 } from "@/lib/rule-profile";
 import { eventEntryHref } from "@/lib/event-entry-intent";
+import { buildSampleChoices } from "@/lib/sample-choices";
 
 function textDetail(details: Record<string, unknown>, key: string) {
   const value = details[key];
@@ -60,7 +61,13 @@ export default async function EventPage({
               eventType: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
             },
             orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
-            select: { id: true, eventDate: true },
+            select: {
+              id: true,
+              eventDate: true,
+              notes: true,
+              externalProviderName: true,
+              externalSource: true,
+            },
           },
           labResults: {
             select: { sourceEventId: true, sampleEventId: true },
@@ -134,13 +141,21 @@ export default async function EventPage({
       .filter((result) => result.sourceEventId !== event.id)
       .map((result) => result.sampleEventId),
   );
-  const availableSamples = system.serviceEvents
-    .filter(
-      (sample) =>
-        sample.id === currentSampleEventId ||
-        !samplesUsedByOtherResults.has(sample.id),
-    )
-    .map((sample) => ({ id: sample.id, date: dateOnly(sample.eventDate) }));
+  const availableSamples = buildSampleChoices(
+    system.serviceEvents
+      .filter(
+        (sample) =>
+          sample.id === currentSampleEventId ||
+          !samplesUsedByOtherResults.has(sample.id),
+      )
+      .map((sample) => ({
+        id: sample.id,
+        date: dateOnly(sample.eventDate),
+        notes: sample.notes,
+        externalProviderName: sample.externalProviderName,
+        externalSource: sample.externalSource,
+      })),
+  );
   const sampleAwaitingResult =
     event.status === "ACTIVE" &&
     event.eventType === "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" &&

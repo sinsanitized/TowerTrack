@@ -10,6 +10,7 @@ import {
   defaultCleaningDate,
   shiftCleaningDate,
 } from "@/lib/cleaning-schedule";
+import { useUnsavedChanges } from "@/components/use-unsaved-changes";
 
 type BuildingOption = {
   id: string;
@@ -31,10 +32,15 @@ export function CleaningJobForm({
   initialBuildingId?: string;
   initialTowerId?: string;
 }) {
-  const initialBuilding =
-    buildings.find((building) => building.id === initialBuildingId) ??
-    buildings[0];
+  const initialBuilding = buildings.find(
+    (building) => building.id === initialBuildingId,
+  );
   const [buildingId, setBuildingId] = useState(initialBuilding?.id ?? "");
+  const [buildingQuery, setBuildingQuery] = useState(
+    initialBuilding
+      ? `${initialBuilding.name} — ${initialBuilding.address}`
+      : "",
+  );
   const [scopeMode, setScopeMode] = useState<"ALL_TOWERS" | "SELECTED_TOWERS">(
     initialTowerId ? "SELECTED_TOWERS" : "ALL_TOWERS",
   );
@@ -48,16 +54,29 @@ export function CleaningJobForm({
   const [cleaningDate, setCleaningDate] = useState(
     defaultCleaningDate(initialDate),
   );
+  const [cleaningDateWasEdited, setCleaningDateWasEdited] = useState(false);
+  const { dirty, markDirty, clearDirty } = useUnsavedChanges();
   useEffect(() => setReady(true), []);
   const building = useMemo(
     () => buildings.find((item) => item.id === buildingId),
     [buildingId, buildings],
   );
   const warning = cleaningGapMessage(addDate, cleaningDate);
+  const matchingBuildings = useMemo(() => {
+    const query = buildingQuery.trim().toLocaleLowerCase();
+    if (!query) return buildings.slice(0, 8);
+    return buildings
+      .filter((item) =>
+        `${item.name} ${item.address}`.toLocaleLowerCase().includes(query),
+      )
+      .slice(0, 8);
+  }, [buildingQuery, buildings]);
 
   function chooseBuilding(id: string) {
     const next = buildings.find((item) => item.id === id);
+    markDirty();
     setBuildingId(id);
+    setBuildingQuery(next ? `${next.name} — ${next.address}` : "");
     setScopeMode("ALL_TOWERS");
     setSelectedTowerIds(next?.towers.map((tower) => tower.id) ?? []);
   }
@@ -72,7 +91,13 @@ export function CleaningJobForm({
   }
 
   return (
-    <form action={createCleaningJobAction} className="space-y-5">
+    <form
+      action={createCleaningJobAction}
+      className="space-y-5"
+      onChangeCapture={markDirty}
+      onSubmitCapture={clearDirty}
+    >
+      <input type="hidden" name="buildingId" value={buildingId} />
       <input type="hidden" name="scopeMode" value={scopeMode} />
       <section className="rounded-xl border border-slate-200 p-4">
         <div className="mb-4">
@@ -81,24 +106,55 @@ export function CleaningJobForm({
             Select the building and towers included in this cleaning plan.
           </p>
         </div>
-        <div>
+        <div className="relative">
           <label className="label" htmlFor="schedule-building">
-            Building
+            Find a building · Required
           </label>
-          <select
+          <input
             id="schedule-building"
-            name="buildingId"
             className="input mt-2 w-full"
-            value={buildingId}
-            onChange={(event) => chooseBuilding(event.target.value)}
-            required
-          >
-            {buildings.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} — {item.address}
-              </option>
-            ))}
-          </select>
+            role="combobox"
+            aria-expanded={!buildingId}
+            aria-controls="schedule-building-options"
+            autoComplete="off"
+            placeholder="Type a building name or address"
+            value={buildingQuery}
+            disabled={!ready}
+            onChange={(event) => {
+              setBuildingQuery(event.target.value);
+              setBuildingId("");
+              setSelectedTowerIds([]);
+            }}
+          />
+          {ready && !buildingId && (
+            <div
+              id="schedule-building-options"
+              role="listbox"
+              className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-300 bg-white p-1 shadow-lg"
+            >
+              {matchingBuildings.length ? (
+                matchingBuildings.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="option"
+                    aria-selected="false"
+                    className="block w-full rounded-lg px-3 py-3 text-left hover:bg-sky-50 focus:bg-sky-50"
+                    onClick={() => chooseBuilding(item.id)}
+                  >
+                    <span className="block font-black">{item.name}</span>
+                    <span className="block text-sm text-slate-600">
+                      {item.address}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="p-3 text-sm font-bold text-slate-600">
+                  No building matches that search.
+                </p>
+              )}
+            </div>
+          )}
           {building && (
             <p className="mt-2 text-sm font-bold text-slate-600">
               {building.address}
@@ -106,7 +162,7 @@ export function CleaningJobForm({
           )}
         </div>
 
-        <fieldset className="mt-4">
+        <fieldset className="mt-4" disabled={!building}>
           <legend className="label">Towers included</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <label
@@ -183,7 +239,8 @@ export function CleaningJobForm({
               value={addDate}
               onChange={(event) => {
                 setAddDate(event.target.value);
-                setCleaningDate(defaultCleaningDate(event.target.value));
+                if (!cleaningDateWasEdited)
+                  setCleaningDate(defaultCleaningDate(event.target.value));
               }}
               disabled={!ready}
               required
@@ -196,7 +253,10 @@ export function CleaningJobForm({
               type="date"
               name="cleaningDate"
               value={cleaningDate}
-              onChange={(event) => setCleaningDate(event.target.value)}
+              onChange={(event) => {
+                setCleaningDate(event.target.value);
+                setCleaningDateWasEdited(true);
+              }}
               disabled={!ready}
               required
             />
@@ -250,6 +310,14 @@ export function CleaningJobForm({
       >
         Schedule chemical addition and cleaning
       </button>
+      {dirty && (
+        <p
+          className="text-center text-sm font-bold text-amber-800"
+          role="status"
+        >
+          Unsaved changes
+        </p>
+      )}
     </form>
   );
 }
@@ -272,6 +340,7 @@ export function CleaningJobEditForm({
   const [addDate, setAddDate] = useState(initialAddDate);
   const [cleaningDate, setCleaningDate] = useState(initialCleaningDate);
   const [shiftTogether, setShiftTogether] = useState(false);
+  const { dirty, markDirty, clearDirty } = useUnsavedChanges();
   const proposedCleaningDate = shiftTogether
     ? shiftCleaningDate(initialAddDate, addDate, initialCleaningDate)
     : cleaningDate;
@@ -281,6 +350,8 @@ export function CleaningJobEditForm({
     <form
       action={updateCleaningJobAction}
       className="rounded-xl border border-slate-300 p-4"
+      onChangeCapture={markDirty}
+      onSubmitCapture={clearDirty}
     >
       <input type="hidden" name="jobId" value={jobId} />
       <input
@@ -327,34 +398,50 @@ export function CleaningJobEditForm({
           checked={shiftTogether}
           onChange={(event) => setShiftTogether(event.target.checked)}
         />
-        Shift Cleaning by the same number of days when Add moves.
+        Move the cleaning date by the same number of days when the chemical
+        addition date moves.
       </label>
       <p className="mt-2 text-sm font-bold text-slate-700">
-        Proposed dates: Add {addDate} → Cleaning {proposedCleaningDate}
+        Proposed dates: Chemical addition {addDate} → Cleaning{" "}
+        {proposedCleaningDate}
       </p>
       {warning && (
         <div className="mt-2 rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-950">
           Review timing: {warning}
         </div>
       )}
-      <select
-        name="assignedTechnicianId"
-        className="input mt-3 w-full"
-        defaultValue={initialTechnicianId ?? ""}
-      >
-        <option value="">Unassigned</option>
-        {technicians.map((technician) => (
-          <option key={technician.id} value={technician.id}>
-            {technician.name}
-          </option>
-        ))}
-      </select>
-      <textarea
-        name="notes"
-        className="input mt-3 min-h-20 w-full"
-        defaultValue={initialNotes ?? ""}
-      />
-      <button className="btn btn-primary mt-3">Save schedule</button>
+      <label className="mt-3 block">
+        <span className="label">Assigned technician (optional)</span>
+        <select
+          name="assignedTechnicianId"
+          className="input mt-1 w-full"
+          defaultValue={initialTechnicianId ?? ""}
+        >
+          <option value="">Unassigned</option>
+          {technicians.map((technician) => (
+            <option key={technician.id} value={technician.id}>
+              {technician.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="mt-3 block">
+        <span className="label">Notes (optional)</span>
+        <textarea
+          name="notes"
+          className="input mt-1 min-h-20 w-full"
+          defaultValue={initialNotes ?? ""}
+          placeholder="Access, timing, or site instructions"
+        />
+      </label>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button className="btn btn-primary">Save schedule</button>
+        {dirty && (
+          <span className="text-sm font-bold text-amber-800" role="status">
+            Unsaved changes
+          </span>
+        )}
+      </div>
     </form>
   );
 }

@@ -11,6 +11,7 @@ import type {
 } from "@/lib/obligation-engine";
 import { buttonClass } from "@/lib/button-variants";
 import type { ServiceResponsibility } from "@/lib/service-responsibility";
+import type { SampleChoice } from "@/lib/sample-choices";
 import {
   isResampleObligation,
   type EventEntryIntentName,
@@ -51,7 +52,7 @@ export function EventRecorderDrawer({
   towerAddress: string;
   defaultDate: string;
   ruleConfig: TowerRuleConfig;
-  samplesAwaitingResults: Array<{ id: string; date: string }>;
+  samplesAwaitingResults: SampleChoice[];
   initialSampleEventId?: string;
   initialEventType?: RegulatoryEventType;
   initialOpen?: boolean;
