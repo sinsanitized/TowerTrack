@@ -1,31 +1,26 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
-import { StatusBadge } from "@/components/status-badge";
 import { EventRecorderDrawer } from "@/components/event-recorder-drawer";
 import { NextActionCallout } from "@/components/next-action-callout";
 import { TowerActionList } from "@/components/tower-action-list";
-import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
-import { ObligationIntelligenceCard } from "@/components/obligation-intelligence-card";
+import { ComplianceDate } from "@/components/compliance-date";
 import { ComplianceTimeline } from "@/components/compliance-timeline";
-import { recordServiceEventAction } from "@/app/actions";
 import { complianceDashboardRows } from "@/lib/queries";
 import { db } from "@/lib/db";
 import {
   formatDate,
+  asUtc,
   dateOnly,
   todayDateOnly,
   workingDaysRemaining,
 } from "@/lib/date";
-import {
-  formatLegionellaResult,
-  plainEnumLabel,
-  requiredActionLabel,
-} from "@/lib/labels";
+import { plainEnumLabel, requiredActionLabel } from "@/lib/labels";
 import { requireUser } from "@/lib/auth";
 import {
   compileTowerRuleConfig,
   composeTowerRuleProfiles,
+  resolveTowerRuleProfiles,
 } from "@/lib/rule-profile";
 import {
   canViewTowerSettings,
@@ -35,7 +30,6 @@ import {
 } from "@/lib/tower-details";
 import { buttonClass } from "@/lib/button-variants";
 import { completionHrefForObligation } from "@/lib/deadline-view";
-import { SubmitButton } from "@/components/submit-button";
 import {
   responsibilityFamilyForObligation,
   responsibilityForServiceObligation,
@@ -51,6 +45,11 @@ import { TowerInformation } from "./components/tower-information";
 import { TowerSettings } from "./components/tower-settings";
 import { TowerComplianceRecords } from "./components/tower-records";
 import { ComplianceUpdateSummary } from "./components/compliance-update-summary";
+import { TowerRequirementDetails } from "./components/tower-requirement-details";
+import {
+  TowerComplianceSnapshot,
+  TowerLabResultHistory,
+} from "./components/tower-overview-details";
 import { buildSampleChoices } from "@/lib/sample-choices";
 
 export default async function SystemPage({
@@ -116,6 +115,10 @@ export default async function SystemPage({
         building: { include: { customer: true } },
         jurisdiction: true,
         ruleProfile: { include: { rules: true } },
+        ruleAssignments: {
+          include: { ruleProfile: { include: { rules: true } } },
+          orderBy: { effectiveStartDate: "desc" },
+        },
         pendingRegulation: true,
         activities: {
           orderBy: { scheduledDate: "desc" },
@@ -163,12 +166,17 @@ export default async function SystemPage({
         },
         reportingObligations: {
           where: {
-            status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
+            status: {
+              in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED", "COMPLETED"],
+            },
           },
           orderBy: [{ latestDueDate: "asc" }, { createdAt: "asc" }],
           include: {
             triggerEvent: {
               select: { id: true, eventType: true, eventDate: true },
+            },
+            completedByEvent: {
+              select: { id: true, status: true, eventDate: true },
             },
           },
         },
@@ -220,16 +228,27 @@ export default async function SystemPage({
     db.ruleProfile.findMany({
       where: {
         active: true,
-        OR: [
+        organizationId: null,
+        jurisdictionMode: {
+          in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
+        },
+        AND: [
           {
-            jurisdictionMode: {
-              in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
-            },
+            OR: [
+              { effectiveStartDate: null },
+              { effectiveStartDate: { lte: asUtc(todayDateOnly()) } },
+            ],
           },
-          { organizationId: user.organizationId },
+          {
+            OR: [
+              { effectiveEndDate: null },
+              { effectiveEndDate: { gte: asUtc(todayDateOnly()) } },
+            ],
+          },
         ],
       },
       include: { rules: true },
+      orderBy: { effectiveStartDate: "desc" },
     }),
   ]);
   if (!system || !dashboardRow) notFound();
@@ -362,22 +381,6 @@ export default async function SystemPage({
   );
   const samplesAwaitingResultIds = new Set(
     samplesAwaitingResults.map(({ id: sampleId }) => sampleId),
-  );
-  const recordedReportingObligationIds = new Set(
-    system.serviceEvents
-      .filter(
-        (event) =>
-          event.status === "ACTIVE" && event.eventType === "REPORT_SUBMITTED",
-      )
-      .map((event) => {
-        const details = event.details as {
-          reportingObligationId?: unknown;
-        } | null;
-        return typeof details?.reportingObligationId === "string"
-          ? details.reportingObligationId
-          : null;
-      })
-      .filter((value): value is string => Boolean(value)),
   );
   const initialSampleEventId =
     requestedSampleEventId &&
@@ -569,12 +572,26 @@ export default async function SystemPage({
         },
       ].filter((item): item is NonNullable<typeof item> => item != null)
     : [];
+  const currentAssignment = system.ruleAssignments.find(
+    (assignment) =>
+      dateOnly(assignment.effectiveStartDate) <= today &&
+      (!assignment.effectiveEndDate ||
+        dateOnly(assignment.effectiveEndDate) >= today),
+  );
+  const currentConfiguration =
+    currentAssignment?.configuration ?? system.ruleConfiguration;
+  const currentAssignedProfile =
+    currentAssignment?.ruleProfile ?? system.ruleProfile;
   const composedRuleProfile = composeTowerRuleProfiles(
-    system.ruleConfiguration,
-    system.ruleConfiguration === "CUSTOM"
-      ? [system.ruleProfile]
-      : availableRuleProfiles,
-    system.ruleProfileId,
+    currentConfiguration,
+    resolveTowerRuleProfiles({
+      configuration: currentConfiguration,
+      sharedProfiles: availableRuleProfiles,
+      assignedProfile: currentAssignedProfile,
+      hasExplicitAssignment: Boolean(currentAssignment),
+      organizationId: user.organizationId,
+    }),
+    currentAssignedProfile.id,
   );
   const ruleConfig = compileTowerRuleConfig(composedRuleProfile, {
     operating: !["FULLY_SHUT_DOWN", "SEASONALLY_INACTIVE"].includes(
@@ -764,212 +781,18 @@ export default async function SystemPage({
           items={nextActionItems}
         />
       )}
-      <details
-        className={view === "overview" ? "panel mb-6 p-5" : "hidden"}
-        aria-labelledby="key-compliance-dates"
-      >
-        <summary
-          id="key-compliance-dates"
-          className="cursor-pointer text-lg font-black"
-        >
-          More tower information
-        </summary>
-        <p className="mt-1 text-sm text-slate-600">
-          Last completed dates and recurring compliance status
-        </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <article className="panel p-4">
-            <div className="label">Last monthly Legionella test</div>
-            <div className="mt-3">
-              <ComplianceDate
-                value={latestMonthlySample}
-                label="Last completed"
-                operational
-                empty="Not recorded"
-              />
-            </div>
-            {dashboardRow.routineSample && (
-              <div className="mt-3 border-t border-slate-200 pt-3">
-                <ComplianceDate
-                  value={dashboardRow.routineSample.latest}
-                  label="Next deadline"
-                  deadline
-                  compact
-                  operational
-                />
-              </div>
-            )}
-          </article>
-          <article className="panel p-4">
-            <div className="label">Quarterly inspection</div>
-            <div className="mt-3">
-              <ComplianceDate
-                value={latestQuarterlyInspection}
-                label="Last completed"
-                operational
-                empty="Not recorded"
-              />
-            </div>
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              <ComplianceDate
-                value={dashboardRow.nextInspection?.latest}
-                label="Next deadline"
-                deadline
-                compact
-                operational
-                empty="Not generated yet"
-              />
-            </div>
-          </article>
-          <article className="panel p-4">
-            <div className="label">Cleanings this year</div>
-            {dashboardRow.cleaning.applicable ? (
-              <>
-                <div className="mt-2 text-2xl font-black">
-                  {dashboardRow.cleaning.completed} of{" "}
-                  {dashboardRow.cleaning.required}
-                </div>
-                <p className="mt-1 text-sm font-bold text-slate-600">
-                  {dashboardRow.cleaning.remaining === 0
-                    ? "Annual requirement met"
-                    : `${dashboardRow.cleaning.remaining} still required in ${dashboardRow.cleaning.year}`}
-                </p>
-                <div className="mt-3 border-t border-slate-200 pt-3">
-                  <ComplianceDate
-                    value={dashboardRow.cleaning.lastCompletedDate}
-                    label="Last cleaning"
-                    operational
-                    empty="Not recorded"
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="mt-2 font-black">Not configured</div>
-            )}
-          </article>
-          <article className="panel p-4">
-            <div className="label">Summertime hyperhalogenation</div>
-            {!dashboardRow.summertimeHyperhalogenation.applicable ? (
-              <div className="mt-2 font-black">Not configured</div>
-            ) : dashboardRow.summertimeHyperhalogenation.completedDate ? (
-              <div className="mt-3">
-                <ComplianceDate
-                  value={dashboardRow.summertimeHyperhalogenation.completedDate}
-                  label={`${dashboardRow.cleaning.year} completed`}
-                  operational
-                />
-              </div>
-            ) : dashboardRow.summertimeHyperhalogenation.due ? (
-              <div className="mt-3 space-y-3">
-                <ComplianceWindow
-                  start={
-                    dashboardRow.summertimeHyperhalogenation.due.targetStart
-                  }
-                  end={dashboardRow.summertimeHyperhalogenation.due.targetEnd}
-                  label="Dates to complete the annual summertime hyperhalogenation"
-                  compact
-                  operational
-                />
-                <ComplianceDate
-                  value={dashboardRow.summertimeHyperhalogenation.due.latest}
-                  label="Deadline"
-                  deadline
-                  compact
-                  operational
-                />
-                <p className="text-xs font-bold text-slate-600">
-                  Completion creates a post-hyperhalogenation Legionella sample
-                  window.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-2 font-black">
-                No open summertime requirement
-              </div>
-            )}
-          </article>
-        </div>
-      </details>
-      {system.labResults.length > 0 && (
-        <section
-          id="samples"
-          className={`${view === "history" ? "panel mb-6" : "hidden"} scroll-mt-6 p-5`}
-        >
-          <div className="label">Legionella result history</div>
-          <h2 className="mt-1 text-xl font-black">Recent Legionella results</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Result receipt is recorded as a calendar date. Exact 24- or 48-hour
-            response timing requires human compliance review because no receipt
-            time is collected.
-          </p>
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            {system.labResults.slice(0, 4).map((result) => {
-              const actionOpen = system.reportingObligations.some(
-                (obligation) =>
-                  obligation.triggerEventId === result.sourceEventId &&
-                  (obligation.obligationType.includes("CORRECTIVE_ACTION") ||
-                    obligation.obligationType === "LEVEL_4_FULL_REMEDIATION"),
-              );
-              const deadline =
-                result.remediationDueAt ?? result.correctiveActionDueAt;
-              const overdue = Boolean(
-                actionOpen && deadline && deadline.getTime() < Date.now(),
-              );
-              return (
-                <article
-                  key={result.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="font-black">
-                        {plainEnumLabel(result.level)} ·{" "}
-                        {formatLegionellaResult(result.cfuPerMl)}
-                      </div>
-                      <div className="mt-1 text-xs font-bold text-slate-600">
-                        Sample collected{" "}
-                        {formatDate(result.sampleEvent.eventDate)}
-                        {" · "}Result received {formatDate(result.receivedDate)}
-                      </div>
-                    </div>
-                    <StatusBadge
-                      color={
-                        result.chainClosed
-                          ? "GREEN"
-                          : overdue
-                            ? "RED"
-                            : actionOpen
-                              ? "YELLOW"
-                              : "GREEN"
-                      }
-                      label={
-                        result.chainClosed
-                          ? "Retest chain closed"
-                          : overdue
-                            ? "Exact deadline overdue"
-                            : actionOpen
-                              ? "Corrective action open"
-                              : "No corrective action open"
-                      }
-                    />
-                  </div>
-                  {result.correctiveActionDueAt && (
-                    <p className="mt-3 text-sm">
-                      <b>Biocide/corrective response due:</b>{" "}
-                      {formatDate(result.correctiveActionDueAt)}
-                    </p>
-                  )}
-                  {result.remediationDueAt && (
-                    <p className="mt-2 text-sm">
-                      <b>Full remediation due:</b>{" "}
-                      {formatDate(result.remediationDueAt)}
-                    </p>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </section>
+      {view === "overview" && (
+        <TowerComplianceSnapshot
+          dashboardRow={dashboardRow}
+          latestMonthlySample={latestMonthlySample}
+          latestQuarterlyInspection={latestQuarterlyInspection}
+        />
+      )}
+      {view === "history" && (
+        <TowerLabResultHistory
+          results={system.labResults}
+          reportingObligations={system.reportingObligations}
+        />
       )}
       {view === "obligations" && (
         <section className="panel mb-6 p-5">
@@ -1001,282 +824,23 @@ export default async function SystemPage({
           />
         </div>
       )}
-      <details
-        className={`${view === "obligations" ? "panel mb-6 p-5" : "hidden"} scroll-mt-6`}
-        open={Boolean(
-          recordedEventId ||
-          query.correctedEvent ||
-          query.voidedEvent ||
-          focusedReportingId,
-        )}
-      >
-        <summary className="cursor-pointer text-base font-black text-emerald-900">
-          Reporting and advanced requirement details
-        </summary>
-        <p className="mt-2 text-sm text-slate-600">
-          Review source rules, record required submissions, or inspect detailed
-          sampling requirements.
-        </p>
-        <div
-          id="obligations"
-          className="mt-5 grid scroll-mt-6 gap-4 xl:grid-cols-2"
-        >
-          <section className="panel p-5">
-            <div className="label">Sampling requirements</div>
-            <h2 className="mt-1 font-black">
-              Open Legionella sampling requirements
-            </h2>
-            <div className="mt-4 space-y-3">
-              {system.sampleObligations.length ? (
-                system.sampleObligations.map((item) => (
-                  <ObligationIntelligenceCard
-                    key={item.id}
-                    today={today}
-                    obligation={{
-                      id: item.id,
-                      type: item.obligationType,
-                      category: "SAMPLE",
-                      earliest: item.earliestDueDate,
-                      targetStart: item.targetStartDate,
-                      targetEnd: item.targetEndDate,
-                      latest: item.latestDueDate,
-                      priority: item.priority,
-                      status: item.status,
-                      reason: item.reason,
-                      sourceCitation: item.sourceCitation,
-                      trigger: {
-                        id: item.triggerEvent.id,
-                        type: item.triggerEvent.eventType,
-                        date: item.triggerEvent.eventDate,
-                      },
-                    }}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No sample requirement created by a compliance record is open.
-                </p>
-              )}
-            </div>
-          </section>
-          <section className="panel p-5">
-            <div className="label">Cleaning requirements</div>
-            <h2 className="mt-1 font-black">
-              Startup maintenance requirements
-            </h2>
-            <div className="mt-4 space-y-3">
-              {system.maintenanceObligations.length ? (
-                system.maintenanceObligations.map((item) => (
-                  <ObligationIntelligenceCard
-                    key={item.id}
-                    today={today}
-                    obligation={{
-                      id: item.id,
-                      type: item.obligationType,
-                      category: "MAINTENANCE",
-                      earliest: item.earliestDueDate,
-                      targetStart: item.targetStartDate,
-                      targetEnd: item.targetEndDate,
-                      latest: item.latestDueDate,
-                      priority: item.priority,
-                      status: item.status,
-                      reason: item.reason,
-                      sourceCitation: item.sourceCitation,
-                      trigger: {
-                        id: item.triggerEvent.id,
-                        type: item.triggerEvent.eventType,
-                        date: item.triggerEvent.eventDate,
-                      },
-                    }}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No startup cleaning requirement is open.
-                </p>
-              )}
-            </div>
-          </section>
-          <section className="panel p-5">
-            <div className="label">Inspection requirements</div>
-            <h2 className="mt-1 font-black">Qualified-person inspection</h2>
-            <div className="mt-4 space-y-3">
-              {system.inspectionObligations.length ? (
-                system.inspectionObligations.map((item) => (
-                  <ObligationIntelligenceCard
-                    key={item.id}
-                    today={today}
-                    obligation={{
-                      id: item.id,
-                      type: "QUARTERLY_COMPLIANCE_INSPECTION",
-                      category: "INSPECTION",
-                      earliest: item.earliestDueDate,
-                      targetStart: item.targetStartDate,
-                      targetEnd: item.targetEndDate,
-                      latest: item.latestDueDate,
-                      priority: item.priority,
-                      status: item.status,
-                      reason: item.reason,
-                      sourceCitation: item.sourceCitation,
-                      trigger: {
-                        id: item.triggerEvent.id,
-                        type: item.triggerEvent.eventType,
-                        date: item.triggerEvent.eventDate,
-                      },
-                    }}
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  Record a completed inspection to establish the next 90-day
-                  requirement.
-                </p>
-              )}
-            </div>
-          </section>
-          <section className="panel p-5">
-            <div className="label">Reporting & action reminders</div>
-            <h2 className="mt-1 font-black">DOH and portal deadlines</h2>
-            <div className="mt-4 space-y-3">
-              {system.reportingObligations.length ? (
-                system.reportingObligations.map((item) => (
-                  <section
-                    key={item.id}
-                    id={`reporting-${item.id}`}
-                    className={`scroll-mt-24 rounded-xl border p-4 text-sm ${
-                      focusedReportingId === item.id
-                        ? "border-emerald-500 bg-emerald-50 ring-4 ring-emerald-100"
-                        : "border-slate-200 bg-slate-50"
-                    }`}
-                  >
-                    <ObligationIntelligenceCard
-                      today={today}
-                      obligation={{
-                        id: item.id,
-                        type: item.obligationType,
-                        category: "REPORTING_ACTION",
-                        earliest: item.earliestDueDate,
-                        targetStart: item.targetStartDate,
-                        targetEnd: item.targetEndDate,
-                        latest: item.latestDueDate,
-                        priority: item.priority,
-                        status: item.status,
-                        reason: item.reason,
-                        sourceCitation: item.sourceCitation,
-                        trigger: {
-                          id: item.triggerEvent.id,
-                          type: item.triggerEvent.eventType,
-                          date: item.triggerEvent.eventDate,
-                        },
-                      }}
-                    />
-                    {!item.obligationType.includes("CORRECTIVE_ACTION") &&
-                    item.obligationType !== "LEVEL_4_FULL_REMEDIATION" &&
-                    item.obligationType !==
-                      "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
-                    recordedReportingObligationIds.has(item.id) ? (
-                      <p className="mt-3 font-bold text-amber-900">
-                        Late submission recorded. The missed deadline remains in
-                        Compliance Issues.
-                      </p>
-                    ) : (
-                      !item.obligationType.includes("CORRECTIVE_ACTION") &&
-                      item.obligationType !== "LEVEL_4_FULL_REMEDIATION" &&
-                      item.obligationType !==
-                        "BIOLOGICAL_INDICATOR_RESIDUAL_MONITORING" &&
-                      (focusedReportingId === item.id ? (
-                        <form
-                          action={recordServiceEventAction}
-                          className="mt-3 rounded-xl border border-emerald-200 bg-white p-4"
-                        >
-                          <div className="mb-3 border-b border-slate-200 pb-3">
-                            <div className="label">
-                              Record actual submission
-                            </div>
-                            <p className="mt-1 text-sm text-slate-600">
-                              Enter the verified completion date, then save.
-                            </p>
-                          </div>
-                          {item.status === "MISSED" && (
-                            <p className="mb-2 font-bold text-red-900">
-                              Record this as a late historical submission. It
-                              will not repair the missed requirement.
-                            </p>
-                          )}
-                          <input type="hidden" name="systemId" value={id} />
-                          <input
-                            type="hidden"
-                            name="eventType"
-                            value="REPORT_SUBMITTED"
-                          />
-                          <label className="block">
-                            <span className="label">
-                              Actual submission date · Required
-                            </span>
-                            <input
-                              className="field mt-1"
-                              name="eventDate"
-                              type="date"
-                              max={today}
-                              required
-                            />
-                            <span className="mt-1 block text-xs font-bold text-slate-600">
-                              Use the date on the portal or agency
-                              confirmation—not today unless it was actually
-                              submitted today.
-                            </span>
-                          </label>
-                          <input
-                            type="hidden"
-                            name="reportType"
-                            value={item.obligationType}
-                          />
-                          <input
-                            type="hidden"
-                            name="reportingObligationId"
-                            value={item.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="notes"
-                            value={`Completed ${plainEnumLabel(item.obligationType)}`}
-                          />
-                          <SubmitButton
-                            className="mt-2"
-                            pendingLabel="Saving submission…"
-                          >
-                            {item.obligationType === "PORTAL_SAMPLE_DATE"
-                              ? "Record NYC portal submission"
-                              : "Record submission"}
-                          </SubmitButton>
-                        </form>
-                      ) : (
-                        <Link
-                          className={buttonClass("primary", "mt-3")}
-                          href={completionHrefForObligation(id, {
-                            id: item.id,
-                            type: item.obligationType,
-                            category: "REPORTING_ACTION",
-                          })}
-                        >
-                          {item.obligationType === "PORTAL_SAMPLE_DATE"
-                            ? "Record NYC portal submission"
-                            : "Record submission"}
-                        </Link>
-                      ))
-                    )}
-                  </section>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  No reporting requirement created by a compliance record is
-                  open.
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
-      </details>
+      {view === "obligations" && (
+        <TowerRequirementDetails
+          systemId={id}
+          today={today}
+          open={Boolean(
+            recordedEventId ||
+            query.correctedEvent ||
+            query.voidedEvent ||
+            focusedReportingId,
+          )}
+          focusedReportingId={focusedReportingId}
+          sampleObligations={system.sampleObligations}
+          maintenanceObligations={system.maintenanceObligations}
+          inspectionObligations={system.inspectionObligations}
+          reportingObligations={system.reportingObligations}
+        />
+      )}
       <div className="mb-6 grid gap-4">
         <div
           id="cleaning-plan"

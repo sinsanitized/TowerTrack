@@ -6,10 +6,9 @@ import {
 } from "@/lib/date";
 import { activitiesCanShareVisit } from "@/lib/activity-compatibility";
 
-export type ComplianceColor =
-  "GREEN" | "YELLOW" | "RED" | "BLUE" | "GRAY" | "PURPLE";
+type ComplianceColor = "GREEN" | "YELLOW" | "RED" | "BLUE" | "GRAY" | "PURPLE";
 
-export type ComplianceUrgency =
+type ComplianceUrgency =
   | "COMPLETED"
   | "SCHEDULED"
   | "OPEN"
@@ -537,7 +536,7 @@ export function bestVisitOpportunity(
   };
 }
 
-export type ComplianceHealth = "GOOD" | "ATTENTION" | "AT_RISK" | "CRITICAL";
+type ComplianceHealth = "GOOD" | "ATTENTION" | "AT_RISK" | "CRITICAL";
 
 export function inactiveComplianceStatus(operatingStatus: string) {
   if (

@@ -28,36 +28,65 @@ export function ServiceResponsibilityFields({
     ) as Record<ServiceResponsibilityFamilyKey, ServiceResponsibility | "">,
   );
   const legionellaResponsibility = values.legionellaResponsibility;
+  const [preset, setPreset] = useState<ServiceResponsibility | "">("");
+  const [previousValues, setPreviousValues] = useState<typeof values | null>(
+    null,
+  );
 
-  function setAll(next: ServiceResponsibility | "") {
-    if (!next) return;
+  function applyPreset() {
+    if (!preset) return;
+    setPreviousValues(values);
     setValues(
       Object.fromEntries(
-        serviceResponsibilityFamilies.map(([key]) => [key, next]),
+        serviceResponsibilityFamilies.map(([key]) => [key, preset]),
       ) as Record<ServiceResponsibilityFamilyKey, ServiceResponsibility | "">,
     );
   }
 
   return (
     <>
-      <label className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:col-span-2">
-        <span className="label">Set all services at once (optional)</span>
-        <select
-          className="field mt-1 bg-white"
-          defaultValue=""
-          onChange={(event) =>
-            setAll(event.target.value as ServiceResponsibility | "")
-          }
-        >
-          <option value="">Choose only if one party handles everything</option>
-          <option value="OUR_COMPANY">Our company handles all services</option>
-          <option value="CUSTOMER">Customer handles all services</option>
-          <option value="OTHER_VENDOR">
-            Another vendor handles all services
-          </option>
-          <option value="NOT_TRACKED">Do not track any services</option>
-        </select>
-      </label>
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 sm:col-span-2">
+        <span className="label">Optional shortcut for all services</span>
+        <p className="mt-1 text-sm text-slate-600">
+          Choose a preset, then apply it. You can still change each service
+          below before saving.
+        </p>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+          <select
+            className="field grow bg-white"
+            value={preset}
+            onChange={(event) =>
+              setPreset(event.target.value as ServiceResponsibility | "")
+            }
+          >
+            <option value="">Choose a preset</option>
+            <option value="OUR_COMPANY">Our company handles all</option>
+            <option value="CUSTOMER">Customer handles all</option>
+            <option value="OTHER_VENDOR">Another vendor handles all</option>
+            <option value="NOT_TRACKED">Do not track any services</option>
+          </select>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={applyPreset}
+            disabled={!preset}
+          >
+            Apply preset
+          </button>
+          {previousValues && (
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setValues(previousValues);
+                setPreviousValues(null);
+              }}
+            >
+              Undo preset
+            </button>
+          )}
+        </div>
+      </div>
       {serviceResponsibilityFamilies.map(([key, label]) => (
         <label
           key={key}

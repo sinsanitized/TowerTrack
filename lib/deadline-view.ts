@@ -27,16 +27,16 @@ import {
   type EventEntryIntentName,
 } from "@/lib/event-entry-intent";
 
-export type DeadlineCategory =
+type DeadlineCategory =
   "SAMPLE" | "INSPECTION" | "MAINTENANCE" | "REPORTING_ACTION";
 
-export type DeadlineStatus =
+type DeadlineStatus =
   | "Overdue"
   | "Due this week"
   | "Due next week"
   | "Due later"
   | "Review required";
-export type DeadlineExecutionState =
+type DeadlineExecutionState =
   "Completion not recorded" | "Waiting" | "Completed";
 
 export const deadlinePeriodValues = [
@@ -258,6 +258,11 @@ function portalPresentation(summary: PreviousLegionellaSummary) {
       display: previousSampleDateDisplay(summary.portalSubmittedDate!),
       accessible: `Previous Legionella sample was submitted to the NYC portal on ${formatLongDate(summary.portalSubmittedDate)}.`,
     };
+  if (summary.portalReportingStatus === "SUBMITTED_LATE")
+    return {
+      display: `Completed late · ${previousSampleDateDisplay(summary.portalSubmittedDate!)}`,
+      accessible: `Previous Legionella sample portal reporting was completed late on ${formatLongDate(summary.portalSubmittedDate)}.`,
+    };
   if (summary.portalReportingStatus === "NOT_SUBMITTED")
     return {
       display: "Not submitted",
@@ -368,7 +373,7 @@ export function completionHrefForObligation(
     : `/systems/${towerId}?view=obligations&report=${encodeURIComponent(obligation.id)}#reporting-${obligation.id}`;
 }
 
-export function executionStateFor(
+function executionStateFor(
   obligation: Pick<DeadlineObligationInput, "status">,
   responsibility: ServiceResponsibility | null,
 ): {

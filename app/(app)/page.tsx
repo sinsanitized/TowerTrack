@@ -299,42 +299,6 @@ export default async function ActionCenterPage({
         </div>
       )}
 
-      {visitIssues.length > 0 && (
-        <section className="section-panel mb-7 border-amber-300">
-          <div className="border-b border-amber-300 bg-amber-50 p-5">
-            <h2 className="text-xl font-black text-amber-950">
-              Scheduled visits needing attention
-            </h2>
-            <p className="mt-1 text-sm font-bold text-amber-900">
-              Review overdue visits and cleaning plans that are not ready.
-            </p>
-          </div>
-          {visitIssues.map((job) => (
-            <Link
-              key={job.id}
-              href={`/calendar?month=${dateOnly(job.cleaningVisit.scheduledDate).slice(0, 7)}&job=${job.id}`}
-              className="record-row block border-l-4 border-amber-500 p-4 hover:bg-amber-50"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="font-black">
-                    {job.building.buildingName} · {job.towers.length} tower
-                    {job.towers.length === 1 ? "" : "s"}
-                  </div>
-                  <div className="mt-1 text-sm text-slate-700">
-                    Chemical addition{" "}
-                    {formatComplianceDate(job.addVisit.scheduledDate)} (
-                    {job.addVisit.status.replaceAll("_", " ")}) → Cleaning{" "}
-                    {formatComplianceDate(job.cleaningVisit.scheduledDate)}
-                  </div>
-                </div>
-                <span className="btn">Review schedule</span>
-              </div>
-            </Link>
-          ))}
-        </section>
-      )}
-
       {(issueCount > 0 || immediateItems.length > 0) && (
         <section className="section-panel mb-7 border-red-200">
           <div className="border-b border-red-200 bg-red-50 p-5">
@@ -375,6 +339,42 @@ export default async function ActionCenterPage({
               </Link>
             </div>
           )}
+        </section>
+      )}
+
+      {visitIssues.length > 0 && (
+        <section className="section-panel mb-7 border-amber-300">
+          <div className="border-b border-amber-300 bg-amber-50 p-5">
+            <h2 className="text-xl font-black text-amber-950">
+              Scheduled visits needing attention
+            </h2>
+            <p className="mt-1 text-sm font-bold text-amber-900">
+              Review overdue visits and cleaning plans that are not ready.
+            </p>
+          </div>
+          {visitIssues.map((job) => (
+            <Link
+              key={job.id}
+              href={`/calendar?month=${dateOnly(job.cleaningVisit.scheduledDate).slice(0, 7)}&job=${job.id}`}
+              className="record-row block border-l-4 border-amber-500 p-4 hover:bg-amber-50"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-black">
+                    {job.building.buildingName} · {job.towers.length} tower
+                    {job.towers.length === 1 ? "" : "s"}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-700">
+                    Chemical addition{" "}
+                    {formatComplianceDate(job.addVisit.scheduledDate)} (
+                    {job.addVisit.status.replaceAll("_", " ")}) → Cleaning{" "}
+                    {formatComplianceDate(job.cleaningVisit.scheduledDate)}
+                  </div>
+                </div>
+                <span className="btn">Review schedule</span>
+              </div>
+            </Link>
+          ))}
         </section>
       )}
 

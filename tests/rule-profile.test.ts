@@ -4,6 +4,7 @@ import {
   composeCompatibleRuleDefinitions,
   composeTowerRuleProfiles,
   RuleConfigurationError,
+  resolveTowerRuleProfiles,
   ruleSetVersion,
   type CompilableRuleProfile,
 } from "@/lib/rule-profile";
@@ -58,6 +59,56 @@ const profile: CompilableRuleProfile = {
 };
 
 describe("compiled rule profiles", () => {
+  it("uses an organization copy only for an explicit same-organization assignment", () => {
+    const sharedNyc = { ...profile, id: "shared-nyc", organizationId: null };
+    const sharedNys = {
+      ...profile,
+      id: "shared-nys",
+      organizationId: null,
+      jurisdictionMode: "NYS_PART_4_ONLY",
+    };
+    const organizationCopy = {
+      ...sharedNyc,
+      id: "org-a-nyc",
+      organizationId: "org-a",
+    };
+
+    expect(
+      resolveTowerRuleProfiles({
+        configuration: "NYC_AND_NYS",
+        sharedProfiles: [sharedNyc, sharedNys, organizationCopy],
+        assignedProfile: organizationCopy,
+        hasExplicitAssignment: false,
+        organizationId: "org-b",
+      }).map(({ id }) => id),
+    ).toEqual(["shared-nyc", "shared-nys"]);
+    expect(
+      resolveTowerRuleProfiles({
+        configuration: "NYC_AND_NYS",
+        sharedProfiles: [sharedNyc, sharedNys],
+        assignedProfile: organizationCopy,
+        hasExplicitAssignment: true,
+        organizationId: "org-a",
+      }).map(({ id }) => id),
+    ).toEqual(["org-a-nyc", "shared-nys"]);
+  });
+
+  it("rejects an explicitly assigned copy owned by another organization", () => {
+    expect(() =>
+      resolveTowerRuleProfiles({
+        configuration: "NYS_ONLY",
+        sharedProfiles: [],
+        assignedProfile: {
+          ...profile,
+          organizationId: "org-a",
+          jurisdictionMode: "NYS_PART_4_ONLY",
+        },
+        hasExplicitAssignment: true,
+        organizationId: "org-b",
+      }),
+    ).toThrow(/ORGANIZATION_SCOPE/);
+  });
+
   it("includes every rule revision in the explainable version", () => {
     expect(ruleSetVersion(profile)).toBe(
       "nyc[hyper@4,inspection@1,portal@3,routine@2]",

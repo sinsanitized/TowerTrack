@@ -36,7 +36,7 @@ export type ProfileMode =
   | "OUT_OF_STATE_GUIDANCE"
   | "PENDING_REGULATION"
   | "CUSTOM_JURISDICTION";
-export type Authority =
+type Authority =
   | "REGULATORY"
   | "GUIDANCE"
   | "COMPANY_POLICY"
@@ -58,7 +58,7 @@ export type StatusResult = {
   nextAction: string;
 };
 
-export const PROFILE_RULES: Record<
+const PROFILE_RULES: Record<
   ProfileMode,
   {
     interval: number | null;
@@ -143,7 +143,7 @@ export interface ClockActivity {
   performedDate: string | null;
 }
 
-export function isLegionellaSampleActivityType(activityType: string): boolean {
+function isLegionellaSampleActivityType(activityType: string): boolean {
   return [
     "ROUTINE_LEGIONELLA_SAMPLE",
     "STARTUP_LEGIONELLA_SAMPLE",
@@ -161,18 +161,6 @@ export function canResetRoutineLegionellaClock(
     activity.qualifiesForRoutineLegionella &&
     isLegionellaSampleActivityType(activity.activityType) &&
     activity.performedDate,
-  );
-}
-
-export function latestQualifyingLegionellaSample(
-  activities: ClockActivity[],
-): string | null {
-  return (
-    activities
-      .filter(canResetRoutineLegionellaClock)
-      .map((activity) => activity.performedDate as string)
-      .sort()
-      .at(-1) ?? null
   );
 }
 

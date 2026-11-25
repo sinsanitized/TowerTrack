@@ -6,7 +6,7 @@ import { AlertTriangle, Save } from "lucide-react";
 import {
   correctServiceEventAction,
   voidServiceEventAction,
-} from "@/app/actions";
+} from "@/app/actions/service-events";
 import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { LegionellaResultInput } from "@/components/legionella-result-input";
 import {
@@ -236,9 +236,6 @@ export function EventEditor({
               )}
             </>
           )}
-          {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
-            <LegionellaResultInput value={cfuPerMl} onChange={setCfuPerMl} />
-          )}
           {eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT" && (
             <label>
               <span className="label">Result (CFU/mL)</span>
@@ -267,6 +264,9 @@ export function EventEditor({
                 <option value="NOT_RESTORED">Not restored within 3 days</option>
               </select>
             </label>
+          )}
+          {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
+            <LegionellaResultInput value={cfuPerMl} onChange={setCfuPerMl} />
           )}
           {eventType === "REPORT_SUBMITTED" && (
             <>

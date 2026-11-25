@@ -17,6 +17,7 @@ import type { ServiceEventTypeValue } from "@/lib/service-events";
 import {
   compileTowerRuleConfig,
   composeTowerRuleProfiles,
+  resolveTowerRuleProfiles,
 } from "@/lib/rule-profile";
 import { eventEntryHref } from "@/lib/event-entry-intent";
 import { buildSampleChoices } from "@/lib/sample-choices";
@@ -100,6 +101,7 @@ export default async function EventPage({
   );
   const availableBaseProfiles = await db.ruleProfile.findMany({
     where: {
+      organizationId: null,
       jurisdictionMode: {
         in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
       },
@@ -117,12 +119,19 @@ export default async function EventPage({
       ],
     },
     include: { rules: true },
+    orderBy: { effectiveStartDate: "desc" },
   });
   const assignedProfile = assignment?.ruleProfile ?? system.ruleProfile;
   const configuration = assignment?.configuration ?? system.ruleConfiguration;
   const composedProfile = composeTowerRuleProfiles(
     configuration,
-    configuration === "CUSTOM" ? [assignedProfile] : availableBaseProfiles,
+    resolveTowerRuleProfiles({
+      configuration,
+      sharedProfiles: availableBaseProfiles,
+      assignedProfile,
+      hasExplicitAssignment: Boolean(assignment),
+      organizationId: user.organizationId,
+    }),
     assignedProfile.id,
   );
   const ruleConfig = compileTowerRuleConfig(composedProfile, {

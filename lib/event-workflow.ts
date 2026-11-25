@@ -1,6 +1,6 @@
 import type { RegulatoryEventType } from "@/lib/obligation-engine";
 
-export type EventWorkflowClassification =
+type EventWorkflowClassification =
   | "FREQUENT_FIELD"
   | "INFREQUENT_FIELD"
   | "OFFICE_ADMINISTRATIVE"
@@ -15,7 +15,7 @@ export type EventWorkflowDefinition = {
   location: "PRIMARY" | "MORE" | "OFFICE_ONLY" | "NOT_IN_MENU";
 };
 
-export const eventWorkflowDefinitions: readonly EventWorkflowDefinition[] = [
+const eventWorkflowDefinitions: readonly EventWorkflowDefinition[] = [
   {
     type: "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
     label: "Sample",

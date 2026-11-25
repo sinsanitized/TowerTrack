@@ -1,20 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  Beaker,
-  CheckCircle2,
-  ClipboardCheck,
-  BrushCleaning,
-  Droplets,
-  FlaskConical,
-  Play,
-  Power,
-  ShieldAlert,
-  Sparkles,
-} from "lucide-react";
-import { recordServiceEventAction } from "@/app/actions";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { recordServiceEventAction } from "@/app/actions/service-events";
 import {
   previewEventImpact,
   type OpenSampleObligationForImpact,
@@ -25,35 +13,16 @@ import { ComplianceDate, ComplianceWindow } from "@/components/compliance-date";
 import { LegionellaResultInput } from "@/components/legionella-result-input";
 import { plainEnumLabel, requirementLabel } from "@/lib/labels";
 import { formatOperationalDate } from "@/lib/date";
-import { eventDefinitionsForLocation } from "@/lib/event-workflow";
 import { buttonClass } from "@/lib/button-variants";
 import { SubmitButton } from "@/components/submit-button";
 import type { SampleChoice } from "@/lib/sample-choices";
 import {
   canRecordExternalLegionella,
-  serviceResponsibilityLabel,
   type ServiceResponsibility,
 } from "@/lib/service-responsibility";
 import type { EventEntryContext } from "@/components/event-recorder-drawer";
 import { isResampleObligation } from "@/lib/event-entry-intent";
-
-const eventIcons = {
-  ROUTINE_LEGIONELLA_SAMPLE_COLLECTED: FlaskConical,
-  BACTERIOLOGICAL_SAMPLE_COLLECTED: FlaskConical,
-  LEGIONELLA_RESULT_RECEIVED: Beaker,
-  QUARTERLY_INSPECTION_COMPLETED: ClipboardCheck,
-  CLEANING_COMPLETED: BrushCleaning,
-  STARTUP: Play,
-  SHUTDOWN: Power,
-  SUMMERTIME_HYPERHALOGENATION: Sparkles,
-  HIGH_LEGIONELLA_DISINFECTION: Droplets,
-  POWER_FAILURE: AlertTriangle,
-  WEEKLY_BIOLOGICAL_INDICATOR_RESULT: ShieldAlert,
-} as const;
-
-const primaryEvents = eventDefinitionsForLocation("PRIMARY");
-const moreEvents = eventDefinitionsForLocation("MORE");
-const officeEvents = eventDefinitionsForLocation("OFFICE_ONLY");
+import { EventTypePicker } from "@/components/event-type-picker";
 
 const emergencyTypes = [
   ["Power failure", "POWER_FAILURE"],
@@ -175,6 +144,11 @@ export function EventRecorder({
       : returnTo === "/" || returnTo?.startsWith("/?")
         ? "Today"
         : null;
+  const primarySaveLabel =
+    returnLabel === "Sample results" &&
+    eventType === "LEGIONELLA_RESULT_RECEIVED"
+      ? "Save result and continue"
+      : saveLabel;
   const externalLegionella = canRecordExternalLegionella(
     legionellaResponsibility,
   );
@@ -225,13 +199,6 @@ export function EventRecorder({
     legionellaResponsibility,
   ]);
   const projectedObligations = preview.impact ? preview.impact.generated : [];
-  const visiblePrimaryEvents = primaryEvents.filter(
-    ({ type }) =>
-      ![
-        "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED",
-        "LEGIONELLA_RESULT_RECEIVED",
-      ].includes(type) || legionellaResponsibility === "OUR_COMPANY",
-  );
   const selectEvent = (value: string) => {
     if (
       value === "LEGIONELLA_RESULT_RECEIVED" &&
@@ -245,152 +212,16 @@ export function EventRecorder({
   return (
     <div id="record-event" className="scroll-mt-6">
       {!intentContext && !eventSelected && (
-        <section className="panel p-5 sm:p-6">
-          <div>
-            <div className="label">Step 1 of 2 · Choose completed work</div>
-            <h2 className="mt-1 text-xl font-black">What happened?</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Choose the familiar field or office task below. TowerTrack will
-              select the correct compliance record and calculate what comes
-              next.
-            </p>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {visiblePrimaryEvents.map(({ label, type: value }) => {
-              const Icon = eventIcons[value as keyof typeof eventIcons];
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  data-recorder-autofocus={
-                    !directedEntry && value === visiblePrimaryEvents[0]?.type
-                      ? "true"
-                      : undefined
-                  }
-                  onClick={() => selectEvent(value)}
-                  disabled={
-                    !ready ||
-                    (value === "LEGIONELLA_RESULT_RECEIVED" &&
-                      !samplesAwaitingResults.length)
-                  }
-                  className={`flex min-h-14 items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm font-bold ${
-                    !ready ||
-                    (value === "LEGIONELLA_RESULT_RECEIVED" &&
-                      !samplesAwaitingResults.length)
-                      ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                      : eventSelected && eventType === value
-                        ? "border-emerald-800 bg-emerald-50 text-emerald-900"
-                        : "border-slate-200 bg-white text-slate-700"
-                  }`}
-                >
-                  <Icon size={17} /> {label}
-                </button>
-              );
-            })}
-          </div>
-          <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-            <summary
-              className={buttonClass(
-                "ghost",
-                "w-full cursor-pointer justify-start text-sm",
-              )}
-            >
-              Less common completed work
-            </summary>
-            <p className="mt-2 text-sm text-slate-600">
-              Emergency, shutdown, treatment, and other occasional records.
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {moreEvents.map(({ label, type: value }) => {
-                const Icon = eventIcons[value as keyof typeof eventIcons];
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={!ready}
-                    onClick={() => selectEvent(value)}
-                    className={`flex min-h-12 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${
-                      !ready
-                        ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                        : eventSelected && eventType === value
-                          ? "border-emerald-800 bg-emerald-50 text-emerald-900"
-                          : "border-slate-200 bg-white text-slate-700"
-                    }`}
-                  >
-                    <Icon size={17} /> {label}
-                  </button>
-                );
-              })}
-            </div>
-            {canConfirmOwnerManaged && (
-              <div className="mt-4 border-t border-slate-200 pt-4">
-                <div className="label">Office confirmation</div>
-                <p className="mt-1 text-sm text-slate-600">
-                  These obligations belong to the cooling-tower owner or an
-                  external provider and are not assigned to technicians.
-                </p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {officeEvents
-                    .filter(
-                      ({ type }) =>
-                        type !== "BACTERIOLOGICAL_SAMPLE_COLLECTED" ||
-                        bacteriologicalResponsibility !== "CUSTOMER",
-                    )
-                    .map(({ label, type: value }) => {
-                      const Icon = eventIcons[value as keyof typeof eventIcons];
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          disabled={!ready}
-                          onClick={() => selectEvent(value)}
-                          className="flex min-h-12 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-bold text-slate-700"
-                        >
-                          <Icon size={17} /> {label}
-                        </button>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-            {canConfirmOwnerManaged && externalLegionella && (
-              <div className="mt-4 border-t border-slate-200 pt-4">
-                <div className="label">
-                  Record External Legionella Information
-                </div>
-                <p className="mt-1 text-sm text-slate-600">
-                  {serviceResponsibilityLabel(legionellaResponsibility)}. These
-                  records are attributed externally, not to our technicians.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    className={buttonClass("secondary")}
-                    type="button"
-                    onClick={() =>
-                      selectEvent("ROUTINE_LEGIONELLA_SAMPLE_COLLECTED")
-                    }
-                  >
-                    Record external sample date
-                  </button>
-                  <button
-                    className={buttonClass("secondary")}
-                    type="button"
-                    disabled={!samplesAwaitingResults.length}
-                    onClick={() => selectEvent("LEGIONELLA_RESULT_RECEIVED")}
-                  >
-                    Record external result
-                  </button>
-                </div>
-              </div>
-            )}
-          </details>
-          {!samplesAwaitingResults.length && (
-            <p className="mt-3 text-sm font-bold text-slate-600">
-              Add a Legionella sample before adding a laboratory result. Every
-              result must be linked to the sample that produced it.
-            </p>
-          )}
-        </section>
+        <EventTypePicker
+          ready={ready}
+          eventType={eventType}
+          hasPendingResults={samplesAwaitingResults.length > 0}
+          canConfirmOwnerManaged={canConfirmOwnerManaged}
+          externalLegionella={externalLegionella}
+          legionellaResponsibility={legionellaResponsibility}
+          bacteriologicalResponsibility={bacteriologicalResponsibility}
+          onSelect={selectEvent}
+        />
       )}
       {!intentContext && eventSelected && (
         <section className="panel flex flex-wrap items-center justify-between gap-3 p-4">
@@ -579,9 +410,6 @@ export function EventRecorder({
               </select>
             </label>
           )}
-          {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
-            <LegionellaResultInput value={cfuPerMl} onChange={setCfuPerMl} />
-          )}
           {eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT" && (
             <label>
               <span className="label">Result (CFU/mL)</span>
@@ -641,6 +469,9 @@ export function EventRecorder({
                 </label>
               )}
             </>
+          )}
+          {eventType === "LEGIONELLA_RESULT_RECEIVED" && (
+            <LegionellaResultInput value={cfuPerMl} onChange={setCfuPerMl} />
           )}
           {eventType === "WEEKLY_BIOLOGICAL_INDICATOR_RESULT" && (
             <label className="sm:col-span-2">
@@ -853,12 +684,19 @@ export function EventRecorder({
               Preview unavailable: {preview.error}
             </p>
           )}
-          <section
-            className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950 sm:col-span-2"
-            aria-live="polite"
-          >
-            <h3 className="font-black">Save impact</h3>
-            <div className="mt-2">
+          <details className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950 sm:col-span-2">
+            <summary className="cursor-pointer font-black" aria-live="polite">
+              {preview.error
+                ? "Save impact — fix the issue above"
+                : !eventDate
+                  ? "Save impact — select a date"
+                  : isResult && cfuPerMl === ""
+                    ? "Save impact — enter the laboratory result"
+                    : projectedObligations.length
+                      ? `Save impact — creates ${projectedObligations.length} follow-up ${projectedObligations.length === 1 ? "requirement" : "requirements"}`
+                      : "Save impact — updates history and compliance dates"}
+            </summary>
+            <div className="mt-3 border-t border-blue-200 pt-3">
               {preview.error ? (
                 <p className="text-sm font-bold">
                   Correct the validation issue above before saving.
@@ -956,7 +794,7 @@ export function EventRecorder({
                 </p>
               </details>
             </div>
-          </section>
+          </details>
           <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-300 bg-white p-3 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] sm:col-span-2 sm:flex-row sm:items-center sm:justify-end">
             {returnLabel && (
               <span className="mr-auto text-center text-sm font-bold text-slate-600 sm:text-left">
@@ -977,10 +815,10 @@ export function EventRecorder({
             )}
             <SubmitButton
               className="min-h-11 w-full lg:w-auto"
-              pendingLabel={`Saving ${saveLabel.replace(/^Save /, "").toLowerCase()}…`}
+              pendingLabel={`Saving ${primarySaveLabel.replace(/^Save /, "").toLowerCase()}…`}
               disabled={Boolean(preview.error)}
             >
-              {saveLabel}
+              {primarySaveLabel}
             </SubmitButton>
           </div>
         </form>

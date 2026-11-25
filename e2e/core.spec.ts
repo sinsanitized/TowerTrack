@@ -26,7 +26,21 @@ test("laboratory entry requires an explicit detected result", async ({
     recorder.getByText("Choose the result shown on the laboratory report."),
   ).toBeVisible();
   await expect(recorder.getByLabel("Result (CFU/mL)")).toHaveCount(0);
-  await recorder.getByLabel("Detected", { exact: true }).click();
+  const detected = recorder.getByLabel("Detected", { exact: true });
+  await detected.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        const ready = () =>
+          Object.keys(element).some((key) => key.startsWith("__reactProps$"));
+        if (ready()) return resolve();
+        const interval = window.setInterval(() => {
+          if (!ready()) return;
+          window.clearInterval(interval);
+          resolve();
+        }, 10);
+      }),
+  );
+  await detected.click();
   await expect(recorder.getByLabel("Result (CFU/mL)")).toBeVisible();
 });
 
@@ -377,6 +391,7 @@ test("customer onboarding continues from address to cooling tower details", asyn
     page.getByRole("heading", { name: "Add cooling tower details" }),
   ).toBeVisible();
   await page.getByText("Add manufacturer (optional)", { exact: true }).click();
+  await page.getByLabel("Tower name").fill("CT-Workflow");
   await page.getByLabel("Manufacturer (optional)").fill("Test Manufacturer");
   await page.getByLabel("Model number").fill("MODEL-100");
   await page.getByLabel("Serial number").fill("SERIAL-100");

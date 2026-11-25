@@ -276,7 +276,12 @@ export default async function CustomersPage({
                           <Building2 size={18} />
                         </span>
                         <div>
-                          <div className="font-black">{customer.name}</div>
+                          <Link
+                            className="font-black underline-offset-4 hover:underline"
+                            href={primaryHref}
+                          >
+                            {customer.name}
+                          </Link>
                         </div>
                       </div>
                     </td>

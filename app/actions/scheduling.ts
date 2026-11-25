@@ -277,10 +277,19 @@ export async function completeAddVisitAction(formData: FormData) {
     UserRole.SCHEDULER,
     UserRole.TECHNICIAN,
   ]);
-  const jobId = z.string().min(1).parse(formData.get("jobId"));
+  const parsed = z
+    .object({
+      jobId: z.string().min(1),
+      completionDate: z.string().date(),
+    })
+    .parse(Object.fromEntries(formData));
+  if (parsed.completionDate > todayDateOnly())
+    throw new Error(
+      "Actual chemical addition cannot be recorded in the future.",
+    );
   const job = await db.cleaningJob.findFirstOrThrow({
     where: {
-      id: jobId,
+      id: parsed.jobId,
       building: { customer: { organizationId: user.organizationId } },
     },
     include: { addVisit: true },
@@ -294,13 +303,13 @@ export async function completeAddVisitAction(formData: FormData) {
       where: { id: job.addVisitId },
       data: {
         status: VisitStatus.COMPLETED,
-        performedDate: job.addVisit.scheduledDate,
+        performedDate: asUtc(parsed.completionDate),
         activities: {
           updateMany: {
             where: { status: ActivityStatus.PLANNED },
             data: {
               status: ActivityStatus.COMPLETED,
-              performedDate: job.addVisit.scheduledDate,
+              performedDate: asUtc(parsed.completionDate),
             },
           },
         },
@@ -313,12 +322,122 @@ export async function completeAddVisitAction(formData: FormData) {
         action: "ADD_VISIT_COMPLETED",
         reason: "Chemical-add field visit completed",
         changedById: user.id,
-        newValue: { performedDate: dateOnly(job.addVisit.scheduledDate) },
+        newValue: { performedDate: parsed.completionDate },
       },
     });
   });
   scheduleRefresh(job.id);
   redirect(`/calendar?job=${job.id}`);
+}
+
+export async function completeCleaningTowersAction(formData: FormData) {
+  const user = await requireRole([
+    UserRole.ADMIN,
+    UserRole.OPERATIONS_MANAGER,
+    UserRole.SCHEDULER,
+    UserRole.TECHNICIAN,
+  ]);
+  const parsed = z
+    .object({
+      jobId: z.string().min(1),
+      systemIds: z.array(z.string().min(1)).min(1),
+      completionDate: z.string().date(),
+    })
+    .parse({
+      jobId: formData.get("jobId"),
+      systemIds: formData.getAll("systemIds"),
+      completionDate: formData.get("completionDate"),
+    });
+  if (parsed.completionDate > todayDateOnly())
+    throw new Error("Actual cleaning cannot be recorded in the future.");
+
+  const targets = await db.cleaningJobTower.findMany({
+    where: {
+      cleaningJobId: parsed.jobId,
+      coolingTowerSystemId: { in: parsed.systemIds },
+      cleaningJob: {
+        building: { customer: { organizationId: user.organizationId } },
+      },
+    },
+    include: { cleaningJob: true },
+  });
+  if (targets.length !== new Set(parsed.systemIds).size)
+    throw new Error("Every selected tower must belong to this cleaning job.");
+  if (targets.some((target) => target.completedByServiceEventId))
+    throw new Error(
+      "One or more selected towers already has a cleaning record.",
+    );
+
+  await db.$transaction(async (tx) => {
+    for (const target of targets) {
+      const event = await tx.serviceEvent.create({
+        data: {
+          coolingTowerSystemId: target.coolingTowerSystemId,
+          eventType: "CLEANING_COMPLETED",
+          eventDate: asUtc(parsed.completionDate),
+          details: { cleaningJobId: parsed.jobId },
+          notes: "Completed from linked cleaning schedule",
+          recordedById: user.id,
+        },
+      });
+      await tx.cleaningJobTower.update({
+        where: { id: target.id },
+        data: { completedByServiceEventId: event.id },
+      });
+      await tx.visitActivity.updateMany({
+        where: {
+          visitId: target.cleaningJob.cleaningVisitId,
+          coolingTowerSystemId: target.coolingTowerSystemId,
+          status: ActivityStatus.PLANNED,
+        },
+        data: {
+          status: ActivityStatus.COMPLETED,
+          performedDate: asUtc(parsed.completionDate),
+        },
+      });
+      const projection = await rebuildSystemComplianceProjections(
+        tx,
+        target.coolingTowerSystemId,
+      );
+      await tx.auditLog.create({
+        data: {
+          entityType: "CleaningJobTower",
+          entityId: target.id,
+          action: "CLEANING_COMPLETED",
+          reason: "Recorded actual cleaning from linked cleaning job",
+          changedById: user.id,
+          newValue: {
+            cleaningJobId: parsed.jobId,
+            systemId: target.coolingTowerSystemId,
+            completionDate: parsed.completionDate,
+            serviceEventId: event.id,
+            generated: projection,
+          },
+        },
+      });
+    }
+
+    const cleaningVisitId = targets[0].cleaningJob.cleaningVisitId;
+    const remaining = await tx.visitActivity.count({
+      where: {
+        visitId: cleaningVisitId,
+        status: ActivityStatus.PLANNED,
+      },
+    });
+    if (remaining === 0)
+      await tx.visit.update({
+        where: { id: cleaningVisitId },
+        data: {
+          status: VisitStatus.COMPLETED,
+          performedDate: asUtc(parsed.completionDate),
+        },
+      });
+  });
+
+  scheduleRefresh(parsed.jobId);
+  for (const systemId of parsed.systemIds)
+    revalidatePath(`/systems/${systemId}`);
+  redirect(`/calendar?job=${parsed.jobId}&completed=1`);
 }
 
 export async function completeCleaningTowerAction(formData: FormData) {

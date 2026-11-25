@@ -40,8 +40,10 @@ describe("sample action queue", () => {
     const complete = sample("complete", "2026-07-01", "OUR_COMPANY", true);
 
     expect(sampleQueueState(reference)).toBe("REFERENCE_ONLY");
-    expect(matchesSampleQueueFilter(unknown, "ACTION_NEEDED")).toBe(true);
-    expect(matchesSampleQueueFilter(ours, "ACTION_NEEDED")).toBe(true);
+    expect(matchesSampleQueueFilter(unknown, "RESPONSIBILITY_NEEDED")).toBe(
+      true,
+    );
+    expect(matchesSampleQueueFilter(ours, "RESULTS_NEEDED")).toBe(true);
     expect(matchesSampleQueueFilter(customer, "WAITING")).toBe(true);
     expect(matchesSampleQueueFilter(complete, "COMPLETED")).toBe(true);
     expect(matchesSampleQueueFilter(reference, "WAITING")).toBe(true);

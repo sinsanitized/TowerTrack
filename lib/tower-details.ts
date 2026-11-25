@@ -5,7 +5,7 @@ import {
 } from "@/lib/compliance-intelligence";
 import { workingDaysRemaining } from "@/lib/date";
 
-export const towerDetailViews = [
+const towerDetailViews = [
   "overview",
   "obligations",
   "history",

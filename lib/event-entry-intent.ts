@@ -1,6 +1,6 @@
 import type { RegulatoryEventType } from "@/lib/obligation-engine";
 
-export const eventEntryIntentNames = [
+const eventEntryIntentNames = [
   "sample",
   "resample",
   "result",

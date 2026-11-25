@@ -58,4 +58,17 @@ test("scheduler creates and reviews linked chemical addition and cleaning visits
     page.getByRole("paragraph").filter({ hasText: "Calendar end-to-end test" }),
   ).toBeVisible();
   await expect(page.getByText(/Status: Planned/)).toHaveCount(2);
+
+  await page.getByLabel("Actual chemical addition date").fill("2026-11-06");
+  await page.getByRole("button", { name: "Record chemical addition" }).click();
+  await expect(
+    page.getByText("Status: Completed", { exact: true }),
+  ).toHaveCount(1);
+
+  const towerChoices = page.locator('input[name="systemIds"]');
+  await expect(towerChoices).toHaveCount(2);
+  await towerChoices.first().check();
+  await page.getByLabel("Actual cleaning date").fill("2026-11-07");
+  await page.getByRole("button", { name: "Record selected cleanings" }).click();
+  await expect(page.getByText("Cleaning recorded ✓")).toHaveCount(1);
 });

@@ -16,6 +16,7 @@ import { isUnverifiedLegacyEvent } from "@/lib/legacy-import/safety";
 import {
   compileTowerRuleConfig,
   composeTowerRuleProfiles,
+  resolveTowerRuleProfiles,
   type TowerRuleConfiguration,
 } from "@/lib/rule-profile";
 import { getComplianceStatus } from "@/lib/compliance-intelligence";
@@ -69,7 +70,7 @@ function obligationData(
   const id = projectionObligationId(
     category,
     obligation.triggerEventId,
-    obligation.obligationType,
+    obligation.identityKey ?? obligation.obligationType,
   );
   return {
     id,
@@ -188,20 +189,25 @@ function statusFromOpen(
   };
 }
 
+export async function lockSystemCompliance(tx: Tx, systemId: string) {
+  await tx.$queryRaw<Array<{ locked: string | null }>>`
+    SELECT pg_advisory_xact_lock(hashtextextended(${systemId}, 0))::text AS locked
+  `;
+}
+
 export async function rebuildSystemComplianceProjections(
   tx: Tx,
   systemId: string,
   today = todayDateOnly(),
 ) {
-  await tx.$queryRaw<Array<{ locked: string | null }>>`
-    SELECT pg_advisory_xact_lock(hashtextextended(${systemId}, 0))::text AS locked
-  `;
+  await lockSystemCompliance(tx, systemId);
   const system = await tx.coolingTowerSystem.findUniqueOrThrow({
     where: { id: systemId },
     include: {
       ruleProfile: {
         include: { rules: true },
       },
+      building: { include: { customer: { select: { organizationId: true } } } },
       ruleAssignments: {
         include: { ruleProfile: { include: { rules: true } } },
         orderBy: { effectiveStartDate: "asc" },
@@ -228,6 +234,7 @@ export async function rebuildSystemComplianceProjections(
   );
   const baseProfiles = await tx.ruleProfile.findMany({
     where: {
+      organizationId: null,
       jurisdictionMode: {
         in: ["NYC_CHAPTER_8_2026_PLUS_NYS_PART_4", "NYS_PART_4_ONLY"],
       },
@@ -254,7 +261,13 @@ export async function rebuildSystemComplianceProjections(
     tx.reportingObligation.deleteMany({
       where: {
         coolingTowerSystemId: systemId,
-        triggerEvent: { status: { not: "ACTIVE" } },
+        OR: [
+          { triggerEvent: { status: { not: "ACTIVE" } } },
+          {
+            completedByEventId: { not: null },
+            completedByEvent: { status: { not: "ACTIVE" } },
+          },
+        ],
       },
     }),
     tx.maintenanceObligation.deleteMany({
@@ -264,6 +277,15 @@ export async function rebuildSystemComplianceProjections(
       },
     }),
   ]);
+  await tx.reportingObligation.updateMany({
+    where: {
+      coolingTowerSystemId: systemId,
+      obligationType: "NYS_ANNUAL_CERTIFICATION",
+      status: { in: ["PENDING", "SCHEDULED", "OVERDUE"] },
+      latestDueDate: { lt: asUtc(today) },
+    },
+    data: { status: "MISSED" },
+  });
   const priorMissedRows = await Promise.all([
     tx.sampleObligation.findMany({
       where: { coolingTowerSystemId: systemId, status: "MISSED" },
@@ -341,9 +363,16 @@ export async function rebuildSystemComplianceProjections(
         (!profile.effectiveEndDate ||
           dateOnly(profile.effectiveEndDate) >= date),
     );
+    const availableProfiles = resolveTowerRuleProfiles({
+      configuration,
+      sharedProfiles: datedBaseProfiles,
+      assignedProfile,
+      hasExplicitAssignment: Boolean(assignment),
+      organizationId: system.building.customer.organizationId,
+    });
     const composed = composeTowerRuleProfiles(
       configuration,
-      configuration === "CUSTOM" ? [assignedProfile] : datedBaseProfiles,
+      availableProfiles,
       assignedProfile.id,
     );
     return compileTowerRuleConfig(composed, {
@@ -352,6 +381,53 @@ export async function rebuildSystemComplianceProjections(
       monthlyTargetEndDay: system.monthlyTargetEndDay,
     });
   };
+
+  const annualTriggerEventId = system.serviceEvents[0]?.id;
+  const currentCertificationYear = Number(today.slice(0, 4));
+  const explicitCertificationYears = system.serviceEvents
+    .filter((event) => {
+      const details = event.details as { reportType?: unknown } | null;
+      return (
+        event.eventType === "REPORT_SUBMITTED" &&
+        details?.reportType === "NYS_ANNUAL_CERTIFICATION"
+      );
+    })
+    .map((event) => detailNumber(event.details, "certificationYear"))
+    .filter(
+      (year): year is number =>
+        year != null && Number.isInteger(year) && year >= 2000 && year <= 2200,
+    );
+  const ensureAnnualCertification = async (year: number) => {
+    if (!annualTriggerEventId) return;
+    const config = ruleConfigForDate(`${year}-11-01`, operating);
+    if (!config.includesNys || !config.annualCertificationEnabled) return;
+    const annual = annualNysCertificationObligation(
+      annualTriggerEventId,
+      year,
+      config.ruleSetVersion ?? system.ruleProfile.id,
+      config.sourceCitations?.annualCertification ?? undefined,
+    );
+    await tx.reportingObligation.createMany({
+      data: [
+        {
+          ...obligationData(
+            annual,
+            systemId,
+            today,
+            "REPORTING_ACTION",
+            previouslyMissedIds,
+          ),
+          obligationType: annual.obligationType,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  };
+  for (const year of new Set([
+    currentCertificationYear,
+    ...explicitCertificationYears,
+  ]))
+    await ensureAnnualCertification(year);
 
   for (const stored of system.serviceEvents) {
     const event: RegulatoryEventInput = {
@@ -369,6 +445,7 @@ export async function rebuildSystemComplianceProjections(
         stored.details,
         "reportingObligationId",
       ),
+      triggeringEventId: detailString(stored.details, "triggeringEventId"),
     };
 
     if (event.type === "STARTUP") {
@@ -437,13 +514,12 @@ export async function rebuildSystemComplianceProjections(
           obligationType: event.reportType,
           ...(event.reportingObligationId
             ? { id: event.reportingObligationId }
+            : { id: "__unresolved_legacy_reporting_period__" }),
+          ...(event.triggeringEventId
+            ? { triggerEventId: event.triggeringEventId }
             : {}),
           status: { in: ["PENDING", "SCHEDULED", "OVERDUE", "MISSED"] },
           earliestDueDate: { lte: stored.eventDate },
-          OR: [
-            { latestDueDate: null },
-            { latestDueDate: { gte: stored.eventDate } },
-          ],
         },
         data: { status: "COMPLETED", completedByEventId: event.id },
       });
@@ -723,40 +799,20 @@ export async function rebuildSystemComplianceProjections(
 
   if (
     currentRuleConfig.includesNys &&
-    system.serviceEvents.length &&
-    currentRuleConfig.annualCertificationEnabled
+    currentRuleConfig.annualCertificationEnabled &&
+    annualTriggerEventId
   ) {
-    const currentYear = Number(today.slice(0, 4));
-    const completedCurrentYear = system.serviceEvents.find((item) => {
-      const details = item.details as { reportType?: unknown } | null;
-      return (
-        item.eventType === "REPORT_SUBMITTED" &&
-        details?.reportType === "NYS_ANNUAL_CERTIFICATION" &&
-        dateOnly(item.eventDate).startsWith(`${currentYear}-`)
-      );
-    });
-    const obligationYear = completedCurrentYear ? currentYear + 1 : currentYear;
-    const annual = annualNysCertificationObligation(
-      system.serviceEvents[0].id,
-      obligationYear,
-      currentRuleConfig.ruleSetVersion ?? system.ruleProfile.id,
-      currentRuleConfig.sourceCitations?.annualCertification ?? undefined,
+    const currentAnnualId = projectionObligationId(
+      "REPORTING_ACTION",
+      annualTriggerEventId,
+      `NYS_ANNUAL_CERTIFICATION:${currentCertificationYear}`,
     );
-    await tx.reportingObligation.createMany({
-      data: [
-        {
-          ...obligationData(
-            annual,
-            systemId,
-            today,
-            "REPORTING_ACTION",
-            previouslyMissedIds,
-          ),
-          obligationType: annual.obligationType,
-        },
-      ],
-      skipDuplicates: true,
+    const currentAnnual = await tx.reportingObligation.findUnique({
+      where: { id: currentAnnualId },
+      select: { status: true },
     });
+    if (currentAnnual?.status === "COMPLETED")
+      await ensureAnnualCertification(currentCertificationYear + 1);
   }
 
   const markMissed = {

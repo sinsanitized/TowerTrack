@@ -7,6 +7,7 @@ const anchor = (
   portalObligations: Array<{
     status: string;
     submittedDate: string | null;
+    dueDate?: string | null;
   }> = [],
 ) => ({ sampleId, sampleCollectedDate, portalObligations });
 
@@ -44,6 +45,26 @@ describe("previous qualifying Legionella summary", () => {
       sampleCollectedDate: "2026-07-08",
       portalReportingStatus: "NOT_SUBMITTED",
       portalSubmittedDate: null,
+    });
+  });
+
+  it("labels a portal submission after its retained deadline as completed late", () => {
+    expect(
+      previousLegionellaSummary({
+        ruleConfiguration: "NYC_AND_NYS",
+        anchors: [
+          anchor("sample", "2026-07-08", [
+            {
+              status: "COMPLETED",
+              submittedDate: "2026-07-20",
+              dueDate: "2026-07-13",
+            },
+          ]),
+        ],
+      }),
+    ).toMatchObject({
+      portalReportingStatus: "SUBMITTED_LATE",
+      portalSubmittedDate: "2026-07-20",
     });
   });
 

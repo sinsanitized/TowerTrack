@@ -1,5 +1,6 @@
 export type LegionellaSampleReportingStatus =
   | "SUBMITTED"
+  | "SUBMITTED_LATE"
   | "NOT_SUBMITTED"
   | "SUBMISSION_DATE_MISSING"
   | "NOT_APPLICABLE"
@@ -19,6 +20,7 @@ export type RoutineLegionellaAnchor = {
   portalObligations: Array<{
     status: string;
     submittedDate: string | null;
+    dueDate?: string | null;
   }>;
 };
 
@@ -81,10 +83,15 @@ export function previousLegionellaSummary(input: {
     return {
       sampleId: anchor.sampleId,
       sampleCollectedDate: anchor.sampleCollectedDate,
-      portalReportingStatus: "SUBMITTED",
+      portalReportingStatus:
+        submitted.dueDate && submitted.submittedDate > submitted.dueDate
+          ? "SUBMITTED_LATE"
+          : "SUBMITTED",
       portalSubmittedDate: submitted.submittedDate,
       explanation:
-        "The previous qualifying sample was submitted to the NYC portal.",
+        submitted.dueDate && submitted.submittedDate > submitted.dueDate
+          ? "The previous qualifying sample was submitted to the NYC portal after its deadline."
+          : "The previous qualifying sample was submitted to the NYC portal.",
     };
   if (submitted)
     return {

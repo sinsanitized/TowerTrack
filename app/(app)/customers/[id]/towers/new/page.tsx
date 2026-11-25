@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { createCoolingTowerSystemAction } from "@/app/actions";
+import { createCoolingTowerSystemAction } from "@/app/actions/towers";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
@@ -91,7 +91,7 @@ export default async function NewCoolingTowerPage({
             <input
               className="field mt-1"
               name="systemName"
-              defaultValue="CT-1"
+              placeholder="Example: CT-1"
               required
             />
           </label>

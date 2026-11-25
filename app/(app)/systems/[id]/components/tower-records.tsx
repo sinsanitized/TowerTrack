@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ServiceEventStatus, ServiceEventType } from "@prisma/client";
-import { voidServiceEventAction } from "@/app/actions";
+import { voidServiceEventAction } from "@/app/actions/service-events";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitButton } from "@/components/submit-button";
+import { ClickableRow } from "@/components/clickable-row";
 import { dateOnly, formatDate } from "@/lib/date";
 import { eventEntryHref } from "@/lib/event-entry-intent";
 import { plainEnumLabel } from "@/lib/labels";
@@ -20,48 +21,6 @@ type RecordSummary = {
   performedByResponsibility: ServiceResponsibility;
   externalProviderName: string | null;
 };
-
-export function RecentTowerActivity({
-  systemId,
-  events,
-}: {
-  systemId: string;
-  events: RecordSummary[];
-}) {
-  return (
-    <section className="panel p-5 lg:col-span-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="label">Latest completed records</div>
-          <h2 className="mt-1 font-black">Recent activity</h2>
-        </div>
-        <Link className="btn" href={`/systems/${systemId}?view=history`}>
-          View full history
-        </Link>
-      </div>
-      <div className="mt-4 space-y-3">
-        {events.map((event) => (
-          <Link
-            key={event.id}
-            href={`/systems/${systemId}/events/${event.id}`}
-            className="block border-b pb-3 text-sm last:border-0"
-          >
-            <div className="font-bold">{plainEnumLabel(event.eventType)}</div>
-            <div className="text-slate-500">
-              <time dateTime={dateOnly(event.eventDate)}>
-                {formatDate(event.eventDate)}
-              </time>{" "}
-              · {plainEnumLabel(event.status)}
-            </div>
-          </Link>
-        ))}
-        {!events.length && (
-          <p className="text-sm text-slate-500">No events recorded yet.</p>
-        )}
-      </div>
-    </section>
-  );
-}
 
 export function TowerComplianceRecords({
   systemId,
@@ -137,8 +96,11 @@ export function TowerComplianceRecords({
         <div className="mt-4 space-y-3">
           {events.length ? (
             events.map((event) => (
-              <article
+              <ClickableRow
+                as="article"
                 key={event.id}
+                href={`/systems/${systemId}/events/${event.id}${event.status === "ACTIVE" ? "?edit=1" : ""}`}
+                label={`View ${plainEnumLabel(event.eventType)} from ${formatDate(event.eventDate)}`}
                 className="group grid gap-3 rounded-xl border border-slate-200 p-4 transition hover:border-emerald-700 hover:shadow-sm lg:grid-cols-[1fr_auto]"
               >
                 <Link href={`/systems/${systemId}/events/${event.id}`}>
@@ -150,7 +112,9 @@ export function TowerComplianceRecords({
                     {plainEnumLabel(event.eventType)}
                   </div>
                   <div className="text-sm text-slate-500">
-                    {formatDate(event.eventDate)}
+                    <time dateTime={dateOnly(event.eventDate)}>
+                      {formatDate(event.eventDate)}
+                    </time>
                     {event.correctedFromEventId
                       ? " · corrected replacement"
                       : ""}
@@ -189,7 +153,7 @@ export function TowerComplianceRecords({
                       : "View audit record →"}
                   </Link>
                 </div>
-              </article>
+              </ClickableRow>
             ))
           ) : (
             <p className="text-sm text-slate-500">

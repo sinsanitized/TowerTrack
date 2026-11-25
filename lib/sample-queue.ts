@@ -1,7 +1,8 @@
 import type { ServiceResponsibility } from "@/lib/service-responsibility";
 
 export const sampleQueueFilters = [
-  "ACTION_NEEDED",
+  "RESULTS_NEEDED",
+  "RESPONSIBILITY_NEEDED",
   "WAITING",
   "COMPLETED",
 ] as const;
@@ -38,8 +39,9 @@ export function matchesSampleQueueFilter(
   filter: SampleQueueFilter,
 ) {
   const state = sampleQueueState(item);
-  if (filter === "ACTION_NEEDED")
-    return state === "ACTION_NEEDED" || state === "RESPONSIBILITY_UNKNOWN";
+  if (filter === "RESULTS_NEEDED") return state === "ACTION_NEEDED";
+  if (filter === "RESPONSIBILITY_NEEDED")
+    return state === "RESPONSIBILITY_UNKNOWN";
   if (filter === "WAITING")
     return state === "WAITING_EXTERNAL" || state === "REFERENCE_ONLY";
   return state === "COMPLETED";

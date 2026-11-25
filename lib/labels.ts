@@ -1,33 +1,3 @@
-const activityLabels: Record<string, string> = {
-  ROUTINE_LEGIONELLA_SAMPLE: "Legionella sample",
-  STARTUP_LEGIONELLA_SAMPLE: "Startup Legionella sample",
-  POST_HYPERHALOGENATION_SAMPLE: "Post-hyperhalogenation sample",
-  CORRECTIVE_RETEST: "Corrective retest",
-  EMERGENCY_SAMPLE: "Emergency sample",
-  ROUTINE_BACTERIOLOGICAL_SAMPLE: "Bacteriological sample",
-  WATER_QUALITY_MONITORING: "Water-quality monitoring",
-  COMPLIANCE_INSPECTION: "Compliance inspection",
-  ROUTINE_CLEANING: "Routine cleaning",
-  STARTUP_CLEANING: "Startup cleaning",
-  CLEANING: "Cleaning",
-  DISINFECTION: "Disinfection",
-  CLEANING_AND_DISINFECTION: "Cleaning and disinfection",
-  SUMMERTIME_HYPERHALOGENATION: "Summertime hyperhalogenation",
-  CORRECTIVE_DISINFECTION: "Corrective disinfection — biocide adjustment",
-  FULL_REMEDIATION: "Full remediation — drain, clean, and flush",
-  STARTUP: "Startup",
-  SHUTDOWN: "Shutdown",
-  NO_CIRCULATION_EVENT: "No-circulation event",
-  PORTAL_SUBMISSION: "Portal submission",
-  LAB_RESULT: "Laboratory result",
-  OWNER_NOTIFICATION: "Owner notification",
-  OTHER: "Other activity",
-};
-
-export function activityLabel(value: string): string {
-  return activityLabels[value] ?? plainEnumLabel(value);
-}
-
 export function plainEnumLabel(value: string): string {
   const text = lowercaseWithJurisdictionAcronyms(value.replaceAll("_", " "));
   return text.charAt(0).toUpperCase() + text.slice(1);

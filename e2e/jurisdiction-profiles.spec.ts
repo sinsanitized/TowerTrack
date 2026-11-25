@@ -15,11 +15,9 @@ test.beforeEach(async ({ page }) => {
 test("tower settings derive effective-dated compliance rules from location", async ({
   page,
 }) => {
-  await page.goto("/deadlines?configuration=NYC_AND_NYS");
-  const table = page.getByRole("table", {
-    name: "All cooling tower required work",
-  });
-  await table.locator('tbody a[href^="/systems/"]').first().click();
+  const search = page.getByRole("combobox", { name: "Find a tower" });
+  await search.fill("JOB-1002");
+  await page.getByRole("option").first().click();
   await page
     .getByLabel("Tower workspace")
     .getByRole("link", { name: "Settings", exact: true })
@@ -40,6 +38,19 @@ test("tower settings derive effective-dated compliance rules from location", asy
     .click();
   const jurisdiction = page.getByLabel(/Tower jurisdiction/);
   await expect(jurisdiction).toBeVisible();
+  await jurisdiction.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        const ready = () =>
+          Object.keys(element).some((key) => key.startsWith("__reactProps$"));
+        if (ready()) return resolve();
+        const interval = window.setInterval(() => {
+          if (!ready()) return;
+          window.clearInterval(interval);
+          resolve();
+        }, 10);
+      }),
+  );
   await expect(
     page.getByRole("heading", { name: "New York City regulatory program" }),
   ).toBeVisible();
@@ -53,19 +64,16 @@ test("tower settings derive effective-dated compliance rules from location", asy
   await expect(
     page.getByText(/Using: Pending Regulation Review/),
   ).toBeVisible();
-  await expect(page.getByLabel(/^Effective date/)).toBeVisible();
+  await expect(page.getByText(/Effective today/)).toBeVisible();
 });
 
 test("hyperhalogenation entry opens the date-only focused form", async ({
   page,
 }) => {
-  await page.goto("/deadlines");
-  const towerHref = await page
-    .getByRole("table", { name: "All cooling tower required work" })
-    .locator('tbody a[href^="/systems/"]')
-    .first()
-    .getAttribute("href");
-  expect(towerHref).toBeTruthy();
+  const search = page.getByRole("combobox", { name: "Find a tower" });
+  await search.fill("JOB-1002");
+  await page.getByRole("option").first().click();
+  const towerHref = new URL(page.url()).pathname;
   await page.goto(`${towerHref}?record=hyperhalogenation#record-event`);
   await expect(page).toHaveURL(/record=hyperhalogenation/);
   await expect(

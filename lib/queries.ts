@@ -385,6 +385,7 @@ export async function complianceDashboardRows({
                 where: { obligationType: "PORTAL_SAMPLE_DATE" },
                 select: {
                   status: true,
+                  latestDueDate: true,
                   completedByEvent: {
                     select: { eventDate: true, status: true },
                   },
@@ -545,6 +546,9 @@ export async function complianceDashboardRows({
                 report.completedByEvent?.status === "ACTIVE"
                   ? dateOnly(report.completedByEvent.eventDate)
                   : null,
+              dueDate: report.latestDueDate
+                ? dateOnly(report.latestDueDate)
+                : null,
             }),
           ),
         })),

@@ -22,8 +22,9 @@ import { withReturnPath } from "@/lib/workflow-context";
 import { eventEntryHref } from "@/lib/event-entry-intent";
 
 const filterLabels: Record<SampleQueueFilter, string> = {
-  ACTION_NEEDED: "Action needed",
-  WAITING: "Waiting / reference",
+  RESULTS_NEEDED: "Enter results",
+  RESPONSIBILITY_NEEDED: "Responsibility needed",
+  WAITING: "Waiting externally",
   COMPLETED: "Completed",
 };
 
@@ -68,7 +69,7 @@ function requestedFilter(
   return typeof value === "string" &&
     sampleQueueFilters.includes(value as SampleQueueFilter)
     ? (value as SampleQueueFilter)
-    : "ACTION_NEEDED";
+    : "RESULTS_NEEDED";
 }
 
 export default async function SamplesPage({
@@ -132,20 +133,17 @@ export default async function SamplesPage({
     coolingTowerSystem: {
       AND: [
         baseSystemWhere,
-        requestedFilter === "ACTION_NEEDED"
-          ? {
-              OR: [
-                { laboratoryResultResponsibility: null },
-                { laboratoryResultResponsibility: "OUR_COMPANY" },
-              ],
-            }
-          : requestedFilter === "WAITING"
-            ? {
-                laboratoryResultResponsibility: {
-                  in: ["CUSTOMER", "OTHER_VENDOR", "NOT_TRACKED"],
-                },
-              }
-            : {},
+        requestedFilter === "RESULTS_NEEDED"
+          ? { laboratoryResultResponsibility: "OUR_COMPANY" }
+          : requestedFilter === "RESPONSIBILITY_NEEDED"
+            ? { laboratoryResultResponsibility: null }
+            : requestedFilter === "WAITING"
+              ? {
+                  laboratoryResultResponsibility: {
+                    in: ["CUSTOMER", "OTHER_VENDOR", "NOT_TRACKED"],
+                  },
+                }
+              : {},
       ],
     },
   });
@@ -186,9 +184,10 @@ export default async function SamplesPage({
     })),
   );
   const counts: Record<SampleQueueFilter, number> = {
-    ACTION_NEEDED: filterCounts[0],
-    WAITING: filterCounts[1],
-    COMPLETED: filterCounts[2],
+    RESULTS_NEEDED: filterCounts[0],
+    RESPONSIBILITY_NEEDED: filterCounts[1],
+    WAITING: filterCounts[2],
+    COMPLETED: filterCounts[3],
   };
   const visibleSamples = queue.filter((item) =>
     matchesSampleQueueFilter(item, filter),
@@ -216,19 +215,21 @@ export default async function SamplesPage({
         </div>
       )}
       <section
-        className="mb-5 grid gap-3 sm:grid-cols-3"
+        className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
         aria-label="Sample status summary"
       >
         {sampleQueueFilters.map((item) => {
           const selected = filter === item;
           const color =
-            item === "ACTION_NEEDED"
+            item === "RESULTS_NEEDED"
               ? "border-amber-400 bg-amber-50 text-amber-950"
-              : item === "WAITING"
+              : item === "RESPONSIBILITY_NEEDED"
                 ? "border-purple-300 bg-purple-50 text-purple-950"
-                : item === "COMPLETED"
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-950"
-                  : "border-slate-300 bg-white text-slate-800";
+                : item === "WAITING"
+                  ? "border-purple-300 bg-purple-50 text-purple-950"
+                  : item === "COMPLETED"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+                    : "border-slate-300 bg-white text-slate-800";
           return (
             <Link
               key={item}
@@ -248,11 +249,13 @@ export default async function SamplesPage({
       >
         <input type="hidden" name="status" value={filter} />
         <p className="text-sm font-bold text-slate-700 sm:col-span-3">
-          {filter === "ACTION_NEEDED"
-            ? "Start with the oldest sample. Enter its laboratory result or assign responsibility."
-            : filter === "WAITING"
-              ? "These results are handled by another party. Follow up only when needed."
-              : "These results are complete. Open a row to review its record."}
+          {filter === "RESULTS_NEEDED"
+            ? "Start with the oldest sample and enter the laboratory result shown on its report."
+            : filter === "RESPONSIBILITY_NEEDED"
+              ? "Assign who handles laboratory results before expecting result-entry work in your queue."
+              : filter === "WAITING"
+                ? "These results are handled by another party. Follow up only when needed."
+                : "These results are complete. Open a row to review its record."}
         </p>
         <label className="grow">
           <span className="label">
@@ -269,7 +272,7 @@ export default async function SamplesPage({
         <button className={buttonClass("secondary", "min-h-11 justify-center")}>
           Search
         </button>
-        {(search || filter !== "ACTION_NEEDED") && (
+        {(search || filter !== "RESULTS_NEEDED") && (
           <Link
             className={buttonClass("secondary", "min-h-11 justify-center")}
             href="/samples"

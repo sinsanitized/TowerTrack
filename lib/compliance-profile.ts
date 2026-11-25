@@ -8,14 +8,6 @@ export function complianceJurisdictionForConfiguration(
   return "CUSTOM";
 }
 
-export function complianceJurisdictionForMode(
-  mode: string,
-): ComplianceJurisdiction {
-  if (mode === "NYC_CHAPTER_8_2026_PLUS_NYS_PART_4") return "NYC";
-  if (mode === "NYS_PART_4_ONLY") return "NYS";
-  return "CUSTOM";
-}
-
 export function complianceJurisdictionLabel(
   jurisdiction: ComplianceJurisdiction,
 ) {

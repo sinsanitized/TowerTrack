@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { updateServiceResponsibilityAction } from "@/app/actions/service-events";
 import {
   changeTowerRuleConfigurationAction,
   updateCustomerTowerAction,
-  updateServiceResponsibilityAction,
-} from "@/app/actions";
+} from "@/app/actions/towers";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
@@ -376,16 +376,16 @@ export default async function EditCustomerTowerPage({
               <label>
                 <span className="label">Effective date</span>
                 <input
-                  className="field mt-1"
                   name="effectiveDate"
-                  type="date"
-                  min={todayDateOnly()}
-                  max={todayDateOnly()}
-                  defaultValue={todayDateOnly()}
-                  required
+                  type="hidden"
+                  value={todayDateOnly()}
                 />
+                <div className="field mt-1 bg-slate-50 font-bold">
+                  Effective today · {formatDate(todayDateOnly())}
+                </div>
                 <span className="mt-1 block text-xs text-slate-600">
-                  Enter the date as month, day, and year.
+                  Rule changes are effective immediately and are saved in the
+                  audit history.
                 </span>
               </label>
               <label>

@@ -1,9 +1,8 @@
 import { diffDays } from "@/lib/date";
 
-export type CoverageColor =
-  "GREEN" | "YELLOW" | "RED" | "BLUE" | "GRAY" | "PURPLE";
+type CoverageColor = "GREEN" | "YELLOW" | "RED" | "BLUE" | "GRAY" | "PURPLE";
 
-export type CoverageRequirement = {
+type CoverageRequirement = {
   id: string;
   type: string;
   sourceRule: string;
@@ -93,7 +92,7 @@ function dateInsideWindow(date: string, requirement: CoverageRequirement) {
   return Boolean(start && end && date >= start && date <= end);
 }
 
-export function obligationName(requirement: CoverageRequirement) {
+function obligationName(requirement: CoverageRequirement) {
   const text =
     `${requirement.sourceRule} ${requirement.explanation}`.toLowerCase();
   if (requirement.type === "LAB_RESULT") return "Laboratory result";

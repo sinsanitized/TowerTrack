@@ -38,6 +38,7 @@ export interface RegulatoryEventInput {
   residualRestoredWithin3Days?: boolean | null;
   reportType?: string | null;
   reportingObligationId?: string | null;
+  triggeringEventId?: string | null;
 }
 
 export interface TowerRuleConfig {
@@ -94,6 +95,7 @@ export interface TowerRuleConfig {
 export interface ProjectedObligation {
   triggerEventId: string;
   obligationType: string;
+  identityKey?: string;
   earliestDueDate: string | null;
   targetStartDate: string | null;
   targetEndDate: string | null;
@@ -131,14 +133,6 @@ export function annualCleaningProgress(cleaningDates: string[], year: number) {
     remaining: Math.max(0, required - dates.length),
     lastCompletedDate: dates.at(-1) ?? null,
   };
-}
-
-export function annualCleaningObligationId(
-  systemId: string,
-  year: number,
-  completed: number,
-) {
-  return `annual-cleaning:${systemId}:${year}:${completed + 1}`;
 }
 
 export function nextAnnualCleaningObligation(input: {
@@ -796,6 +790,7 @@ export function annualNysCertificationObligation(
   return {
     triggerEventId,
     obligationType: "NYS_ANNUAL_CERTIFICATION",
+    identityKey: `NYS_ANNUAL_CERTIFICATION:${year}`,
     earliestDueDate: `${year}-01-01`,
     targetStartDate: `${year}-10-01`,
     targetEndDate: `${year}-11-01`,

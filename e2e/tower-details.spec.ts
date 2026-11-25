@@ -12,7 +12,11 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL("/");
 
   await page.goto("/towers");
-  await page.locator("article[role='link']").first().click();
+  await page
+    .locator("article[data-action-label]")
+    .first()
+    .getByRole("link", { name: /^Open / })
+    .click();
   await expect(page).toHaveURL(/\/systems\//);
 });
 
@@ -58,9 +62,7 @@ test("tower details uses focused role-aware views", async ({ page }) => {
   const cancel = drawer.getByRole("button", { name: "Cancel", exact: true });
   await expect(saveEvent).toHaveClass(/btn-primary/);
   await expect(cancel).not.toHaveClass(/btn-primary/);
-  await expect(
-    drawer.getByRole("heading", { name: "Save impact" }),
-  ).toBeVisible();
+  await expect(drawer.getByText(/^Save impact —/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
   await expect(recordButton).toBeFocused();
@@ -112,13 +114,18 @@ test("tower details uses focused role-aware views", async ({ page }) => {
 test("samples prioritize action and expose clear status views", async ({
   page,
 }) => {
-  await page.getByRole("link", { name: "Samples", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Samples" })).toBeVisible();
+  await page.goto("/samples");
   await expect(
-    page.getByRole("link", { name: /Action needed/ }),
+    page.getByRole("heading", { name: "Samples", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Enter results/ }),
   ).toHaveAttribute("aria-current", "page");
   await expect(
-    page.getByRole("link", { name: /Waiting \/ reference/ }),
+    page.getByRole("link", { name: /Responsibility needed/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Waiting externally/ }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /Completed/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /All samples/ })).toHaveCount(0);
@@ -134,7 +141,7 @@ test("records are ordered by completed event date, newest first", async ({
 }) => {
   await page.getByRole("link", { name: "Tower records", exact: true }).click();
   const dates = await page
-    .locator("main time")
+    .locator("#regulatory-events time")
     .evaluateAll((items) =>
       items.map((item) => item.getAttribute("datetime") || ""),
     );

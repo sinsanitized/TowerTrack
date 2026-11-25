@@ -54,10 +54,6 @@ export function isAnnualCleaningActivity(activityType: string) {
   return ANNUAL_CLEANING_ACTIVITY_TYPES.has(activityType);
 }
 
-export function isCleaningCompletionEvent(eventType: string) {
-  return CLEANING_EVENT_TYPES.has(eventType);
-}
-
 export function annualCleaningCompletionDates(
   events: Array<{ eventType: string; eventDate: string | Date }>,
 ) {

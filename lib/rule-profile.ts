@@ -19,6 +19,7 @@ export type CompilableRuleDefinition = {
 
 export type CompilableRuleProfile = {
   id: string;
+  organizationId?: string | null;
   jurisdictionMode: string;
   legionellaIntervalDays: number | null;
   internalTargetIntervalDays: number | null;
@@ -26,9 +27,53 @@ export type CompilableRuleProfile = {
   includedJurisdictionModes?: string[];
 };
 
+export function resolveTowerRuleProfiles(input: {
+  configuration: TowerRuleConfiguration;
+  sharedProfiles: CompilableRuleProfile[];
+  assignedProfile: CompilableRuleProfile;
+  hasExplicitAssignment: boolean;
+  organizationId: string;
+}) {
+  const sharedByMode = new Map<string, CompilableRuleProfile>();
+  for (const profile of input.sharedProfiles) {
+    if (profile.organizationId != null) continue;
+    if (!sharedByMode.has(profile.jurisdictionMode))
+      sharedByMode.set(profile.jurisdictionMode, profile);
+  }
+
+  if (input.configuration === "CUSTOM") {
+    if (
+      input.assignedProfile.organizationId != null &&
+      input.assignedProfile.organizationId !== input.organizationId
+    )
+      throw new RuleConfigurationError(input.assignedProfile.id, [
+        "ORGANIZATION_SCOPE",
+      ]);
+    return [input.assignedProfile];
+  }
+
+  if (input.hasExplicitAssignment) {
+    const owner = input.assignedProfile.organizationId;
+    if (owner != null && owner !== input.organizationId)
+      throw new RuleConfigurationError(input.assignedProfile.id, [
+        "ORGANIZATION_SCOPE",
+      ]);
+    sharedByMode.set(
+      input.assignedProfile.jurisdictionMode,
+      input.assignedProfile,
+    );
+  }
+
+  const requiredModes =
+    input.configuration === "NYC_AND_NYS" ? [NYC_MODE, NYS_MODE] : [NYS_MODE];
+  return requiredModes
+    .map((mode) => sharedByMode.get(mode))
+    .filter((profile): profile is CompilableRuleProfile => Boolean(profile));
+}
+
 export type TowerRuleConfiguration = "NYC_AND_NYS" | "NYS_ONLY" | "CUSTOM";
 
-export type RuleReference = {
+type RuleReference = {
   profileId: string;
   ruleId: string;
   authority: string;
@@ -72,7 +117,7 @@ function maximumDefined(values: Array<number | null>) {
   return defined.length ? Math.max(...defined) : null;
 }
 
-export function compatibleRuleKey(rule: CompilableRuleDefinition) {
+function compatibleRuleKey(rule: CompilableRuleDefinition) {
   return [
     rule.requirementType,
     rule.dueDateCalculation ?? "UNSPECIFIED",

@@ -1,11 +1,3 @@
-export const COMPANY_WORK_CALENDAR_RULESET_VERSION = "US_FEDERAL_2026.1";
-
-export const COMPANY_HOLIDAY_POLICY = {
-  excludesFederalHoliday: "Veterans Day",
-  additionalHoliday: "Day after Thanksgiving",
-  observesWeekendFederalHolidays: true,
-} as const;
-
 function isoDate(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }

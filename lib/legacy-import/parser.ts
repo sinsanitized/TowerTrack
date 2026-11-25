@@ -1,7 +1,7 @@
 import readXlsxFile, { type CellValue } from "read-excel-file/node";
 import { createHash } from "node:crypto";
 
-export type LegacyEvent = {
+type LegacyEvent = {
   eventType:
     "ROUTINE_LEGIONELLA_SAMPLE_COLLECTED" | "SUMMERTIME_HYPERHALOGENATION";
   date: string;
@@ -51,7 +51,7 @@ const monthBlocks = [
   { start: 58, end: 69, year: 2025 },
 ] as const;
 
-export const legacyColumnMapping = [
+const legacyColumnMapping = [
   {
     columns: "I",
     year: 2020,
@@ -74,7 +74,7 @@ export const legacyColumnMapping = [
   },
 ];
 
-export function columnName(index: number) {
+function columnName(index: number) {
   let value = index;
   let result = "";
   while (value > 0) {
